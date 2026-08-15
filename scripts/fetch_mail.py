@@ -67,6 +67,18 @@ def load_env(workspace):
     return out
 
 
+def is_placeholder(value):
+    """True for the untouched values shipped in .env.example."""
+    value = (value or "").strip()
+    if not value:
+        return True
+    lowered = value.lower()
+    if lowered in ("you@gmail.com", "you@example.com", "your@email.com"):
+        return True
+    # A run of x's is the stand-in for the 16-character app password.
+    return set(lowered) <= {"x"}
+
+
 def load_config(workspace):
     path = os.path.join(workspace, "config.yaml")
     defaults = {
@@ -368,11 +380,13 @@ def main():
     if cfg["imap"].get("host") in (None, "", "imap.gmail.com"):
         cfg["imap"]["host"] = env.get("IMAP_HOST") or cfg["imap"].get("host") or "imap.gmail.com"
 
-    if not user or not password:
+    if is_placeholder(user) or is_placeholder(password):
         print(json.dumps({
             "error": "missing_credentials",
-            "hint": "Set IMAP_USER and IMAP_PASSWORD in %s/.env (see .env.example)"
-                    % ws,
+            "hint": "Fill in IMAP_USER and IMAP_PASSWORD in %s/.env — it still "
+                    "holds the placeholders from .env.example." % ws,
+            "gmail": "Needs an App Password (2FA on): "
+                     "https://myaccount.google.com/apppasswords",
         }, indent=2))
         return 2
 
@@ -385,8 +399,16 @@ def main():
                               "user": user, "folder": cfg["imap"].get("folder")}, indent=2))
             return 0 if typ == "OK" else 1
         except Exception as exc:  # noqa: BLE001 - surface any IMAP failure verbatim
-            print(json.dumps({"ok": False, "error": type(exc).__name__,
-                              "detail": str(exc)[:300]}, indent=2))
+            detail = str(exc)[:300]
+            result = {"ok": False, "error": type(exc).__name__, "detail": detail}
+            if "AUTHENTICATIONFAILED" in detail.upper():
+                result["hint"] = (
+                    "IMAP rejected the login. Gmail does not accept your account "
+                    "password here — generate an App Password at "
+                    "https://myaccount.google.com/apppasswords (requires 2FA) and "
+                    "put it in %s/.env" % ws
+                )
+            print(json.dumps(result, indent=2))
             return 1
 
     state = load_state(ws)
