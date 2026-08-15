@@ -1,0 +1,48 @@
+#!/bin/sh
+# Block accidental commits of credentials or personal data.
+# Install with ./install.sh, or: git config core.hooksPath .githooks
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+fail=0
+note() { printf '  \033[31m%s\033[0m  %s\n' "$1" "$2"; fail=1; }
+
+# --- path rules -----------------------------------------------------------
+for f in $staged; do
+  case "$f" in
+    .env|.env.local|.env.*)
+      [ "$f" = ".env.example" ] || note "$f" "credentials file" ;;
+    config.yaml)
+      note "$f" "real config — commit config.example.yaml instead" ;;
+    data/*|reports/*|profile/*|cache/*)
+      note "$f" "workspace data (emails / reports / resume)" ;;
+    *.eml|*.mbox|*.pdf)
+      note "$f" "may contain personal data" ;;
+    *.tex)
+      case "$f" in tests/fixtures/*) ;; *) note "$f" "resume source belongs in its own repo" ;; esac ;;
+  esac
+done
+
+# --- content rules --------------------------------------------------------
+# A filled-in IMAP password, or a Google app password (16 lowercase letters,
+# often written in four groups).
+for f in $staged; do
+  [ -f "$f" ] || continue
+  case "$f" in .env.example) continue ;; esac
+
+  if git show ":$f" 2>/dev/null | grep -qE '^[[:space:]]*IMAP_PASSWORD[[:space:]]*=[[:space:]]*[^x[:space:]#]'; then
+    note "$f" "looks like a real IMAP_PASSWORD value"
+  fi
+  if git show ":$f" 2>/dev/null | grep -qE '\b[a-z]{4} ?[a-z]{4} ?[a-z]{4} ?[a-z]{4}\b.*(pass|pwd|secret)'; then
+    note "$f" "looks like a Google app password"
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  printf '\n\033[31mpre-commit blocked this commit.\033[0m\n'
+  printf 'Personal data belongs in ~/.job-scan/, not in this repo.\n'
+  printf 'If you are certain it is safe: git commit --no-verify\n\n'
+  exit 1
+fi
+exit 0

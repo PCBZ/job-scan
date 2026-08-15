@@ -1,0 +1,36 @@
+# This repo is public. Everything personal lives in ~/.job-scan/ and must
+# never appear here. These rules are a second line of defence — the first is
+# that the data simply is not in this directory.
+
+# Credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Real config (the example is the only one tracked)
+config.yaml
+!config.example.yaml
+
+# Anything that could carry personal data if the workspace is ever copied in
+data/
+reports/
+profile/
+cache/
+*.eml
+*.mbox
+
+# Resume artifacts — the resume lives in its own repo
+*.pdf
+*.tex
+!tests/fixtures/*.tex
+resume*
+!scripts/resume_text.py
+
+# Noise
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+venv/
