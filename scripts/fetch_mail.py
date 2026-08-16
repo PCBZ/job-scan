@@ -10,8 +10,6 @@ Usage:
     python3 fetch_mail.py --days 7 --stdout       # print to stdout, don't touch state
 """
 
-import _bootstrap  # noqa: F401  — must precede any import that assumes 3.14
-
 import argparse
 import email
 import email.header
@@ -29,20 +27,49 @@ from html import unescape
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_WORKSPACE = os.path.expanduser("~/.job-scan")
 
-# Footer markers: everything from the first match onward is boilerplate.
-FOOTER_MARKERS = [
+# Everything from the first footer marker onward is boilerplate: unsubscribe
+# text, mailing address, legal notices. It is typically a third of an alert
+# email and contains no job data, so cutting it is mostly about noise — the
+# model should not be parsing "you are receiving this" as a posting.
+#
+# Two tiers, because one list forced a bad trade-off. A marker trusted anywhere
+# risks truncating real content; a marker trusted only near the end leaves the
+# whole footer in place whenever it starts early, which is the common shape for
+# a short alert with a long footer.
+
+# Effectively never appear inside a job posting, so they cut at any position.
+FOOTER_MARKERS_STRONG = [
     "unsubscribe",
     "this email was sent to",
     "you are receiving this",
     "you're receiving this",
+    "you received this email because",
     "manage your email",
     "email preferences",
     "update your preferences",
-    "privacy policy",
     "view this email in your browser",
-    "©",
+    "退订",
+    "取消订阅",
+]
+
+# Real copy does use these, so only believe them in the tail of the message.
+FOOTER_MARKERS_WEAK = [
+    "privacy policy",
+    "terms of service",
+    "all rights reserved",
     "©",
 ]
+
+# A weak marker is only a footer if it lands this far into the body.
+FOOTER_TAIL_FRACTION = 0.6
+
+# A marker that fires near the very start is not credible (a nav "unsubscribe"
+# link above the content, say). Veto the cut only when it is both short in
+# absolute terms AND would throw away most of the message — an absolute floor
+# alone is biased against CJK, where 200 characters is a substantial body and
+# a real footer would never get stripped.
+FOOTER_MIN_KEEP = 200
+FOOTER_MIN_KEEP_FRACTION = 0.5
 
 TRACKING_PARAMS = re.compile(
     r"[?&](utm_[a-z]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga)=[^&]*",
@@ -289,11 +316,17 @@ def clean_text(text, max_chars):
 
     lowered = text.lower()
     cut = len(text)
-    for marker in FOOTER_MARKERS:
+    for marker in FOOTER_MARKERS_STRONG:
         idx = lowered.find(marker)
-        # Only trust a footer marker in the last 40% of the body.
-        if idx != -1 and idx > len(text) * 0.6:
+        if idx != -1:
             cut = min(cut, idx)
+    for marker in FOOTER_MARKERS_WEAK:
+        idx = lowered.find(marker)
+        if idx != -1 and idx > len(text) * FOOTER_TAIL_FRACTION:
+            cut = min(cut, idx)
+    # Too early to believe: keep the whole body rather than risk eating jobs.
+    if cut < FOOTER_MIN_KEEP and cut < len(text) * FOOTER_MIN_KEEP_FRACTION:
+        cut = len(text)
     text = text[:cut].strip()
 
     if len(text) > max_chars:
