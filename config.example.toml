@@ -20,34 +20,32 @@
 # Account names key the dedupe state, so keep them stable and unique. Renaming
 # one makes its history look unseen and you will get a day of repeats.
 # ---------------------------------------------------------------------------
+# `provider` fills in host and port: gmail, m365, outlook, icloud, yahoo,
+# fastmail. Set `host` directly for anything else. With several mailboxes this
+# is worth using — one typo in a repeated hostname is a confusing failure.
 [[account]]
 name = "gmail-main"
-host = "imap.gmail.com"
-port = 993
+provider = "gmail"
 folder = "INBOX"            # a Gmail label also works, e.g. "Job Alerts"
-user_env = "GMAIL_MAIN_USER"
-password_env = "GMAIL_MAIN_PASSWORD"
 
-# Every Gmail account needs its own App Password — they are per-account, not
-# per-device. Add as many blocks as you have inboxes.
+# Every Gmail account needs its OWN App Password — they are per-account, not
+# per-device. Env keys default to <NAME>_USER / <NAME>_PASSWORD, so this one
+# reads GMAIL_ALT_USER and GMAIL_ALT_PASSWORD.
 [[account]]
 name = "gmail-alt"
-host = "imap.gmail.com"
-user_env = "GMAIL_ALT_USER"
-password_env = "GMAIL_ALT_PASSWORD"
+provider = "gmail"
 
-# Microsoft 365 / Outlook. Same shape, different host. Read the note below
-# before assuming this one will connect.
+# Microsoft 365 / Outlook. Read the note below before assuming these connect.
 [[account]]
 name = "school"
-host = "outlook.office365.com"
-port = 993
-folder = "INBOX"
-user_env = "SCHOOL_USER"
-password_env = "SCHOOL_PASSWORD"
+provider = "m365"
 # Any [mail] key can be overridden per account. A university inbox carries
 # career-services digests that the shared allowlist would drop:
 senders = ["linkedin.com", "handshake", "joinhandshake.com", "careers", "edu"]
+
+[[account]]
+name = "outlook-personal"
+provider = "outlook"
 
 # Microsoft disabled basic auth for Exchange Online, and most school and work
 # tenants never re-enabled it. If a 365 account fails with AUTHENTICATIONFAILED
@@ -100,8 +98,16 @@ subject_keywords = [
 
 exclude_senders = ["noreply@github.com", "notifications@slack.com"]
 
-max_messages = 60           # per run, newest first
+max_messages = 60           # PER ACCOUNT, newest first
 max_chars_per_message = 6000
+
+# Whole-run ceiling across every account. max_messages is per mailbox, so
+# without this the volume handed to the model grows linearly with the number of
+# accounts — four mailboxes at the caps above is roughly 360k tokens of email,
+# which will not fit. Newest mail wins; anything dropped is reported in
+# stats.dropped_by_account and is NOT marked as seen, so it can still arrive
+# tomorrow. If it drops every day, narrow `senders` or lower `--days`.
+max_total_messages = 150
 
 # ---------------------------------------------------------------------------
 # Your profile. Drives the hard gates during matching.

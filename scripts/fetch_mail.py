@@ -86,6 +86,29 @@ def is_placeholder(value):
 SHARED_KEYS = ("senders", "subject_keywords", "exclude_senders",
                "max_messages", "max_chars_per_message")
 
+# Saves repeating host strings across half a dozen accounts, where one typo
+# turns into a confusing connection error. Also tells auth_hint which advice
+# to give without sniffing the hostname.
+PROVIDERS = {
+    "gmail":   {"host": "imap.gmail.com", "port": 993},
+    "m365":    {"host": "outlook.office365.com", "port": 993},
+    "outlook": {"host": "outlook.office365.com", "port": 993},
+    "icloud":  {"host": "imap.mail.me.com", "port": 993},
+    "yahoo":   {"host": "imap.mail.yahoo.com", "port": 993},
+    "fastmail": {"host": "imap.fastmail.com", "port": 993},
+}
+
+
+def infer_provider(host):
+    host = (host or "").lower()
+    if "gmail" in host or "googlemail" in host:
+        return "gmail"
+    if "office365" in host or "outlook" in host or "hotmail" in host:
+        return "m365"
+    if "me.com" in host or "icloud" in host:
+        return "icloud"
+    return "imap"
+
 
 def load_config(workspace):
     """Return {"accounts": [...]}, each account merged over the [mail] defaults.
@@ -135,14 +158,31 @@ def load_config(workspace):
         seen_names.add(name.lower())
         slug = re.sub(r"[^A-Z0-9]+", "_", name.upper()).strip("_") or "ACCOUNT"
 
+        provider = str(entry.get("provider") or "").lower().strip()
+        if provider and provider not in PROVIDERS:
+            raise SystemExit(
+                "error: account %r has unknown provider %r in %s.\n"
+                "       Known: %s — or set host directly."
+                % (name, provider, path, ", ".join(sorted(PROVIDERS)))
+            )
+        preset = PROVIDERS.get(provider, {})
+        host = entry.get("host") or preset.get("host")
+        if not host:
+            raise SystemExit(
+                "error: account %r in %s sets neither provider nor host.\n"
+                "       Guessing a mail server is how you end up connecting to "
+                "the wrong one." % (name, path)
+            )
+
         account = dict(shared)
         for key in SHARED_KEYS:          # per-account override of the defaults
             if entry.get(key) is not None:
                 account[key] = entry[key]
         account.update({
             "name": name,
-            "host": entry.get("host", "imap.gmail.com"),
-            "port": int(entry.get("port", 993)),
+            "provider": provider or infer_provider(host),
+            "host": host,
+            "port": int(entry.get("port") or preset.get("port") or 993),
             "folder": entry.get("folder", "INBOX"),
             "user_env": entry.get("user_env", "%s_USER" % slug),
             "password_env": entry.get("password_env", "%s_PASSWORD" % slug),
@@ -160,7 +200,12 @@ def load_config(workspace):
             )
         seen_env[key] = name
         accounts.append(account)
-    return {"accounts": accounts}
+
+    # max_messages is per account, so total volume grows linearly with the
+    # number of mailboxes — six accounts can hand the model half a million
+    # tokens of email. Cap the run as a whole and say what was dropped.
+    return {"accounts": accounts,
+            "max_total_messages": int(mail.get("max_total_messages", 150))}
 
 
 def load_state(workspace):
@@ -439,9 +484,9 @@ def auth_hint(detail, workspace, account):
                 "INVALID CREDENTIALS")):
         return None
     env_file = os.path.join(workspace, ".env")
-    host = account["host"].lower()
+    provider = account.get("provider") or infer_provider(account.get("host"))
 
-    if "office365" in host or "outlook" in host or "hotmail" in host:
+    if provider in ("m365", "outlook"):
         # Microsoft turned off basic auth for Exchange Online; most school and
         # work tenants never turned it back on. No password fixes that, so say
         # so rather than sending the user round the app-password loop.
@@ -452,6 +497,13 @@ def auth_hint(detail, workspace, account):
                 "that works and scan that one instead. Credentials are read "
                 "from %s in %s." % (account["name"], account["password_env"],
                                     env_file))
+
+    if provider != "gmail":
+        return ("IMAP rejected the login for %r (%s). Check the username and "
+                "password in %s under %s / %s, and whether the provider "
+                "requires an app-specific password."
+                % (account["name"], account["host"], env_file,
+                   account["user_env"], account["password_env"]))
 
     return ("IMAP rejected the login for %r. Gmail does not accept an account "
             "password here — generate an App Password at "
@@ -466,6 +518,8 @@ def main():
     ap.add_argument("--days", type=int, default=2,
                     help="lookback window; overlap is fine, dedupe handles it")
     ap.add_argument("--account", help="scan only this account (default: all)")
+    ap.add_argument("--max-total", type=int, dest="max_total",
+                    help="global message ceiling across all accounts")
     ap.add_argument("--check", action="store_true", help="verify logins only")
     ap.add_argument("--stdout", action="store_true",
                     help="print JSON to stdout and leave state untouched")
@@ -474,7 +528,9 @@ def main():
 
     ws = os.path.expanduser(args.workspace)
     env = load_env(ws)
-    accounts = load_config(ws)["accounts"]
+    cfg = load_config(ws)
+    accounts = cfg["accounts"]
+    budget = args.max_total or cfg["max_total_messages"]
 
     if args.account:
         wanted = args.account.lower()
@@ -483,7 +539,7 @@ def main():
             print(json.dumps({
                 "error": "unknown_account",
                 "requested": args.account,
-                "available": [a["name"] for a in load_config(ws)["accounts"]],
+                "available": [a["name"] for a in cfg["accounts"]],
             }, indent=2))
             return 2
 
@@ -555,6 +611,22 @@ def main():
                          indent=2))
         return 1
 
+    # Enforce the whole-run ceiling, newest first. Undated mail sorts last:
+    # a message with no parseable Date is the least trustworthy thing to keep.
+    dropped_by_account = {}
+    if len(messages) > budget:
+        messages.sort(key=lambda m: (bool(m["date"]), m["date"]), reverse=True)
+        for msg in messages[budget:]:
+            dropped_by_account[msg["account"]] = \
+                dropped_by_account.get(msg["account"], 0) + 1
+        messages = messages[:budget]
+
+    kept_by_account = {}
+    for msg in messages:
+        kept_by_account[msg["account"]] = kept_by_account.get(msg["account"], 0) + 1
+    for stats in per_account:
+        stats["kept_after_budget"] = kept_by_account.get(stats["account"], 0)
+
     today = datetime.now().strftime("%Y-%m-%d")
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -562,9 +634,13 @@ def main():
         "stats": {
             "accounts_scanned": len(per_account),
             "accounts_failed": len(failures),
-            "kept": sum(s["kept"] for s in per_account),
+            "kept": len(messages),
             "already_seen": sum(s["already_seen"] for s in per_account),
             "filtered_out": sum(s["filtered_out"] for s in per_account),
+            "total_chars": sum(len(m["body"]) for m in messages),
+            "budget": budget,
+            "dropped_for_budget": sum(dropped_by_account.values()),
+            "dropped_by_account": dropped_by_account,
             "per_account": per_account,
         },
         "failures": failures,

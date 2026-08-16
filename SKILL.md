@@ -77,6 +77,14 @@ is worth more than any single recommendation below it.
 `stats.per_account` shows the split. If total `stats.kept` is 0, write a short
 report saying so and stop — never pad a report with stale postings.
 
+`max_messages` is per mailbox, so a whole-run ceiling (`max_total_messages`,
+default 150) keeps four or five accounts from handing you half a million
+tokens of email. If `stats.dropped_for_budget` is non-zero, mention it near the
+failure line: those messages were **not** marked seen and can still arrive
+tomorrow, but if the same accounts overflow every day the user should narrow
+`senders` or lower `--days`. `stats.dropped_by_account` says which mailbox is
+flooding.
+
 ### 3. Load the resume library
 
 ```bash

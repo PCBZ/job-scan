@@ -120,16 +120,23 @@ a single report, tagged by which mailbox each lead came through.
 
 ```toml
 [[account]]
-name = "personal"
-host = "imap.gmail.com"
-user_env = "GMAIL_USER"          # names the .env keys; credentials never
-password_env = "GMAIL_PASSWORD"  # appear in config.toml
+name = "gmail-main"
+provider = "gmail"        # fills in host and port
+
+[[account]]
+name = "gmail-alt"
+provider = "gmail"        # reads GMAIL_ALT_USER / GMAIL_ALT_PASSWORD
 
 [[account]]
 name = "school"
-host = "outlook.office365.com"
+provider = "m365"
 senders = ["linkedin.com", "joinhandshake.com", "careers"]  # per-account override
 ```
+
+`provider` accepts `gmail`, `m365`, `outlook`, `icloud`, `yahoo`, `fastmail`,
+or set `host` yourself. An account with neither is an error — guessing a mail
+server is how you connect to the wrong one. Credentials never appear in
+`config.toml`; accounts name the `.env` keys to read.
 
 Omit `user_env`/`password_env` and they default to `<NAME>_USER` /
 `<NAME>_PASSWORD`, uppercased with punctuation replaced by `_`. Any `[mail]`
@@ -150,6 +157,14 @@ rest still run. Check them with:
 ```bash
 ~/.job-scan/bin/python scripts/fetch_mail.py --check
 ```
+
+`max_messages` is per mailbox, so total volume grows linearly with account
+count — four accounts at the default caps is roughly 360k tokens of email,
+which will not fit in a context window. `max_total_messages` (default 150) is
+the whole-run ceiling. Newest mail wins; anything dropped is reported in
+`stats.dropped_by_account` and is deliberately **not** marked as seen, so it
+can still arrive tomorrow. Persistent overflow means your `senders` list is
+too broad.
 
 ### Per-provider notes
 
