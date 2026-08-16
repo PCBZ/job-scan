@@ -40,11 +40,17 @@ skill often runs unattended on a schedule.
 ~/.job-scan/bin/python ~/.claude/skills/job-scan/scripts/resume_text.py --list
 ```
 
-- `missing_credentials` → tell the user to fill `~/.job-scan/.env` themselves.
-  **Never type, generate, or read back the password.** Gmail needs an App
-  Password (2FA required): <https://myaccount.google.com/apppasswords>
+`--check` reports **per account** (`{"healthy": 1, "total": 2, "accounts": [...]}`),
+because there may be several mailboxes and they fail independently.
+
+- `missing_credentials` → tell the user which `.env` keys are unset, by name
+  (each account declares its own `user_env` / `password_env`). **Never type,
+  generate, or read back a password.** Gmail needs an App Password (2FA
+  required): <https://myaccount.google.com/apppasswords>
 - `AUTHENTICATIONFAILED` → nearly always an account password used where an App
-  Password is required. Say so; don't retry in a loop.
+  Password is required. On a university or work M365 tenant it can also mean
+  IMAP basic auth is disabled outright, which no password will fix. Say so;
+  don't retry in a loop.
 - `lib_not_found` / `no_variants` → `resume.lib` in `~/.job-scan/config.toml`
   isn't pointing at the resume repo, or the `variants` globs match nothing.
 
@@ -58,9 +64,18 @@ writing them. Never silently invent visa status, salary floor, or seniority.
 ~/.job-scan/bin/python ~/.claude/skills/job-scan/scripts/fetch_mail.py --days 2
 ```
 
-Writes `~/.job-scan/data/raw/<date>.json` and records message IDs so tomorrow
-skips them. Read that file. If `stats.kept` is 0, write a short report saying so
-and stop — never pad a report with stale postings.
+Scans every configured mailbox in one pass (add `--account <name>` for just
+one). Writes `~/.job-scan/data/raw/<date>.json` and records message IDs,
+namespaced per account, so tomorrow skips them. Read that file.
+
+**Check `failures[]` before anything else.** One mailbox failing does not stop
+the run — the others still produce a report — so a dead account is easy to miss
+for weeks. If it is non-empty, put a line at the *top* of the report naming the
+account and the reason. An expired app password silently halving your coverage
+is worth more than any single recommendation below it.
+
+`stats.per_account` shows the split. If total `stats.kept` is 0, write a short
+report saying so and stop — never pad a report with stale postings.
 
 ### 3. Load the resume library
 
@@ -86,8 +101,12 @@ From each message body, pull every distinct posting:
 ```json
 {"title": "", "company": "", "location": "", "workplace": "onsite|hybrid|remote|unknown",
  "salary": "", "requirements": [], "source": "linkedin|indeed|handshake|recruiter|other",
- "posted": "", "url": "", "message_subject": ""}
+ "posted": "", "url": "", "message_subject": "", "account": ""}
 ```
+
+Copy `account` straight from the message — it is how the report says which
+mailbox a lead came through, and it is the only way to notice that one inbox
+produces everything worth reading.
 
 One alert email usually holds 5–25 postings — get them all. Use `links[]` from
 the JSON for `url`, matching on anchor text. **Leave a field empty rather than
@@ -99,8 +118,11 @@ guessing.** An empty `salary` is a fact; an invented one is a bug.
 ~/.job-scan/bin/python ~/.claude/skills/job-scan/scripts/seen_jobs.py filter < /tmp/jobs.json
 ```
 
-Rank only `new`. Report `repeat` as a one-line count so the user knows they were
-considered, not lost.
+The output splits three ways. Rank only `new`. Report `repeat` (recommended on
+an earlier day) as a one-line count so the user knows they were considered, not
+lost. `duplicates` are the same posting reaching two mailboxes in one run — the
+kept copy carries `_duplicate_count`; don't list them separately, and don't
+treat arriving twice as a signal of quality.
 
 ### 6. Gate, then score
 
@@ -144,7 +166,11 @@ To `~/.job-scan/reports/<date>.md`:
 ```markdown
 # Job Scan — 2026-08-15
 
-**Scanned** 14 emails → 62 postings → 9 new after dedupe → **4 worth your time**
+> ⚠️ **`school` mailbox failed to sync** — AUTHENTICATIONFAILED. Its app
+> password likely expired; today's results cover `personal` only.
+
+**Scanned** 14 emails across 1 of 2 mailboxes → 62 postings → 9 new after
+dedupe → **4 worth your time**
 _Repeats suppressed: 18. Filtered by hard gates: 41 (see bottom)._
 _Matched against `backend.tex` @ a1b2c3d (committed 12 days ago) + 2 variants._
 
@@ -152,6 +178,7 @@ _Matched against `backend.tex` @ a1b2c3d (committed 12 days ago) + 2 variants._
 
 ### 1. Senior Backend Engineer — Stripe · 87/100 · confidence: medium
 **Remote (US)** · $180–220k · [posting](https://…) · **send `backend.tex`**
+_via `personal`_
 
 **Fit:** Go + distributed systems is the core of the role; resume shows 3 yrs of
 Go at scale and a 12k req/s service.

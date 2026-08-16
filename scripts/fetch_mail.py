@@ -83,16 +83,17 @@ def is_placeholder(value):
     return set(lowered) <= {"x"}
 
 
+SHARED_KEYS = ("senders", "subject_keywords", "exclude_senders",
+               "max_messages", "max_chars_per_message")
+
+
 def load_config(workspace):
+    """Return {"accounts": [...]}, each account merged over the [mail] defaults.
+
+    Credentials never live in config.toml — an account names the .env keys to
+    read, so the config file stays safe to share and only .env needs chmod 600.
+    """
     path = os.path.join(workspace, "config.toml")
-    defaults = {
-        "imap": {"host": "imap.gmail.com", "port": 993, "folder": "INBOX"},
-        "senders": [],
-        "subject_keywords": [],
-        "exclude_senders": [],
-        "max_messages": 60,
-        "max_chars_per_message": 6000,
-    }
     # Never proceed on defaults: an empty `senders` list collapses the IMAP
     # search to "everything since <date>", which would pull ordinary personal
     # mail into data/raw/ and hand it to the model as job data.
@@ -108,16 +109,46 @@ def load_config(workspace):
     except tomllib.TOMLDecodeError as exc:
         raise SystemExit("error: %s is not valid TOML — %s" % (path, exc))
 
-    merged = dict(defaults)
+    shared = {"senders": [], "subject_keywords": [], "exclude_senders": [],
+              "max_messages": 60, "max_chars_per_message": 6000}
     mail = cfg.get("mail") or {}
-    for key in ("senders", "subject_keywords", "exclude_senders",
-                "max_messages", "max_chars_per_message"):
+    for key in SHARED_KEYS:
         if mail.get(key) is not None:
-            merged[key] = mail[key]
-    imap = dict(defaults["imap"])
-    imap.update(cfg.get("imap") or {})
-    merged["imap"] = imap
-    return merged
+            shared[key] = mail[key]
+
+    raw = cfg.get("account") or []
+    if not raw:
+        raise SystemExit(
+            "error: no [[account]] block in %s.\n"
+            "       Define at least one mailbox — see config.example.toml."
+            % path
+        )
+
+    accounts, seen_names = [], set()
+    for index, entry in enumerate(raw):
+        name = str(entry.get("name") or "account%d" % (index + 1)).strip()
+        if name.lower() in seen_names:
+            raise SystemExit(
+                "error: duplicate account name %r in %s — names key the "
+                "dedupe state, so they must be unique." % (name, path)
+            )
+        seen_names.add(name.lower())
+        slug = re.sub(r"[^A-Z0-9]+", "_", name.upper()).strip("_") or "ACCOUNT"
+
+        account = dict(shared)
+        for key in SHARED_KEYS:          # per-account override of the defaults
+            if entry.get(key) is not None:
+                account[key] = entry[key]
+        account.update({
+            "name": name,
+            "host": entry.get("host", "imap.gmail.com"),
+            "port": int(entry.get("port", 993)),
+            "folder": entry.get("folder", "INBOX"),
+            "user_env": entry.get("user_env", "%s_USER" % slug),
+            "password_env": entry.get("password_env", "%s_PASSWORD" % slug),
+        })
+        accounts.append(account)
+    return {"accounts": accounts}
 
 
 def load_state(workspace):
@@ -277,18 +308,18 @@ def build_search(days, senders):
     return criteria, since
 
 
-def connect(cfg, user, password):
-    host = cfg["imap"]["host"]
-    port = int(cfg["imap"].get("port", 993))
+def connect(account, user, password):
     ctx = ssl.create_default_context()
-    conn = imaplib.IMAP4_SSL(host, port, ssl_context=ctx)
+    conn = imaplib.IMAP4_SSL(account["host"], account["port"], ssl_context=ctx)
     conn.login(user, password)
     return conn
 
 
 def fetch(cfg, user, password, days, state, verbose=False):
+    """Fetch one account. `cfg` is a single account dict from load_config."""
     conn = connect(cfg, user, password)
-    folder = cfg["imap"].get("folder", "INBOX")
+    folder = cfg.get("folder", "INBOX")
+    account_name = cfg["name"]
     try:
         typ, _ = conn.select('"%s"' % folder, readonly=True)
         if typ != "OK":
@@ -306,7 +337,8 @@ def fetch(cfg, user, password, days, state, verbose=False):
         ids = (data[0] or b"").split()
         ids = ids[-int(cfg.get("max_messages", 60)):]
         if verbose:
-            sys.stderr.write("info: %d candidate messages in %s\n" % (len(ids), folder))
+            sys.stderr.write("info: [%s] %d candidate messages in %s\n"
+                             % (account_name, len(ids), folder))
 
         keywords = [k.lower() for k in (cfg.get("subject_keywords") or [])]
         blocked = [b.lower() for b in (cfg.get("exclude_senders") or [])]
@@ -323,7 +355,9 @@ def fetch(cfg, user, password, days, state, verbose=False):
             msg_id = (msg.get("Message-ID") or "").strip()
             if not msg_id:
                 msg_id = "no-id:%s:%s" % (msg.get("Date", ""), msg.get("Subject", ""))
-            if msg_id in seen:
+            # Namespaced by account: the same alert delivered to two mailboxes
+            # is two messages, and each account tracks its own history.
+            if "%s|%s" % (account_name, msg_id) in seen:
                 skipped_seen += 1
                 continue
 
@@ -356,6 +390,7 @@ def fetch(cfg, user, password, days, state, verbose=False):
                 continue
 
             messages.append({
+                "account": account_name,
                 "message_id": msg_id,
                 "from": sender,
                 "subject": subject,
@@ -364,7 +399,8 @@ def fetch(cfg, user, password, days, state, verbose=False):
                 "links": extract_links(html) if html else [],
             })
 
-        return messages, {"candidates": len(ids), "already_seen": skipped_seen,
+        return messages, {"account": account_name, "candidates": len(ids),
+                          "already_seen": skipped_seen,
                           "filtered_out": skipped_filter, "kept": len(messages)}
     finally:
         try:
@@ -376,62 +412,116 @@ def fetch(cfg, user, password, days, state, verbose=False):
 
 # --------------------------------------------------------------------------- #
 
+def credentials_for(account, env):
+    user = env.get(account["user_env"]) or os.environ.get(account["user_env"])
+    password = (env.get(account["password_env"])
+                or os.environ.get(account["password_env"]))
+    return user, password
+
+
+def auth_hint(detail, workspace, account):
+    if "AUTHENTICATIONFAILED" not in detail.upper():
+        return None
+    return ("IMAP rejected the login for %r. Gmail does not accept an account "
+            "password here — generate an App Password at "
+            "https://myaccount.google.com/apppasswords (requires 2FA) and put "
+            "it in %s under %s."
+            % (account["name"], os.path.join(workspace, ".env"),
+               account["password_env"]))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--workspace", default=DEFAULT_WORKSPACE)
     ap.add_argument("--days", type=int, default=2,
                     help="lookback window; overlap is fine, dedupe handles it")
-    ap.add_argument("--check", action="store_true", help="verify login only")
+    ap.add_argument("--account", help="scan only this account (default: all)")
+    ap.add_argument("--check", action="store_true", help="verify logins only")
     ap.add_argument("--stdout", action="store_true",
                     help="print JSON to stdout and leave state untouched")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
     ws = os.path.expanduser(args.workspace)
-    cfg = load_config(ws)
     env = load_env(ws)
-    user = env.get("IMAP_USER") or os.environ.get("IMAP_USER")
-    password = env.get("IMAP_PASSWORD") or os.environ.get("IMAP_PASSWORD")
-    if cfg["imap"].get("host") in (None, "", "imap.gmail.com"):
-        cfg["imap"]["host"] = env.get("IMAP_HOST") or cfg["imap"].get("host") or "imap.gmail.com"
+    accounts = load_config(ws)["accounts"]
 
-    if is_placeholder(user) or is_placeholder(password):
-        print(json.dumps({
-            "error": "missing_credentials",
-            "hint": "Fill in IMAP_USER and IMAP_PASSWORD in %s/.env — it still "
-                    "holds the placeholders from .env.example." % ws,
-            "gmail": "Needs an App Password (2FA on): "
-                     "https://myaccount.google.com/apppasswords",
-        }, indent=2))
-        return 2
+    if args.account:
+        wanted = args.account.lower()
+        accounts = [a for a in accounts if a["name"].lower() == wanted]
+        if not accounts:
+            print(json.dumps({
+                "error": "unknown_account",
+                "requested": args.account,
+                "available": [a["name"] for a in load_config(ws)["accounts"]],
+            }, indent=2))
+            return 2
 
+    # ---- credential / connectivity check ---------------------------------- #
     if args.check:
-        try:
-            conn = connect(cfg, user, password)
-            typ, _ = conn.select('"%s"' % cfg["imap"].get("folder", "INBOX"), readonly=True)
-            conn.logout()
-            print(json.dumps({"ok": typ == "OK", "host": cfg["imap"]["host"],
-                              "user": user, "folder": cfg["imap"].get("folder")}, indent=2))
-            return 0 if typ == "OK" else 1
-        except Exception as exc:  # noqa: BLE001 - surface any IMAP failure verbatim
-            detail = str(exc)[:300]
-            result = {"ok": False, "error": type(exc).__name__, "detail": detail}
-            if "AUTHENTICATIONFAILED" in detail.upper():
-                result["hint"] = (
-                    "IMAP rejected the login. Gmail does not accept your account "
-                    "password here — generate an App Password at "
-                    "https://myaccount.google.com/apppasswords (requires 2FA) and "
-                    "put it in %s/.env" % ws
-                )
-            print(json.dumps(result, indent=2))
-            return 1
+        results = []
+        for account in accounts:
+            user, password = credentials_for(account, env)
+            if is_placeholder(user) or is_placeholder(password):
+                results.append({
+                    "account": account["name"], "ok": False,
+                    "error": "missing_credentials",
+                    "hint": "Set %s and %s in %s/.env"
+                            % (account["user_env"], account["password_env"], ws),
+                })
+                continue
+            try:
+                conn = connect(account, user, password)
+                typ, _ = conn.select('"%s"' % account["folder"], readonly=True)
+                conn.logout()
+                results.append({"account": account["name"], "ok": typ == "OK",
+                                "host": account["host"], "user": user,
+                                "folder": account["folder"]})
+            except Exception as exc:  # noqa: BLE001 - surface IMAP failures verbatim
+                detail = str(exc)[:300]
+                entry = {"account": account["name"], "ok": False,
+                         "error": type(exc).__name__, "detail": detail}
+                hint = auth_hint(detail, ws, account)
+                if hint:
+                    entry["hint"] = hint
+                results.append(entry)
+        healthy = sum(1 for r in results if r.get("ok"))
+        print(json.dumps({"ok": healthy == len(results), "healthy": healthy,
+                          "total": len(results), "accounts": results}, indent=2))
+        return 0 if healthy else 1
 
+    # ---- fetch ------------------------------------------------------------ #
     state = load_state(ws)
-    try:
-        messages, stats = fetch(cfg, user, password, args.days, state,
-                                verbose=not args.quiet)
-    except Exception as exc:  # noqa: BLE001
-        print(json.dumps({"error": type(exc).__name__, "detail": str(exc)[:300]},
+    messages, per_account, failures = [], [], []
+
+    for account in accounts:
+        user, password = credentials_for(account, env)
+        if is_placeholder(user) or is_placeholder(password):
+            failures.append({
+                "account": account["name"], "error": "missing_credentials",
+                "hint": "Set %s and %s in %s/.env"
+                        % (account["user_env"], account["password_env"], ws),
+            })
+            continue
+        try:
+            got, stats = fetch(account, user, password, args.days, state,
+                               verbose=not args.quiet)
+        except Exception as exc:  # noqa: BLE001
+            # One bad mailbox must not sink the run — an expired password on
+            # the school account should still let the personal one through.
+            detail = str(exc)[:300]
+            entry = {"account": account["name"], "error": type(exc).__name__,
+                     "detail": detail}
+            hint = auth_hint(detail, ws, account)
+            if hint:
+                entry["hint"] = hint
+            failures.append(entry)
+            continue
+        messages.extend(got)
+        per_account.append(stats)
+
+    if not per_account:
+        print(json.dumps({"error": "all_accounts_failed", "failures": failures},
                          indent=2))
         return 1
 
@@ -439,7 +529,15 @@ def main():
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "window_days": args.days,
-        "stats": stats,
+        "stats": {
+            "accounts_scanned": len(per_account),
+            "accounts_failed": len(failures),
+            "kept": sum(s["kept"] for s in per_account),
+            "already_seen": sum(s["already_seen"] for s in per_account),
+            "filtered_out": sum(s["filtered_out"] for s in per_account),
+            "per_account": per_account,
+        },
+        "failures": failures,
         "messages": messages,
     }
 
@@ -453,11 +551,12 @@ def main():
         json.dump(payload, fh, indent=2, ensure_ascii=False)
 
     for msg in messages:
-        state["seen_messages"][msg["message_id"]] = today
+        state["seen_messages"]["%s|%s" % (msg["account"], msg["message_id"])] = today
     state["last_run"] = payload["fetched_at"]
     save_state(ws, state)
 
-    print(json.dumps({"written": out_path, "stats": stats}, indent=2))
+    print(json.dumps({"written": out_path, "stats": payload["stats"],
+                      "failures": failures}, indent=2))
     return 0
 
 

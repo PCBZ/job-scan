@@ -4,8 +4,14 @@
 A job's fingerprint is a normalized "company|title" pair, which survives the
 minor title/formatting drift between LinkedIn, Indeed, and recruiter emails.
 
+`filter` splits its input three ways:
+    new         first sighting, rank these
+    repeat      recommended on an earlier day, inside --days
+    duplicates  the same posting twice in one batch, which is what happens
+                when an alert is delivered to two of your mailboxes
+
 Usage:
-    python3 seen_jobs.py filter < jobs.json   # -> {"new": [...], "repeat": [...]}
+    python3 seen_jobs.py filter < jobs.json
     python3 seen_jobs.py add    < jobs.json   # record as seen
     python3 seen_jobs.py list --days 30       # what's been recommended lately
 
@@ -107,16 +113,27 @@ def main():
     jobs = read_jobs()
     if args.command == "filter":
         cutoff = (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%d")
-        new, repeat = [], []
+        new, repeat, duplicates = [], [], []
+        # Two buckets of duplication, and they mean different things:
+        # `repeat` was recommended on an earlier day; `duplicates` arrived
+        # twice today because the same alert went to two mailboxes.
+        batch = {}
         for job in jobs:
             fp = fingerprint(job)
             prior = seen.get(fp)
             if prior and prior.get("last_seen", "") >= cutoff:
                 repeat.append(dict(job, _fingerprint=fp,
                                    _first_seen=prior.get("first_seen")))
-            else:
-                new.append(dict(job, _fingerprint=fp))
-        print(json.dumps({"new": new, "repeat": repeat}, indent=2,
+                continue
+            if fp in batch:
+                kept = new[batch[fp]]
+                kept["_duplicate_count"] = kept.get("_duplicate_count", 1) + 1
+                duplicates.append(dict(job, _fingerprint=fp))
+                continue
+            batch[fp] = len(new)
+            new.append(dict(job, _fingerprint=fp))
+        print(json.dumps({"new": new, "repeat": repeat,
+                          "duplicates": duplicates}, indent=2,
                          ensure_ascii=False))
         return 0
 

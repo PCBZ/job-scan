@@ -10,7 +10,8 @@ tracker-laden HTML and reaches the model as a few thousand characters of clean
 text, so a daily run stays cheap.
 
 ```
-inbox ──▶ fetch_mail.py ──▶ clean text ──┐
+inbox ─┐
+inbox ─┴▶ fetch_mail.py ──▶ clean text ──┐
                                           ├──▶ Claude: extract, gate, score ──▶ reports/2026-08-15.md
 resume repo ──▶ resume_text.py ──────────┘
    (.tex)         latex_text.py
@@ -18,8 +19,10 @@ resume repo ──▶ resume_text.py ──────────┘
 
 ## What it actually does
 
-1. **Fetch** job-alert mail over IMAP, read-only — `BODY.PEEK` throughout, so
-   nothing is marked read, moved, or deleted.
+1. **Fetch** job-alert mail over IMAP from every configured mailbox, read-only
+   — `BODY.PEEK` throughout, so nothing is marked read, moved, or deleted. One
+   mailbox failing doesn't sink the run; the failure is reported at the top of
+   the report rather than quietly halving your coverage.
 2. **Clean** each message: strip HTML, drop footers, remove tracking params
    from links, dedupe by `Message-ID`.
 3. **Load** your resume variants from a resume library — a directory, usually
@@ -108,6 +111,44 @@ $EDITOR ~/.job-scan/config.toml   # resume.lib, then every TODO under [profile]
 
 Gmail requires an [App Password](https://myaccount.google.com/apppasswords)
 with 2FA enabled; your account password will not authenticate over IMAP.
+
+### Multiple mailboxes
+
+Add one `[[account]]` block per inbox — job alerts to a personal Gmail,
+recruiter mail to a school address. All are scanned in one run and merged into
+a single report, tagged by which mailbox each lead came through.
+
+```toml
+[[account]]
+name = "personal"
+host = "imap.gmail.com"
+user_env = "GMAIL_USER"          # names the .env keys; credentials never
+password_env = "GMAIL_PASSWORD"  # appear in config.toml
+
+[[account]]
+name = "school"
+host = "outlook.office365.com"
+senders = ["linkedin.com", "joinhandshake.com", "careers"]  # per-account override
+```
+
+Omit `user_env`/`password_env` and they default to `<NAME>_USER` /
+`<NAME>_PASSWORD`, uppercased. Any `[mail]` key can be overridden per account.
+
+Account names key the dedupe state, so keep them stable — renaming one makes
+its history look unseen and costs you a day of repeats. Dedupe is deliberately
+per-account at the message level, and global at the job level: the same alert
+landing in two inboxes is two messages but one posting.
+
+Accounts fail independently. An expired password on one is reported and the
+rest still run. Check them with:
+
+```bash
+~/.job-scan/bin/python scripts/fetch_mail.py --check
+```
+
+Note that many university and corporate M365 tenants disable IMAP basic auth
+entirely — no app password will work there. Forward that mail to an account
+that does.
 
 The `[profile]` TODOs are not cosmetic. `needs_sponsorship` alone filters out
 most defense and government postings, and `seniority` is what stops a new-grad

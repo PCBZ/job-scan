@@ -34,8 +34,14 @@ for f in $staged; do
   if git show ":$f" 2>/dev/null | grep -qE '^[[:space:]]*IMAP_PASSWORD[[:space:]]*=[[:space:]]*[^x[:space:]#]'; then
     note "$f" "looks like a real IMAP_PASSWORD value"
   fi
-  if git show ":$f" 2>/dev/null | grep -qE '\b[a-z]{4} ?[a-z]{4} ?[a-z]{4} ?[a-z]{4}\b.*(pass|pwd|secret)'; then
-    note "$f" "looks like a Google app password"
+  # A Google app password is 16 lowercase letters, often shown in four groups.
+  # Only flag it in an assignment — matching the shape alone fires on any prose
+  # that happens to string four short words together near the word "password",
+  # and a hook that cries wolf just teaches people to pass --no-verify.
+  if git show ":$f" 2>/dev/null \
+       | grep -viE 'x{8,}' \
+       | grep -qiE '(password|passwd|pwd|secret|token)[a-z_]*[[:space:]]*[=:][[:space:]]*.?[a-z]{4}[[:space:]]?[a-z]{4}[[:space:]]?[a-z]{4}[[:space:]]?[a-z]{4}'; then
+    note "$f" "looks like a real credential assignment"
   fi
 done
 

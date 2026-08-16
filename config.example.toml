@@ -6,10 +6,39 @@
 # Anything marked TODO drives hard filtering. Get these right, or the scan will
 # confidently recommend roles you can't actually take.
 
-[imap]
-host = "imap.gmail.com"     # Outlook/M365: outlook.office365.com
+# ---------------------------------------------------------------------------
+# Mailboxes. Add one [[account]] block per inbox — job alerts to a personal
+# Gmail, recruiter mail to a school address, and so on. All of them are scanned
+# in one run and merged into a single report.
+#
+# Credentials are NOT stored here. Each account names the .env keys to read, so
+# this file stays safe to share and only .env needs chmod 600. If you omit
+# user_env / password_env they default to <NAME>_USER and <NAME>_PASSWORD,
+# uppercased — the "personal" account below would read PERSONAL_USER and
+# PERSONAL_PASSWORD.
+#
+# Account names key the dedupe state, so keep them stable and unique. Renaming
+# one makes its history look unseen and you will get a day of repeats.
+# ---------------------------------------------------------------------------
+[[account]]
+name = "personal"
+host = "imap.gmail.com"
 port = 993
 folder = "INBOX"            # a Gmail label also works, e.g. "Job Alerts"
+user_env = "GMAIL_USER"
+password_env = "GMAIL_PASSWORD"
+
+# A second mailbox — delete this block if you only have one.
+[[account]]
+name = "school"
+host = "outlook.office365.com"
+port = 993
+folder = "INBOX"
+user_env = "SCHOOL_USER"
+password_env = "SCHOOL_PASSWORD"
+# Any [mail] key can be overridden per account. A university inbox carries
+# career-services digests that the shared allowlist would drop:
+senders = ["linkedin.com", "handshake", "joinhandshake.com", "careers", "edu"]
 
 # ---------------------------------------------------------------------------
 # Resume library — a directory (usually its own git repo) of resume variants.
@@ -23,6 +52,9 @@ variants = ["*.tex", "src/*.tex"]  # globs, relative to lib
 default = "resume"                 # variant name (filename without extension)
 
 [mail]
+# Shared defaults for every account. Any key here can be overridden inside an
+# individual [[account]] block.
+#
 # Who counts as a job-alert sender. Matched as a substring of the From header,
 # so a bare domain covers every subaddress. Mail from these senders skips the
 # subject-keyword check below.
