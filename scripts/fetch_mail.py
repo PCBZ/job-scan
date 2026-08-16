@@ -21,6 +21,21 @@ import re
 import ssl
 import sys
 from datetime import datetime, timedelta, timezone
+from html import unescape
+
+try:
+    import tomllib
+except ModuleNotFoundError:          # Python < 3.11
+    try:
+        import tomli as tomllib      # type: ignore
+    except ModuleNotFoundError:
+        raise SystemExit(
+            "error: job-scan needs Python 3.11+ for tomllib.\n"
+            "       Running under %s (%s).\n"
+            "       Run ./install.sh to pin a newer interpreter, or: "
+            "pip install tomli"
+            % (".".join(map(str, sys.version_info[:3])), sys.executable)
+        )
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_WORKSPACE = os.path.expanduser("~/.job-scan")
@@ -80,7 +95,7 @@ def is_placeholder(value):
 
 
 def load_config(workspace):
-    path = os.path.join(workspace, "config.yaml")
+    path = os.path.join(workspace, "config.toml")
     defaults = {
         "imap": {"host": "imap.gmail.com", "port": 993, "folder": "INBOX"},
         "senders": [],
@@ -89,24 +104,27 @@ def load_config(workspace):
         "max_messages": 60,
         "max_chars_per_message": 6000,
     }
+    # Never proceed on defaults: an empty `senders` list collapses the IMAP
+    # search to "everything since <date>", which would pull ordinary personal
+    # mail into data/raw/ and hand it to the model as job data.
     if not os.path.exists(path):
-        return defaults
-    try:
-        import yaml  # noqa
-    except ImportError:
-        # Never fall back to defaults here: an empty `senders` list turns the
-        # IMAP search into "everything since <date>", which would pull ordinary
-        # personal mail into data/raw/ and hand it to the model as job data.
         raise SystemExit(
-            "error: %s exists but PyYAML is not installed, so it cannot be "
-            "read.\n       Refusing to run with default filters — that would "
-            "fetch unrelated mail.\n       Fix: python3 -m pip install PyYAML"
-            % path
+            "error: %s not found.\n       Refusing to run without a sender "
+            "allowlist — that would fetch unrelated mail.\n       Fix: run "
+            "./install.sh, or copy config.example.toml there." % path
         )
-    with open(path, "r", encoding="utf-8") as fh:
-        cfg = yaml.safe_load(fh) or {}
+    try:
+        with open(path, "rb") as fh:
+            cfg = tomllib.load(fh)
+    except tomllib.TOMLDecodeError as exc:
+        raise SystemExit("error: %s is not valid TOML — %s" % (path, exc))
+
     merged = dict(defaults)
-    merged.update({k: v for k, v in cfg.items() if v is not None})
+    mail = cfg.get("mail") or {}
+    for key in ("senders", "subject_keywords", "exclude_senders",
+                "max_messages", "max_chars_per_message"):
+        if mail.get(key) is not None:
+            merged[key] = mail[key]
     imap = dict(defaults["imap"])
     imap.update(cfg.get("imap") or {})
     merged["imap"] = imap
@@ -153,13 +171,14 @@ def html_to_text(html):
             tag.decompose()
         return soup.get_text("\n")
     except ImportError:
+        # stdlib path — equivalent for alert emails, and keeps the LaTeX
+        # pipeline dependency-free.
         text = re.sub(r"(?is)<(script|style|head).*?</\1>", " ", html)
-        text = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</tr>|</li>", "\n", text)
+        text = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</tr>|</li>|</td>", "\n", text)
         text = re.sub(r"<[^>]+>", " ", text)
-        for ent, ch in [("&nbsp;", " "), ("&amp;", "&"), ("&lt;", "<"),
-                        ("&gt;", ">"), ("&quot;", '"'), ("&#39;", "'")]:
-            text = text.replace(ent, ch)
-        return text
+        # Full entity table, not a hand-picked handful: job alerts are dense
+        # with &middot;, &bull;, &#8217; and friends as visual separators.
+        return unescape(text)
 
 
 def extract_links(html, limit=40):

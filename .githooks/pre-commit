@@ -13,8 +13,8 @@ for f in $staged; do
   case "$f" in
     .env|.env.local|.env.*)
       [ "$f" = ".env.example" ] || note "$f" "credentials file" ;;
-    config.yaml)
-      note "$f" "real config — commit config.example.yaml instead" ;;
+    config.toml|config.yaml)
+      note "$f" "real config — commit config.example.toml instead" ;;
     data/*|reports/*|profile/*|cache/*)
       note "$f" "workspace data (emails / reports / resume)" ;;
     *.eml|*.mbox|*.pdf)

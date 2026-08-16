@@ -10,8 +10,9 @@
 *.key
 
 # Real config (the example is the only one tracked)
+config.toml
 config.yaml
-!config.example.yaml
+!config.example.toml
 
 # Anything that could carry personal data if the workspace is ever copied in
 data/

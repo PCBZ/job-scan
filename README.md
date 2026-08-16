@@ -60,17 +60,19 @@ This links the skill into `~/.claude/skills/`, creates the private workspace at
 `~/.job-scan/`, and arms a pre-commit hook that blocks credentials and personal
 data from reaching this repo.
 
-Requires Python 3.9+ and `PyYAML`. PDF resumes additionally need `pypdf` or
-`PyMuPDF`; LaTeX and Markdown resumes need nothing beyond stdlib.
+Requires **Python 3.11+** and nothing else. Config is TOML, parsed by the
+stdlib `tomllib`; HTML is cleaned with `html.parser`; LaTeX has a parser in
+this repo. With a LaTeX or Markdown resume there is no `pip install` step at
+all. Only PDF resumes pull in a dependency (`pypdf` or `PyMuPDF`).
 
-```bash
-python3 -m pip install PyYAML
-```
+`install.sh` probes for a 3.11+ interpreter and pins it at
+`~/.job-scan/bin/python`. This matters on macOS, where bare `python3` is
+usually the 3.9 system build: the scripts refuse to run there rather than
+guessing at a config they cannot parse.
 
-`PyYAML` is a hard requirement rather than a soft one on purpose. Config drives
-the sender allowlist, so a silent fallback to defaults would widen the IMAP
-search to *every* recent message and pull ordinary personal mail into
-`data/raw/`. The scripts refuse to run instead.
+Missing or unparseable config is a hard error, never a fallback to defaults.
+Config carries the sender allowlist, so defaulting would widen the IMAP search
+to *every* recent message and pull ordinary personal mail into `data/raw/`.
 
 ## Code here, data there
 
@@ -87,23 +89,23 @@ email bodies — that is the file to worry about, and it lives in the workspace.
 
 ```bash
 $EDITOR ~/.job-scan/.env          # IMAP_USER + app password
-$EDITOR ~/.job-scan/config.yaml   # resume.lib, then every TODO under profile:
+$EDITOR ~/.job-scan/config.toml   # resume.lib, then every TODO under [profile]
 ```
 
 Gmail requires an [App Password](https://myaccount.google.com/apppasswords)
 with 2FA enabled; your account password will not authenticate over IMAP.
 
-The `profile:` TODOs are not cosmetic. `needs_sponsorship` alone filters out most
-defense and government postings, and `seniority` is what stops a new-grad scan
-from returning Staff roles.
+The `[profile]` TODOs are not cosmetic. `needs_sponsorship` alone filters out
+most defense and government postings, and `seniority` is what stops a new-grad
+scan from returning Staff roles.
 
 Point `resume.lib` at your resume repo:
 
-```yaml
-resume:
-  lib: ~/Developer/my-resume
-  variants: ["*.tex"]
-  default: resume
+```toml
+[resume]
+lib = "~/Developer/my-resume"
+variants = ["*.tex"]
+default = "resume"
 ```
 
 Every matching file is a variant. Name them for the direction they target —
@@ -113,8 +115,8 @@ to send for each posting, along with the git commit it was matched against.
 Verify:
 
 ```bash
-python3 scripts/fetch_mail.py --check
-python3 scripts/resume_text.py --list
+~/.job-scan/bin/python scripts/fetch_mail.py --check
+~/.job-scan/bin/python scripts/resume_text.py --list
 ```
 
 ## Run

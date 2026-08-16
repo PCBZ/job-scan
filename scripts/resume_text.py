@@ -24,6 +24,20 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
+try:
+    import tomllib
+except ModuleNotFoundError:          # Python < 3.11
+    try:
+        import tomli as tomllib      # type: ignore
+    except ModuleNotFoundError:
+        raise SystemExit(
+            "error: job-scan needs Python 3.11+ for tomllib.\n"
+            "       Running under %s (%s).\n"
+            "       Run ./install.sh to pin a newer interpreter, or: "
+            "pip install tomli"
+            % (".".join(map(str, sys.version_info[:3])), sys.executable)
+        )
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
@@ -35,24 +49,17 @@ NOT_A_VARIANT = {"preamble", "macros", "commands", "styles", "header", "config"}
 
 
 def load_config(workspace):
-    path = os.path.join(workspace, "config.yaml")
+    path = os.path.join(workspace, "config.toml")
     default = {"lib": os.path.join(workspace, "profile"),
                "variants": ["*.tex", "*.pdf", "*.md", "*.txt"],
                "default": None}
     if not os.path.exists(path):
         return default
     try:
-        import yaml
-    except ImportError:
-        # Falling back would silently ignore resume.lib and look in the wrong
-        # directory, reporting "no variants" for a library that is right there.
-        raise SystemExit(
-            "error: %s exists but PyYAML is not installed, so resume.lib "
-            "cannot be read.\n       Fix: python3 -m pip install PyYAML"
-            % path
-        )
-    with open(path, "r", encoding="utf-8") as fh:
-        cfg = yaml.safe_load(fh) or {}
+        with open(path, "rb") as fh:
+            cfg = tomllib.load(fh)
+    except tomllib.TOMLDecodeError as exc:
+        raise SystemExit("error: %s is not valid TOML — %s" % (path, exc))
     resume = cfg.get("resume") or {}
     merged = dict(default)
     for key in ("lib", "variants", "default"):
@@ -180,7 +187,7 @@ def pick_default(variants, cfg):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--workspace", default=DEFAULT_WORKSPACE)
-    ap.add_argument("--lib", help="override the library path from config.yaml")
+    ap.add_argument("--lib", help="override the library path from config.toml")
     ap.add_argument("--variant", help="variant name (filename without extension)")
     ap.add_argument("--list", action="store_true", help="list variants as JSON")
     ap.add_argument("--all", action="store_true", help="{name: text} as JSON")
@@ -196,7 +203,7 @@ def main():
         print(json.dumps({
             "error": "lib_not_found",
             "lib": cfg["lib"],
-            "hint": "Point resume.lib in %s/config.yaml at your resume repo."
+            "hint": "Point resume.lib in %s/config.toml at your resume repo."
                     % ws,
         }, indent=2))
         return 2
