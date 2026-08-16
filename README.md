@@ -60,8 +60,17 @@ This links the skill into `~/.claude/skills/`, creates the private workspace at
 `~/.job-scan/`, and arms a pre-commit hook that blocks credentials and personal
 data from reaching this repo.
 
-Requires Python 3.9+. PDF resumes additionally need `pypdf` or `PyMuPDF`; YAML
-config needs `PyYAML`. LaTeX and Markdown resumes need nothing beyond stdlib.
+Requires Python 3.9+ and `PyYAML`. PDF resumes additionally need `pypdf` or
+`PyMuPDF`; LaTeX and Markdown resumes need nothing beyond stdlib.
+
+```bash
+python3 -m pip install PyYAML
+```
+
+`PyYAML` is a hard requirement rather than a soft one on purpose. Config drives
+the sender allowlist, so a silent fallback to defaults would widen the IMAP
+search to *every* recent message and pull ordinary personal mail into
+`data/raw/`. The scripts refuse to run instead.
 
 ## Code here, data there
 

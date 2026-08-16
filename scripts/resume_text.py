@@ -44,7 +44,13 @@ def load_config(workspace):
     try:
         import yaml
     except ImportError:
-        return default
+        # Falling back would silently ignore resume.lib and look in the wrong
+        # directory, reporting "no variants" for a library that is right there.
+        raise SystemExit(
+            "error: %s exists but PyYAML is not installed, so resume.lib "
+            "cannot be read.\n       Fix: python3 -m pip install PyYAML"
+            % path
+        )
     with open(path, "r", encoding="utf-8") as fh:
         cfg = yaml.safe_load(fh) or {}
     resume = cfg.get("resume") or {}

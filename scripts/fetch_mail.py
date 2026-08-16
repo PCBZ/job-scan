@@ -94,8 +94,15 @@ def load_config(workspace):
     try:
         import yaml  # noqa
     except ImportError:
-        sys.stderr.write("warn: PyYAML missing, using defaults\n")
-        return defaults
+        # Never fall back to defaults here: an empty `senders` list turns the
+        # IMAP search into "everything since <date>", which would pull ordinary
+        # personal mail into data/raw/ and hand it to the model as job data.
+        raise SystemExit(
+            "error: %s exists but PyYAML is not installed, so it cannot be "
+            "read.\n       Refusing to run with default filters — that would "
+            "fetch unrelated mail.\n       Fix: python3 -m pip install PyYAML"
+            % path
+        )
     with open(path, "r", encoding="utf-8") as fh:
         cfg = yaml.safe_load(fh) or {}
     merged = dict(defaults)
