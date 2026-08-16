@@ -132,12 +132,17 @@ senders = ["linkedin.com", "joinhandshake.com", "careers"]  # per-account overri
 ```
 
 Omit `user_env`/`password_env` and they default to `<NAME>_USER` /
-`<NAME>_PASSWORD`, uppercased. Any `[mail]` key can be overridden per account.
+`<NAME>_PASSWORD`, uppercased with punctuation replaced by `_`. Any `[mail]`
+key can be overridden per account.
 
 Account names key the dedupe state, so keep them stable — renaming one makes
-its history look unseen and costs you a day of repeats. Dedupe is deliberately
-per-account at the message level, and global at the job level: the same alert
-landing in two inboxes is two messages but one posting.
+its history look unseen and costs you a day of repeats. They must also stay
+unique *after* slugging: `gmail-alt` and `gmail.alt` both yield
+`GMAIL_ALT_USER`, and the loader refuses to start rather than let two accounts
+silently read one mailbox's credentials.
+
+Dedupe is deliberately per-account at the message level, and global at the job
+level: the same alert landing in two inboxes is two messages but one posting.
 
 Accounts fail independently. An expired password on one is reported and the
 rest still run. Check them with:
@@ -146,9 +151,23 @@ rest still run. Check them with:
 ~/.job-scan/bin/python scripts/fetch_mail.py --check
 ```
 
-Note that many university and corporate M365 tenants disable IMAP basic auth
-entirely — no app password will work there. Forward that mail to an account
-that does.
+### Per-provider notes
+
+**Gmail** — every account needs its **own** App Password with 2FA enabled.
+They are per-account, not per-device, so one for your main inbox does nothing
+for the others.
+
+**Microsoft 365 / Outlook** — Microsoft disabled basic auth for Exchange
+Online, and most university and corporate tenants never re-enabled it. When a
+365 account fails with `AUTHENTICATIONFAILED` regardless of the password, the
+tenant is the cause and no app password will fix it. `--check` reports each
+account separately so you can tell which ones actually work.
+
+There is no local fallback for this. Reading Outlook's on-disk mail via
+AppleScript works only on the *legacy* Outlook for Mac; the current "new
+Outlook" has no AppleScript dictionary at all and returns error `-1728` for
+any account query. If your tenant blocks IMAP, forward that mailbox to a Gmail
+account and scan that instead.
 
 The `[profile]` TODOs are not cosmetic. `needs_sponsorship` alone filters out
 most defense and government postings, and `seniority` is what stops a new-grad

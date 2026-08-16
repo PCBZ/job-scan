@@ -124,7 +124,7 @@ def load_config(workspace):
             % path
         )
 
-    accounts, seen_names = [], set()
+    accounts, seen_names, seen_env = [], set(), {}
     for index, entry in enumerate(raw):
         name = str(entry.get("name") or "account%d" % (index + 1)).strip()
         if name.lower() in seen_names:
@@ -147,6 +147,18 @@ def load_config(workspace):
             "user_env": entry.get("user_env", "%s_USER" % slug),
             "password_env": entry.get("password_env", "%s_PASSWORD" % slug),
         })
+
+        # Distinct names can flatten to the same env slug ("gmail-work" and
+        # "gmail.work" both give GMAIL_WORK_USER). Two accounts silently
+        # reading one mailbox's credentials is worse than a startup error.
+        key = (account["user_env"], account["password_env"])
+        if key in seen_env:
+            raise SystemExit(
+                "error: accounts %r and %r both resolve to %s / %s in %s.\n"
+                "       Set user_env and password_env explicitly on at least "
+                "one of them." % (seen_env[key], name, key[0], key[1], path)
+            )
+        seen_env[key] = name
         accounts.append(account)
     return {"accounts": accounts}
 
@@ -420,14 +432,32 @@ def credentials_for(account, env):
 
 
 def auth_hint(detail, workspace, account):
-    if "AUTHENTICATIONFAILED" not in detail.upper():
+    """Provider-specific advice — the two failures need opposite responses."""
+    upper = detail.upper()
+    if not any(sig in upper for sig in
+               ("AUTHENTICATIONFAILED", "AUTHENTICATE FAILED", "LOGIN FAILED",
+                "INVALID CREDENTIALS")):
         return None
+    env_file = os.path.join(workspace, ".env")
+    host = account["host"].lower()
+
+    if "office365" in host or "outlook" in host or "hotmail" in host:
+        # Microsoft turned off basic auth for Exchange Online; most school and
+        # work tenants never turned it back on. No password fixes that, so say
+        # so rather than sending the user round the app-password loop.
+        return ("IMAP rejected the login for %r. Microsoft disabled basic auth "
+                "for Exchange Online and most school/work tenants leave it off "
+                "— if yours has, no app password will help. Confirm the tenant "
+                "allows IMAP; if it doesn't, forward this mailbox to an account "
+                "that works and scan that one instead. Credentials are read "
+                "from %s in %s." % (account["name"], account["password_env"],
+                                    env_file))
+
     return ("IMAP rejected the login for %r. Gmail does not accept an account "
             "password here — generate an App Password at "
-            "https://myaccount.google.com/apppasswords (requires 2FA) and put "
-            "it in %s under %s."
-            % (account["name"], os.path.join(workspace, ".env"),
-               account["password_env"]))
+            "https://myaccount.google.com/apppasswords (requires 2FA), and note "
+            "that each Gmail account needs its own. Put it in %s under %s."
+            % (account["name"], env_file, account["password_env"]))
 
 
 def main():

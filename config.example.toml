@@ -21,14 +21,23 @@
 # one makes its history look unseen and you will get a day of repeats.
 # ---------------------------------------------------------------------------
 [[account]]
-name = "personal"
+name = "gmail-main"
 host = "imap.gmail.com"
 port = 993
 folder = "INBOX"            # a Gmail label also works, e.g. "Job Alerts"
-user_env = "GMAIL_USER"
-password_env = "GMAIL_PASSWORD"
+user_env = "GMAIL_MAIN_USER"
+password_env = "GMAIL_MAIN_PASSWORD"
 
-# A second mailbox — delete this block if you only have one.
+# Every Gmail account needs its own App Password — they are per-account, not
+# per-device. Add as many blocks as you have inboxes.
+[[account]]
+name = "gmail-alt"
+host = "imap.gmail.com"
+user_env = "GMAIL_ALT_USER"
+password_env = "GMAIL_ALT_PASSWORD"
+
+# Microsoft 365 / Outlook. Same shape, different host. Read the note below
+# before assuming this one will connect.
 [[account]]
 name = "school"
 host = "outlook.office365.com"
@@ -39,6 +48,18 @@ password_env = "SCHOOL_PASSWORD"
 # Any [mail] key can be overridden per account. A university inbox carries
 # career-services digests that the shared allowlist would drop:
 senders = ["linkedin.com", "handshake", "joinhandshake.com", "careers", "edu"]
+
+# Microsoft disabled basic auth for Exchange Online, and most school and work
+# tenants never re-enabled it. If a 365 account fails with AUTHENTICATIONFAILED
+# no matter which password you try, the tenant is the reason and no app
+# password will fix it — forward that mailbox to a Gmail account above and
+# scan that instead. `--check` reports each account separately so you can tell
+# which ones actually work.
+#
+# Account names key the dedupe state AND derive the default env var names, so
+# they must stay unique after uppercasing and replacing punctuation:
+# "gmail-alt" and "gmail.alt" would collide. The loader refuses to start on a
+# collision rather than let two accounts read one mailbox's credentials.
 
 # ---------------------------------------------------------------------------
 # Resume library — a directory (usually its own git repo) of resume variants.
