@@ -230,6 +230,33 @@ tasks fire only while Claude Code is open; a missed run happens at next launch.
 
 Each runs standalone with `--help`.
 
+## Why is the email cleaning hand-rolled?
+
+It shouldn't be, and that was checked rather than assumed. The candidates were
+measured on a representative LinkedIn job alert — 15 job facts that must
+survive, 10 boilerplate strings that must go:
+
+| | job data kept | boilerplate left | size |
+|---|---|---|---|
+| **`clean_text` here** | **15/15** | **1/10** | 579 ch |
+| trafilatura | 15/15 | 10/10 | 1090 ch |
+| html2text | 15/15 | 10/10 | 1259 ch |
+| inscriptis | 15/15 | 10/10 | 5735 ch |
+| boilerpy3 | 0/15 | 3/10 | 355 ch |
+| justext | 0/15 | 0/10 | 0 ch |
+
+No trafilatura option combination removed any footer text; it extracts a main
+body, and an email footer *is* in the body. justext and boilerpy3 were worse
+than useless — they classify boilerplate by short text at high link density,
+which describes a job listing exactly, so every posting was labelled boilerplate
+and justext returned an empty string.
+
+These libraries target news articles: long prose, low link density. A job alert
+is the structural inverse. html2text also emits Markdown by design, injecting
+`**`, `##` and `|` noise, and renders `&middot;` as `*`.
+
+Re-measure before replacing this. The fixture and harness make that cheap.
+
 ## Why not an MCP server for the resume library?
 
 MCP earns its keep when Claude needs a capability it lacks or a remote system it
