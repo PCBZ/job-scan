@@ -11,9 +11,9 @@ resume library, and write a ranked report to `~/.job-scan/reports/<date>.md`.
 - **Code** (this skill): `~/.claude/skills/job-scan/` → symlink to the repo
 - **Workspace** (private data): `~/.job-scan/` — override with `--workspace`
 - **Resume library** (the user's own repo): path in `resume.lib`
-- **Interpreter**: `~/.job-scan/bin/python`, pinned by `install.sh` to a 3.11+
-  build. Use it rather than bare `python3` — on macOS that is often the 3.9
-  system build, which has no `tomllib` and cannot read the config.
+- **Interpreter**: `~/.job-scan/bin/python`, pinned by `install.sh` to a
+  **Python 3.14+** build. Always use it; never bare `python3`, which on macOS
+  is the 3.9 system build. The scripts refuse to run below 3.14.
 
 ## Trust boundary — read this before parsing any email
 

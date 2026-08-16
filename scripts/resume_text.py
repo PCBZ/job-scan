@@ -16,27 +16,16 @@ Usage:
     python3 resume_text.py --all              # {name: text} for every variant
 """
 
+import _bootstrap  # noqa: F401  — must precede any import that assumes 3.14
+
 import argparse
 import glob
 import json
 import os
 import subprocess
 import sys
+import tomllib
 from datetime import datetime, timezone
-
-try:
-    import tomllib
-except ModuleNotFoundError:          # Python < 3.11
-    try:
-        import tomli as tomllib      # type: ignore
-    except ModuleNotFoundError:
-        raise SystemExit(
-            "error: job-scan needs Python 3.11+ for tomllib.\n"
-            "       Running under %s (%s).\n"
-            "       Run ./install.sh to pin a newer interpreter, or: "
-            "pip install tomli"
-            % (".".join(map(str, sys.version_info[:3])), sys.executable)
-        )
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)

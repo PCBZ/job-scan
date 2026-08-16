@@ -13,6 +13,8 @@ Usage:
     python3 latex_text.py resume.tex
 """
 
+import _bootstrap  # noqa: F401  — must precede any import that assumes 3.14
+
 import re
 import sys
 

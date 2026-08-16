@@ -60,15 +60,29 @@ This links the skill into `~/.claude/skills/`, creates the private workspace at
 `~/.job-scan/`, and arms a pre-commit hook that blocks credentials and personal
 data from reaching this repo.
 
-Requires **Python 3.11+** and nothing else. Config is TOML, parsed by the
-stdlib `tomllib`; HTML is cleaned with `html.parser`; LaTeX has a parser in
-this repo. With a LaTeX or Markdown resume there is no `pip install` step at
-all. Only PDF resumes pull in a dependency (`pypdf` or `PyMuPDF`).
+## Requirements
 
-`install.sh` probes for a 3.11+ interpreter and pins it at
-`~/.job-scan/bin/python`. This matters on macOS, where bare `python3` is
-usually the 3.9 system build: the scripts refuse to run there rather than
-guessing at a config they cannot parse.
+**Python 3.14 or newer. Nothing else.**
+
+| | |
+|---|---|
+| Python | **≥ 3.14** — declared in `pyproject.toml` (`requires-python`), pinned in `.python-version`, enforced at import by `scripts/_bootstrap.py` |
+| Runtime dependencies | none |
+| Optional | `pypdf` — only if your resume library holds PDFs instead of LaTeX/Markdown (`pip install 'job-scan[pdf]'`) |
+
+There is no compatibility layer and no backport path: older interpreters are
+rejected at import with a message naming the version they ran under. Config is
+TOML via stdlib `tomllib`, HTML is cleaned with `html.parser` + `html.unescape`,
+and LaTeX is handled by `scripts/latex_text.py` in this repo.
+
+`install.sh` locates a 3.14+ interpreter and pins it at
+`~/.job-scan/bin/python`, which is what the skill and the scheduled task
+invoke. Never call bare `python3` — on macOS that is the 3.9 system build.
+
+The installer resolves pyenv shims to their real binary before pinning. A shim
+picks its version from the *current directory's* `.python-version` and
+dispatches on `argv[0]`, so pinning one would work in this repo and fail
+everywhere else. Override the choice with `JOB_SCAN_PYTHON=/path/to/python`.
 
 Missing or unparseable config is a hard error, never a fallback to defaults.
 Config carries the sender allowlist, so defaulting would widen the IMAP search

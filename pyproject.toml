@@ -1,0 +1,23 @@
+[project]
+name = "job-scan"
+version = "0.1.0"
+description = "Match job-alert emails against a resume library and write a ranked daily report"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.14"
+
+# Deliberately empty. Config is TOML via stdlib tomllib, HTML is cleaned with
+# html.parser + html.unescape, and LaTeX has a parser in scripts/latex_text.py.
+# A LaTeX or Markdown resume needs nothing installed.
+dependencies = []
+
+[project.optional-dependencies]
+# Only needed if your resume library holds PDFs rather than LaTeX/Markdown.
+pdf = ["pypdf>=5.0"]
+
+[project.urls]
+Homepage = "https://github.com/PCBZ/job-scan"
+
+[tool.job-scan]
+# Kept in sync by hand with scripts/_bootstrap.py REQUIRES and .python-version.
+python-floor = "3.14"

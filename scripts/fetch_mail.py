@@ -10,6 +10,8 @@ Usage:
     python3 fetch_mail.py --days 7 --stdout       # print to stdout, don't touch state
 """
 
+import _bootstrap  # noqa: F401  — must precede any import that assumes 3.14
+
 import argparse
 import email
 import email.header
@@ -20,22 +22,9 @@ import os
 import re
 import ssl
 import sys
+import tomllib
 from datetime import datetime, timedelta, timezone
 from html import unescape
-
-try:
-    import tomllib
-except ModuleNotFoundError:          # Python < 3.11
-    try:
-        import tomli as tomllib      # type: ignore
-    except ModuleNotFoundError:
-        raise SystemExit(
-            "error: job-scan needs Python 3.11+ for tomllib.\n"
-            "       Running under %s (%s).\n"
-            "       Run ./install.sh to pin a newer interpreter, or: "
-            "pip install tomli"
-            % (".".join(map(str, sys.version_info[:3])), sys.executable)
-        )
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_WORKSPACE = os.path.expanduser("~/.job-scan")
