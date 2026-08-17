@@ -77,6 +77,11 @@ is worth more than any single recommendation below it.
 `stats.per_account` shows the split. If total `stats.kept` is 0, write a short
 report saying so and stop — never pad a report with stale postings.
 
+`stats.body_from_plain` / `body_from_html` say where each body came from. Bodies
+rendered from HTML have been through a tag stripper and may have lost table
+structure, so a posting whose fields look jumbled is more likely mis-rendered
+than genuinely odd — prefer leaving a field empty over reconstructing it.
+
 `max_messages` is per mailbox, so a whole-run ceiling (`max_total_messages`,
 default 150) keeps four or five accounts from handing you half a million
 tokens of email. If `stats.dropped_for_budget` is non-zero, mention it near the

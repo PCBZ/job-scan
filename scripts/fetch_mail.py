@@ -37,19 +37,27 @@ TRACKING_PARAMS = re.compile(
 # --------------------------------------------------------------------------- #
 
 def html_to_text(html):
-    """Render an email's HTML part to plain text.
+    """Render an email's HTML part to plain text. Conditional fallback only.
 
-    Unlike the footer stripping that used to live here, this step is
-    load-bearing rather than a token optimisation. Measured on an alert with
-    three postings and the bulk real marketing HTML carries — an inlined style
-    block with media queries, MSO conditionals, per-element inline styles,
-    nested tables — 23k chars of HTML render to 694 chars of text, a 33x
-    reduction.
+    Not on the main path. The caller prefers the text/plain alternative and only
+    reaches here when that part is missing or under 200 characters, so for a
+    multipart sender this never runs — verified at zero calls in test_mime.
+    Whether it matters therefore depends entirely on who mails you:
 
-    The reason it cannot be skipped is the interaction with
-    max_chars_per_message. Feeding raw HTML, the first 6000 characters are still
-    inside <style>, so the model sees CSS and finds 0 of 3 job titles; rendered
-    first, it finds 3 of 3. Raising the cap does not rescue it either: 48 raw
+        multipart + real plain part   -> not called (most large job boards)
+        multipart + stub plain part   -> called ("view this in your browser")
+        text/html only               -> called (common for direct recruiter mail)
+
+    `stats.body_from_plain` / `body_from_html` report the split per run, which is
+    the only honest way to know which case your inbox is.
+
+    When it does run it is load-bearing, not a token optimisation. On an alert
+    carrying the bulk real marketing HTML has — inlined style block with media
+    queries, MSO conditionals, per-element inline styles, nested tables — 23k
+    chars of HTML render to 694 chars of text, a 33x reduction. More to the
+    point, fed raw HTML the first 6000 characters (max_chars_per_message) are
+    still inside <style>, so the model sees CSS and finds 0 of 3 job titles;
+    rendered first it finds 3 of 3. Raising the cap does not rescue that — 48 raw
     messages is ~275k tokens against ~8k rendered.
 
     Uses bs4 when available and falls back to stdlib regex plus html.unescape.
@@ -257,7 +265,15 @@ def fetch(cfg, user, password, days, state, verbose=False):
                 date_iso = ""
 
             plain, html = message_body(msg)
-            body = plain if len(plain.strip()) > 200 else html_to_text(html or plain)
+            # Most big job boards send multipart/alternative, so the plain part
+            # usually wins and html_to_text never runs. Record which path was
+            # taken: whether rendering is load-bearing or dead weight depends
+            # entirely on who mails you, and that is a fact about the inbox,
+            # not something to guess at.
+            if len(plain.strip()) > 200:
+                body, body_source = plain, "plain"
+            else:
+                body, body_source = html_to_text(html or plain), "html"
             body = clean_text(body, max_chars)
             if len(body) < 40:
                 skipped_filter += 1
@@ -270,12 +286,16 @@ def fetch(cfg, user, password, days, state, verbose=False):
                 "subject": subject,
                 "date": date_iso,
                 "body": body,
+                "body_source": body_source,
                 "links": extract_links(html) if html else [],
             })
 
+        rendered = sum(1 for m in messages if m["body_source"] == "html")
         return messages, {"account": account_name, "candidates": len(ids),
                           "already_seen": skipped_seen,
-                          "filtered_out": skipped_filter, "kept": len(messages)}
+                          "filtered_out": skipped_filter, "kept": len(messages),
+                          "body_from_plain": len(messages) - rendered,
+                          "body_from_html": rendered}
     finally:
         try:
             conn.close()
@@ -455,6 +475,11 @@ def main():
             "already_seen": sum(s["already_seen"] for s in per_account),
             "filtered_out": sum(s["filtered_out"] for s in per_account),
             "total_chars": sum(len(m["body"]) for m in messages),
+            # Answers "is html_to_text actually doing anything for my mail?"
+            "body_from_plain": sum(1 for m in messages
+                                   if m["body_source"] == "plain"),
+            "body_from_html": sum(1 for m in messages
+                                  if m["body_source"] == "html"),
             "budget": budget,
             "dropped_for_budget": sum(dropped_by_account.values()),
             "dropped_by_account": dropped_by_account,
