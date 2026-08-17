@@ -163,6 +163,24 @@ never soft-scored into the main list):
 - Location: outside `locations` and not remote.
 - Anything in `exclude_keywords`, or below `min_salary_usd` when salary is stated.
 
+**Sentinel values turn a gate off.** `seniority = "all"`, `years_experience =
+"unknown"`, `needs_sponsorship = "unknown"`, `min_salary_usd = 0`, or an empty
+`core_skills` all mean "do not filter on this". Treat a disabled gate as a
+deliberate choice, not as missing config — do not ask the user to fill it in,
+and do not invent a value to gate with.
+
+A disabled gate still gets *reported*. When `needs_sponsorship` is `"unknown"`
+and a posting states a work-authorization requirement, keep the posting and note
+the requirement in its entry so the user can judge it. Same for a stated salary
+when the floor is 0: quote it, don't filter on it. The point of switching a gate
+off is to see the full field, not to hide what the gate would have caught.
+
+Non-US locations change what some fields mean. A `locations` list naming
+Canadian, UK or EU cities makes the US-framed `needs_sponsorship` question
+(H-1B / OPT) the wrong test, and `min_salary_usd` compares against postings
+quoted in another currency. Say so once in the report rather than silently
+gating on a mismatched unit.
+
 **Score the survivors 0–100**, against the *best-fitting* variant:
 
 | Dimension | Weight | What earns points |
