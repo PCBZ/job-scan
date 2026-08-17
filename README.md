@@ -202,6 +202,21 @@ Every matching file is a variant. Name them for the direction they target —
 `backend.tex`, `ml.tex`, `newgrad.tex` — and the report will tell you which one
 to send for each posting, along with the git commit it was matched against.
 
+A GitHub repo is the intended shape: clone it, point `resume.lib` at the clone,
+and the report gains commit, age, dirty state and upstream position for free.
+
+**Watch for a stale clone.** If you edit the resume on another machine and push,
+this clone keeps an older HEAD — and every other signal still looks healthy,
+because `committed_at`, `days_since_commit` and `dirty` all describe the *local*
+commit. A clone three commits behind reports as freshly updated, and the scan
+matches against a resume missing whatever was added upstream. `behind_upstream`
+catches it; pass `--fetch` so the number reflects this moment rather than the
+last time you happened to fetch:
+
+```bash
+~/.job-scan/bin/python scripts/resume_text.py --list --fetch
+```
+
 Verify:
 
 ```bash

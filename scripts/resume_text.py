@@ -37,34 +37,59 @@ SUPPORTED = (".tex", ".pdf", ".md", ".markdown", ".txt")
 NOT_A_VARIANT = {"preamble", "macros", "commands", "styles", "header", "config"}
 
 
-def git_info(path):
-    """Commit, date and dirty state for one file. Empty dict if not in git."""
-    directory = os.path.dirname(os.path.abspath(path))
+def _git(directory, *args, timeout=5):
+    """Run git in `directory`; return stripped stdout, or None on any failure."""
     try:
-        out = subprocess.run(
-            ["git", "-C", directory, "log", "-1", "--format=%h%x1f%cI", "--",
-             os.path.basename(path)],
-            capture_output=True, text=True, timeout=5,
-        )
-        if out.returncode != 0 or not out.stdout.strip():
-            return {}
-        commit, _, iso = out.stdout.strip().partition("\x1f")
-        status = subprocess.run(
-            ["git", "-C", directory, "status", "--porcelain", "--",
-             os.path.basename(path)],
-            capture_output=True, text=True, timeout=5,
-        )
-        info = {"commit": commit, "committed_at": iso,
-                "dirty": bool(status.stdout.strip())}
-        try:
-            age = (datetime.now(timezone.utc)
-                   - datetime.fromisoformat(iso)).days
-            info["days_since_commit"] = age
-        except ValueError:
-            pass
-        return info
+        out = subprocess.run(["git", "-C", directory, *args],
+                             capture_output=True, text=True, timeout=timeout)
     except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    return out.stdout.strip()
+
+
+def git_info(path, fetch=False):
+    """Commit, date, dirty state and upstream position for one file.
+
+    `behind_upstream` matters more than it looks. A library cloned from GitHub
+    and edited on another machine leaves this clone with an older HEAD, and every
+    other signal here says it is fine: committed_at and days_since_commit
+    describe the local commit, and dirty is False because nothing is uncommitted.
+    So a clone several commits behind reports as freshly updated, and the scan
+    matches against a resume missing whatever was added upstream — silently.
+
+    Without a fetch this only knows what the last fetch learned, so
+    `upstream_checked` says whether the comparison is meaningful. Pass
+    fetch=True to refresh first; it is a network call, so it is opt-in.
+    """
+    directory = os.path.dirname(os.path.abspath(path))
+    name = os.path.basename(path)
+
+    head = _git(directory, "log", "-1", "--format=%h%x1f%cI", "--", name)
+    if not head:
         return {}
+    commit, _, iso = head.partition("\x1f")
+    info = {"commit": commit, "committed_at": iso,
+            "dirty": bool(_git(directory, "status", "--porcelain", "--", name))}
+    try:
+        info["days_since_commit"] = (
+            datetime.now(timezone.utc) - datetime.fromisoformat(iso)).days
+    except ValueError:
+        pass
+
+    upstream = _git(directory, "rev-parse", "--abbrev-ref", "@{upstream}")
+    if not upstream:
+        info["upstream"] = None          # no remote tracking branch configured
+        return info
+    info["upstream"] = upstream
+    if fetch:
+        _git(directory, "fetch", "--quiet", timeout=20)
+    info["upstream_checked"] = bool(fetch)
+    behind = _git(directory, "rev-list", "--count", "HEAD..@{upstream}")
+    if behind is not None and behind.isdigit():
+        info["behind_upstream"] = int(behind)
+    return info
 
 
 def discover(cfg):
@@ -160,6 +185,8 @@ def main():
     ap.add_argument("--list", action="store_true", help="list variants as JSON")
     ap.add_argument("--all", action="store_true", help="{name: text} as JSON")
     ap.add_argument("--force", action="store_true", help="ignore the cache")
+    ap.add_argument("--fetch", action="store_true",
+                    help="git fetch the library first, so behind_upstream is real")
     args = ap.parse_args()
 
     ws = resolve(args.workspace)
@@ -196,7 +223,7 @@ def main():
                 "modified": datetime.fromtimestamp(
                     os.path.getmtime(path)).strftime("%Y-%m-%d"),
                 "is_default": path == pick_default(variants, cfg),
-                "git": git_info(path),
+                "git": git_info(path, fetch=args.fetch),
             })
         print(json.dumps({"lib": cfg["lib"], "variants": rows}, indent=2,
                          ensure_ascii=False))

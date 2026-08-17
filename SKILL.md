@@ -101,9 +101,22 @@ flooding.
 variant, plain `resume_text.py` is enough. Extraction is cached, so the daily
 run costs nothing after the first.
 
-Note each variant's `git.days_since_commit`. If the one you're about to
-recommend hasn't been touched in 90+ days, say so in the report — a stale resume
-is a real problem the user can act on.
+Use `--fetch` on the `--list` call when the library has an upstream: it refreshes
+the remote refs so `git.behind_upstream` is real rather than whatever the last
+fetch happened to know.
+
+Two staleness signals, and the second is the dangerous one:
+
+- `git.days_since_commit` — the resume hasn't been edited in a while. If the
+  variant you're recommending is 90+ days old, say so; the user can act on it.
+- `git.behind_upstream > 0` — **this clone is out of date.** The library was
+  edited elsewhere and pushed. Every other signal looks healthy: `committed_at`
+  and `days_since_commit` describe the local commit and `dirty` is False, so a
+  clone three commits behind reports as freshly updated. You would be matching
+  against a resume missing whatever was added upstream, and saying it is current.
+  Put a line at the top of the report: which variant, how many commits behind,
+  and `git pull` as the fix. `upstream_checked: false` means the number predates
+  this run — treat it as a lower bound, not as zero.
 
 Also read `~/.job-scan/config.toml` for `[profile]` and `[report]`.
 
