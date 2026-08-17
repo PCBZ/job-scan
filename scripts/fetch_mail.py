@@ -20,203 +20,16 @@ import os
 import re
 import ssl
 import sys
-import tomllib
 from datetime import datetime, timedelta, timezone
 from html import unescape
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_WORKSPACE = os.path.expanduser("~/.job-scan")
+from workspace import (DEFAULT_WORKSPACE, infer_provider, is_placeholder,
+                       load_env, load_state, mail_config, save_state)
 
 TRACKING_PARAMS = re.compile(
     r"[?&](utm_[a-z]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga)=[^&]*",
     re.I,
 )
-
-
-# --------------------------------------------------------------------------- #
-# config / env
-# --------------------------------------------------------------------------- #
-
-def load_env(workspace):
-    """Minimal .env parser. Never logs or echoes values."""
-    path = os.path.join(workspace, ".env")
-    if not os.path.exists(path):
-        return {}
-    out = {}
-    with open(path, "r", encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            val = val.strip().strip('"').strip("'")
-            out[key.strip()] = val
-    return out
-
-
-def is_placeholder(value):
-    """True for the untouched values shipped in .env.example."""
-    value = (value or "").strip()
-    if not value:
-        return True
-    lowered = value.lower()
-    if lowered in ("you@gmail.com", "you@example.com", "your@email.com"):
-        return True
-    # A run of x's is the stand-in for the 16-character app password.
-    return set(lowered) <= {"x"}
-
-
-SHARED_KEYS = ("senders", "subject_keywords", "exclude_senders",
-               "max_messages", "max_chars_per_message")
-
-# Saves repeating host strings across half a dozen accounts, where one typo
-# turns into a confusing connection error. Also tells auth_hint which advice
-# to give without sniffing the hostname.
-PROVIDERS = {
-    "gmail":   {"host": "imap.gmail.com", "port": 993},
-    "m365":    {"host": "outlook.office365.com", "port": 993},
-    "outlook": {"host": "outlook.office365.com", "port": 993},
-    "icloud":  {"host": "imap.mail.me.com", "port": 993},
-    "yahoo":   {"host": "imap.mail.yahoo.com", "port": 993},
-    "fastmail": {"host": "imap.fastmail.com", "port": 993},
-}
-
-
-def infer_provider(host):
-    host = (host or "").lower()
-    if "gmail" in host or "googlemail" in host:
-        return "gmail"
-    if "office365" in host or "outlook" in host or "hotmail" in host:
-        return "m365"
-    if "me.com" in host or "icloud" in host:
-        return "icloud"
-    return "imap"
-
-
-def load_config(workspace):
-    """Return {"accounts": [...]}, each account merged over the [mail] defaults.
-
-    Credentials never live in config.toml — an account names the .env keys to
-    read, so the config file stays safe to share and only .env needs chmod 600.
-    """
-    path = os.path.join(workspace, "config.toml")
-    # Never proceed on defaults: an empty `senders` list collapses the IMAP
-    # search to "everything since <date>", which would pull ordinary personal
-    # mail into data/raw/ and hand it to the model as job data.
-    if not os.path.exists(path):
-        raise SystemExit(
-            "error: %s not found.\n       Refusing to run without a sender "
-            "allowlist — that would fetch unrelated mail.\n       Fix: run "
-            "./install.sh, or copy config.example.toml there." % path
-        )
-    try:
-        with open(path, "rb") as fh:
-            cfg = tomllib.load(fh)
-    except tomllib.TOMLDecodeError as exc:
-        raise SystemExit("error: %s is not valid TOML — %s" % (path, exc))
-
-    shared = {"senders": [], "subject_keywords": [], "exclude_senders": [],
-              "max_messages": 60, "max_chars_per_message": 6000}
-    mail = cfg.get("mail") or {}
-    for key in SHARED_KEYS:
-        if mail.get(key) is not None:
-            shared[key] = mail[key]
-
-    raw = cfg.get("account") or []
-    if not raw:
-        raise SystemExit(
-            "error: no [[account]] block in %s.\n"
-            "       Define at least one mailbox — see config.example.toml."
-            % path
-        )
-
-    accounts, seen_names, seen_env = [], set(), {}
-    for index, entry in enumerate(raw):
-        name = str(entry.get("name") or "account%d" % (index + 1)).strip()
-        if name.lower() in seen_names:
-            raise SystemExit(
-                "error: duplicate account name %r in %s — names key the "
-                "dedupe state, so they must be unique." % (name, path)
-            )
-        seen_names.add(name.lower())
-        slug = re.sub(r"[^A-Z0-9]+", "_", name.upper()).strip("_") or "ACCOUNT"
-
-        provider = str(entry.get("provider") or "").lower().strip()
-        if provider and provider not in PROVIDERS:
-            raise SystemExit(
-                "error: account %r has unknown provider %r in %s.\n"
-                "       Known: %s — or set host directly."
-                % (name, provider, path, ", ".join(sorted(PROVIDERS)))
-            )
-        preset = PROVIDERS.get(provider, {})
-        host = entry.get("host") or preset.get("host")
-        if not host:
-            raise SystemExit(
-                "error: account %r in %s sets neither provider nor host.\n"
-                "       Guessing a mail server is how you end up connecting to "
-                "the wrong one." % (name, path)
-            )
-
-        account = dict(shared)
-        for key in SHARED_KEYS:          # per-account override of the defaults
-            if entry.get(key) is not None:
-                account[key] = entry[key]
-        account.update({
-            "name": name,
-            "provider": provider or infer_provider(host),
-            "host": host,
-            "port": int(entry.get("port") or preset.get("port") or 993),
-            "folder": entry.get("folder", "INBOX"),
-            "user_env": entry.get("user_env", "%s_USER" % slug),
-            "password_env": entry.get("password_env", "%s_PASSWORD" % slug),
-        })
-
-        # Distinct names can flatten to the same env slug ("gmail-work" and
-        # "gmail.work" both give GMAIL_WORK_USER). Two accounts silently
-        # reading one mailbox's credentials is worse than a startup error.
-        key = (account["user_env"], account["password_env"])
-        if key in seen_env:
-            raise SystemExit(
-                "error: accounts %r and %r both resolve to %s / %s in %s.\n"
-                "       Set user_env and password_env explicitly on at least "
-                "one of them." % (seen_env[key], name, key[0], key[1], path)
-            )
-        seen_env[key] = name
-        accounts.append(account)
-
-    # max_messages is per account, so total volume grows linearly with the
-    # number of mailboxes — six accounts can hand the model half a million
-    # tokens of email. Cap the run as a whole and say what was dropped.
-    return {"accounts": accounts,
-            "max_total_messages": int(mail.get("max_total_messages", 150))}
-
-
-def load_state(workspace):
-    path = os.path.join(workspace, "data", "state.json")
-    if not os.path.exists(path):
-        return {"seen_messages": {}, "seen_jobs": {}, "last_run": None}
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            state = json.load(fh)
-    except (ValueError, IOError):
-        return {"seen_messages": {}, "seen_jobs": {}, "last_run": None}
-    state.setdefault("seen_messages", {})
-    state.setdefault("seen_jobs", {})
-    return state
-
-
-def save_state(workspace, state):
-    path = os.path.join(workspace, "data", "state.json")
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    # Prune message ids older than 90 days so state.json stays small.
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
-    state["seen_messages"] = {
-        k: v for k, v in state.get("seen_messages", {}).items() if v >= cutoff
-    }
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(state, fh, indent=2, ensure_ascii=False)
-    os.replace(tmp, path)
 
 
 # --------------------------------------------------------------------------- #
@@ -358,7 +171,7 @@ def connect(account, user, password):
 
 
 def fetch(cfg, user, password, days, state, verbose=False):
-    """Fetch one account. `cfg` is a single account dict from load_config."""
+    """Fetch one account. `cfg` is a single account dict from workspace.mail_config."""
     conn = connect(cfg, user, password)
     folder = cfg.get("folder", "INBOX")
     account_name = cfg["name"]
@@ -513,7 +326,7 @@ def main():
 
     ws = os.path.expanduser(args.workspace)
     env = load_env(ws)
-    cfg = load_config(ws)
+    cfg = mail_config(ws)
     accounts = cfg["accounts"]
     budget = args.max_total or cfg["max_total_messages"]
 

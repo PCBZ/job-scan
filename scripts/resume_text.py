@@ -24,38 +24,17 @@ import json
 import os
 import subprocess
 import sys
-import tomllib
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-DEFAULT_WORKSPACE = os.path.expanduser("~/.job-scan")
+from workspace import DEFAULT_WORKSPACE, resume_config  # noqa: E402
+
 SUPPORTED = (".tex", ".pdf", ".md", ".markdown", ".txt")
 
 # Files a LaTeX resume repo carries that are not themselves resumes.
 NOT_A_VARIANT = {"preamble", "macros", "commands", "styles", "header", "config"}
-
-
-def load_config(workspace):
-    path = os.path.join(workspace, "config.toml")
-    default = {"lib": os.path.join(workspace, "profile"),
-               "variants": ["*.tex", "*.pdf", "*.md", "*.txt"],
-               "default": None}
-    if not os.path.exists(path):
-        return default
-    try:
-        with open(path, "rb") as fh:
-            cfg = tomllib.load(fh)
-    except tomllib.TOMLDecodeError as exc:
-        raise SystemExit("error: %s is not valid TOML — %s" % (path, exc))
-    resume = cfg.get("resume") or {}
-    merged = dict(default)
-    for key in ("lib", "variants", "default"):
-        if resume.get(key):
-            merged[key] = resume[key]
-    merged["lib"] = os.path.expanduser(str(merged["lib"]))
-    return merged
 
 
 def git_info(path):
@@ -184,7 +163,7 @@ def main():
     args = ap.parse_args()
 
     ws = os.path.expanduser(args.workspace)
-    cfg = load_config(ws)
+    cfg = resume_config(ws)
     if args.lib:
         cfg["lib"] = os.path.expanduser(args.lib)
 

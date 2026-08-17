@@ -27,7 +27,7 @@ import re
 import sys
 from datetime import datetime, timedelta
 
-DEFAULT_WORKSPACE = os.path.expanduser("~/.job-scan")
+from workspace import DEFAULT_WORKSPACE, load_state, save_state
 
 # Suffixes and decorations that differ between job boards but mean the same role.
 NOISE = re.compile(
@@ -50,33 +50,6 @@ def normalize(value):
 
 def fingerprint(job):
     return "%s|%s" % (normalize(job.get("company")), normalize(job.get("title")))
-
-
-def state_path(ws):
-    return os.path.join(ws, "data", "state.json")
-
-
-def load_state(ws):
-    path = state_path(ws)
-    if not os.path.exists(path):
-        return {"seen_messages": {}, "seen_jobs": {}, "last_run": None}
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            state = json.load(fh)
-    except (ValueError, IOError):
-        return {"seen_messages": {}, "seen_jobs": {}, "last_run": None}
-    state.setdefault("seen_jobs", {})
-    state.setdefault("seen_messages", {})
-    return state
-
-
-def save_state(ws, state):
-    path = state_path(ws)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(state, fh, indent=2, ensure_ascii=False)
-    os.replace(tmp, path)
 
 
 def read_jobs():

@@ -224,10 +224,21 @@ tasks fire only while Claude Code is open; a missed run happens at next launch.
 
 | Script | Job |
 |---|---|
+| `workspace.py` | Config, credentials and dedupe state — everything read from or written to `~/.job-scan/` |
 | `fetch_mail.py` | Multi-account IMAP fetch, HTML→text, size cap, message dedupe |
 | `resume_text.py` | Discover variants, extract, cache, attach git metadata |
 | `latex_text.py` | Brace-aware LaTeX→text (handles `\resumeSubheading`-style macros) |
 | `seen_jobs.py` | Job-level dedupe across rewordings |
+| `_bootstrap.py` | The Python floor, enforced at import |
+
+`workspace.py` exists because three scripts each reached into `~/.job-scan/` on
+their own and had started to disagree. `load_config` existed twice under one
+name with different semantics — one hard-failing on a missing file, the other
+quietly defaulting — and `load_state`/`save_state` existed twice over the *same*
+JSON file with different invariants: one pruned old message ids, the other did
+not, and neither ever pruned job fingerprints, so that half of the file grew
+without bound. One owner, one retention policy: 90 days for message ids, 365 for
+job fingerprints, comfortably past any `repeat_suppression_days`.
 
 Each runs standalone with `--help`.
 
