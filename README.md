@@ -71,8 +71,8 @@ data from reaching this repo.
 | | |
 |---|---|
 | Python | **≥ 3.14** — declared in `pyproject.toml` (`requires-python`), pinned in `.python-version`, enforced at import by `scripts/_bootstrap.py` |
-| Runtime dependencies | none |
-| Optional | `pypdf` — only if your resume library holds PDFs instead of LaTeX/Markdown (`pip install 'job-scan[pdf]'`) |
+| Runtime dependencies | none — `pip install -r requirements.txt` is a deliberate no-op |
+| Optional | `pypdf`, only if your resume library holds PDFs instead of LaTeX/Markdown: `pip install -r requirements-pdf.txt` |
 
 There is no compatibility layer and no backport path: older interpreters are
 rejected at import with a message naming the version they ran under. Config is

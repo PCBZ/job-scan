@@ -1,0 +1,18 @@
+# job-scan has no runtime dependencies. This file is intentionally empty of
+# packages, and `pip install -r requirements.txt` is a deliberate no-op.
+#
+# Everything comes from the standard library:
+#   tomllib                      config parsing        (3.11+)
+#   imaplib, ssl, email          mail fetch and MIME
+#   html.parser, html.unescape   HTML rendering
+#   scripts/latex_text.py        LaTeX, written here
+#
+# The one real requirement is the interpreter, which cannot be expressed in this
+# format: Python >= 3.14. It is declared in pyproject.toml (requires-python),
+# pinned in .python-version, and enforced at import by scripts/_bootstrap.py.
+# `install.sh` locates a suitable interpreter and pins it at
+# ~/.job-scan/bin/python, which is what the skill and scheduled task invoke.
+#
+# Optional — only if your resume library holds PDFs rather than LaTeX or
+# Markdown, in which case resume_text.py exits with a message saying so:
+#   pip install -r requirements-pdf.txt
