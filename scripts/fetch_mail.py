@@ -27,77 +27,6 @@ from html import unescape
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_WORKSPACE = os.path.expanduser("~/.job-scan")
 
-# Everything from the first footer marker onward is boilerplate: unsubscribe
-# text, mailing address, legal notices. It is typically a third of an alert
-# email and contains no job data, so cutting it is mostly about noise — the
-# model should not be parsing "you are receiving this" as a posting.
-#
-# This is hand-rolled on purpose. The libraries were measured against a
-# representative LinkedIn alert (15 job facts to keep, 10 boilerplate strings to
-# drop) rather than assumed better, and all lost:
-#
-#   markers here        keep 15/15   boilerplate left  1/10    579 chars
-#   email-reply-parser  keep 15/15   boilerplate left  9/10   1297
-#   trafilatura         keep 15/15   boilerplate left 10/10   1090  (any options)
-#   html2text           keep 15/15   boilerplate left 10/10   1259
-#   inscriptis          keep 15/15   boilerplate left 10/10   5735
-#   boilerpy3           keep  0/15   boilerplate left  3/10    355
-#   justext             keep  0/15   boilerplate left  0/10      0
-#   talon               could not be installed (see below)
-#
-# The open-source email-cleaning ecosystem targets *conversational* mail —
-# stripping quoted replies and personal signatures — because that is the corpus
-# it was built on. A job alert has neither, so email-reply-parser removes almost
-# nothing. Marketing/notification footer removal is a different problem with no
-# maintained library: talon is the only email-specific candidate and it pins
-# cchardet, an unmaintained C extension that fails to build on 3.14.
-#
-# The web tools mismatch differently. Extractors (trafilatura) treat an email
-# footer as part of the body, since no article structure separates them.
-# Classifiers (justext, boilerpy3) are worse: they detect boilerplate by short
-# text at high link density, which describes a job listing exactly — justext
-# labelled every posting BOILER and returned an empty string.
-#
-# Re-measure before swapping one in.
-#
-# The token saving is not the point — measured at ~135 tokens per message, or
-# about 6.5k on a realistic four-account day, which would not justify any
-# complexity on its own. The point is that footers contain lines like
-#
-#   LinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085
-#
-# which is textually indistinguishable from the "company · location" pattern the
-# extraction step looks for. On an unattended run, one phantom posting costs more
-# trust than the tokens are worth.
-#
-# Deliberately one flat list. An earlier version had a second tier of weaker
-# markers ("privacy policy", "terms of service", "©") trusted only in the tail,
-# which needed two extra thresholds and produced two bugs. Measured against a
-# representative alert it changed nothing: US commercial mail must carry an
-# unsubscribe mechanism, so a strong marker is nearly always present and always
-# earlier. Weak markers are also the risky ones — a privacy-tooling role
-# mentions its own privacy policy.
-FOOTER_MARKERS = [
-    "unsubscribe",
-    "this email was sent to",
-    "you are receiving this",
-    "you're receiving this",
-    "you received this email because",
-    "manage your email",
-    "email preferences",
-    "update your preferences",
-    "view this email in your browser",
-    "退订",
-    "取消订阅",
-]
-
-# A marker firing near the very start is not credible (a nav "unsubscribe" link
-# above the content, say). Veto the cut only when it is both short in absolute
-# terms AND would discard most of the message — an absolute floor alone is
-# biased against CJK, where 200 characters is a substantial body.
-FOOTER_MIN_KEEP = 200
-FOOTER_MIN_KEEP_FRACTION = 0.5
-
 TRACKING_PARAMS = re.compile(
     r"[?&](utm_[a-z]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga)=[^&]*",
     re.I,
@@ -335,22 +264,22 @@ def extract_links(html, limit=40):
 
 
 def clean_text(text, max_chars):
+    """Normalise whitespace and enforce the per-message size cap.
+
+    Deliberately does not strip unsubscribe footers. That was implemented and
+    measured — ~135 tokens saved per message, and every candidate library did
+    worse than the hand-rolled version — but neither number justified owning a
+    marker list. Footers now reach the model intact, so SKILL.md carries the one
+    instruction that matters: a sender's own corporate address is not a posting.
+
+    The remaining truncation is `max_chars`, which bounds the token budget and
+    is unrelated to footer detection.
+    """
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = re.sub(r"[ \t ]+", " ", text)
     text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
     lines = [ln.strip() for ln in text.split("\n")]
     text = "\n".join(ln for ln in lines if ln)
-
-    lowered = text.lower()
-    cut = len(text)
-    for marker in FOOTER_MARKERS:
-        idx = lowered.find(marker)
-        if idx != -1:
-            cut = min(cut, idx)
-    # Too early to believe: keep the whole body rather than risk eating jobs.
-    if cut < FOOTER_MIN_KEEP and cut < len(text) * FOOTER_MIN_KEEP_FRACTION:
-        cut = len(text)
-    text = text[:cut].strip()
 
     if len(text) > max_chars:
         text = text[:max_chars] + "\n[...truncated]"

@@ -230,40 +230,50 @@ tasks fire only while Claude Code is open; a missed run happens at next launch.
 
 Each runs standalone with `--help`.
 
-## Why is the email cleaning hand-rolled?
+## Why aren't unsubscribe footers stripped?
 
-It shouldn't be, and that was checked rather than assumed. The candidates were
-measured on a representative LinkedIn job alert — 15 job facts that must
-survive, 10 boilerplate strings that must go:
+Because it was measured and did not earn its keep. Bodies reach the model with
+their footers intact.
 
-| | built for | job data kept | boilerplate left | size |
-|---|---|---|---|---|
-| **`clean_text` here** | — | **15/15** | **1/10** | 579 ch |
-| talon | email signatures/replies | *would not install* | — | — |
-| email-reply-parser | quoted replies | 15/15 | 9/10 | 1297 ch |
-| trafilatura | web articles | 15/15 | 10/10 | 1090 ch |
-| html2text | HTML→Markdown | 15/15 | 10/10 | 1259 ch |
-| inscriptis | HTML→text | 15/15 | 10/10 | 5735 ch |
-| boilerpy3 | web articles | 0/15 | 3/10 | 355 ch |
-| justext | web articles | 0/15 | 0/10 | 0 ch |
+Footer stripping was built, then removed. It saved ~135 tokens per message —
+about 6.5k on a realistic four-account day — which is not worth owning a marker
+list that needs a new entry every time a sender changes its template. Two bugs
+came out of that list before it was deleted.
 
-The open-source email-cleaning ecosystem targets **conversational** mail —
-stripping quoted replies and personal signatures — because that is the corpus it
-was built on. A job alert has neither, so `email-reply-parser` removes almost
-nothing. Marketing/notification footer removal is a separate problem with no
-maintained library: `talon` is the only email-specific candidate and it pins
-`cchardet`, an unmaintained C extension that fails to build on Python 3.14.
+The library route was checked too, on a representative LinkedIn alert: 15 job
+facts that had to survive, 10 boilerplate strings that had to go.
 
-The web tools mismatch differently. No trafilatura option combination removed
-any footer text — it extracts a main body, and an email footer *is* in the body.
-justext and boilerpy3 were worse than useless: they classify boilerplate by
-short text at high link density, which describes a job listing exactly, so every
-posting was labelled boilerplate and justext returned an empty string.
+| | built for | job data kept | boilerplate left |
+|---|---|---|---|
+| talon | email signatures/replies | *would not install* | — |
+| email-reply-parser | quoted replies | 15/15 | 9/10 |
+| trafilatura | web articles | 15/15 | 10/10 |
+| html2text | HTML→Markdown | 15/15 | 10/10 |
+| inscriptis | HTML→text | 15/15 | 10/10 |
+| boilerpy3 | web articles | 0/15 | 3/10 |
+| justext | web articles | 0/15 | 0/10 |
 
-html2text also emits Markdown by design, injecting `**`, `##` and `|` noise, and
-renders `&middot;` as `*`.
+Nothing off the shelf does this. The open-source email-cleaning ecosystem
+targets **conversational** mail — quoted replies and personal signatures —
+because that is the corpus it was built on, and a job alert has neither.
+`talon` is the only email-specific candidate and it pins `cchardet`, an
+unmaintained C extension that fails to build on 3.14. The web tools mismatch
+worse: justext and boilerpy3 classify boilerplate by short text at high link
+density, which describes a job listing exactly, so every posting was labelled
+boilerplate and justext returned an empty string.
 
-Re-measure before replacing this. The fixture and harness make that cheap.
+The one thing footers do cost is a false-positive risk. A line like
+
+```
+LinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085
+```
+
+is textually indistinguishable from the `company · location` pattern extraction
+looks for. That mitigation lives in `SKILL.md` instead of in code: a posting
+requires a job title, and a company name beside a city is not one.
+
+`max_chars_per_message` still applies. It bounds the token budget and has
+nothing to do with footers.
 
 ## Why not an MCP server for the resume library?
 

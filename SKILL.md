@@ -120,6 +120,20 @@ One alert email usually holds 5–25 postings — get them all. Use `links[]` fr
 the JSON for `url`, matching on anchor text. **Leave a field empty rather than
 guessing.** An empty `salary` is a fact; an invented one is a bug.
 
+Bodies arrive with their unsubscribe footers intact — nothing strips them, by
+design. Footers are not postings, and one line in particular reads exactly like
+one:
+
+```
+LinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085
+```
+
+That is the sender's own registered address, not a job in Sunnyvale. Ignore the
+whole tail of the message: unsubscribe and preference links, legal and trademark
+text, app-store badges, and the sender's corporate address. **A posting needs a
+job title.** A company name next to a city is not enough — if you cannot name
+the role, there is no posting there.
+
 ### 5. Drop repeats
 
 ```bash
