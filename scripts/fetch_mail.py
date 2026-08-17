@@ -60,13 +60,24 @@ DEFAULT_WORKSPACE = os.path.expanduser("~/.job-scan")
 #
 # Re-measure before swapping one in.
 #
-# Two tiers, because one list forced a bad trade-off. A marker trusted anywhere
-# risks truncating real content; a marker trusted only near the end leaves the
-# whole footer in place whenever it starts early, which is the common shape for
-# a short alert with a long footer.
-
-# Effectively never appear inside a job posting, so they cut at any position.
-FOOTER_MARKERS_STRONG = [
+# The token saving is not the point — measured at ~135 tokens per message, or
+# about 6.5k on a realistic four-account day, which would not justify any
+# complexity on its own. The point is that footers contain lines like
+#
+#   LinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085
+#
+# which is textually indistinguishable from the "company · location" pattern the
+# extraction step looks for. On an unattended run, one phantom posting costs more
+# trust than the tokens are worth.
+#
+# Deliberately one flat list. An earlier version had a second tier of weaker
+# markers ("privacy policy", "terms of service", "©") trusted only in the tail,
+# which needed two extra thresholds and produced two bugs. Measured against a
+# representative alert it changed nothing: US commercial mail must carry an
+# unsubscribe mechanism, so a strong marker is nearly always present and always
+# earlier. Weak markers are also the risky ones — a privacy-tooling role
+# mentions its own privacy policy.
+FOOTER_MARKERS = [
     "unsubscribe",
     "this email was sent to",
     "you are receiving this",
@@ -80,22 +91,10 @@ FOOTER_MARKERS_STRONG = [
     "取消订阅",
 ]
 
-# Real copy does use these, so only believe them in the tail of the message.
-FOOTER_MARKERS_WEAK = [
-    "privacy policy",
-    "terms of service",
-    "all rights reserved",
-    "©",
-]
-
-# A weak marker is only a footer if it lands this far into the body.
-FOOTER_TAIL_FRACTION = 0.6
-
-# A marker that fires near the very start is not credible (a nav "unsubscribe"
-# link above the content, say). Veto the cut only when it is both short in
-# absolute terms AND would throw away most of the message — an absolute floor
-# alone is biased against CJK, where 200 characters is a substantial body and
-# a real footer would never get stripped.
+# A marker firing near the very start is not credible (a nav "unsubscribe" link
+# above the content, say). Veto the cut only when it is both short in absolute
+# terms AND would discard most of the message — an absolute floor alone is
+# biased against CJK, where 200 characters is a substantial body.
 FOOTER_MIN_KEEP = 200
 FOOTER_MIN_KEEP_FRACTION = 0.5
 
@@ -344,13 +343,9 @@ def clean_text(text, max_chars):
 
     lowered = text.lower()
     cut = len(text)
-    for marker in FOOTER_MARKERS_STRONG:
+    for marker in FOOTER_MARKERS:
         idx = lowered.find(marker)
         if idx != -1:
-            cut = min(cut, idx)
-    for marker in FOOTER_MARKERS_WEAK:
-        idx = lowered.find(marker)
-        if idx != -1 and idx > len(text) * FOOTER_TAIL_FRACTION:
             cut = min(cut, idx)
     # Too early to believe: keep the whole body rather than risk eating jobs.
     if cut < FOOTER_MIN_KEEP and cut < len(text) * FOOTER_MIN_KEEP_FRACTION:
