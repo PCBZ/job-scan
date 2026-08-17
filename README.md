@@ -23,8 +23,9 @@ resume repo ──▶ resume_text.py ──────────┘
    — `BODY.PEEK` throughout, so nothing is marked read, moved, or deleted. One
    mailbox failing doesn't sink the run; the failure is reported at the top of
    the report rather than quietly halving your coverage.
-2. **Clean** each message: strip HTML, drop footers, remove tracking params
-   from links, dedupe by `Message-ID`.
+2. **Clean** each message: strip HTML, normalise whitespace, remove tracking
+   params from links, dedupe by `Message-ID`. Unsubscribe footers are left in
+   place — see below for why.
 3. **Load** your resume variants from a resume library — a directory, usually
    its own git repo, of `.tex` (or `.pdf`/`.md`) files.
 4. **Extract** every posting from the alert bodies.
@@ -223,7 +224,7 @@ tasks fire only while Claude Code is open; a missed run happens at next launch.
 
 | Script | Job |
 |---|---|
-| `fetch_mail.py` | IMAP fetch, HTML→text, footer strip, message dedupe |
+| `fetch_mail.py` | Multi-account IMAP fetch, HTML→text, size cap, message dedupe |
 | `resume_text.py` | Discover variants, extract, cache, attach git metadata |
 | `latex_text.py` | Brace-aware LaTeX→text (handles `\resumeSubheading`-style macros) |
 | `seen_jobs.py` | Job-level dedupe across rewordings |
