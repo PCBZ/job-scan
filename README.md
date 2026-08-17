@@ -106,9 +106,20 @@ email bodies — that is the file to worry about, and it lives in the workspace.
 ## Configure
 
 ```bash
-$EDITOR ~/.job-scan/.env          # IMAP_USER + app password
 $EDITOR ~/.job-scan/config.toml   # resume.lib, then every TODO under [profile]
+$EDITOR ~/.job-scan/.env          # one USER/PASSWORD pair per account
 ```
+
+Edit `config.toml` first: account names there derive the `.env` key names. Ask
+the tool which keys yours needs rather than copying the example, which is only
+correct for the example config:
+
+```bash
+~/.job-scan/bin/python scripts/fetch_mail.py --env-template
+```
+
+It reads your `config.toml` and emits the exact skeleton with per-provider notes.
+It never reads the existing `.env`, so it cannot echo a credential.
 
 Gmail requires an [App Password](https://myaccount.google.com/apppasswords)
 with 2FA enabled; your account password will not authenticate over IMAP.
