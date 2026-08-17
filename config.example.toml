@@ -14,8 +14,11 @@
 # Credentials are NOT stored here. Each account names the .env keys to read, so
 # this file stays safe to share and only .env needs chmod 600. If you omit
 # user_env / password_env they default to <NAME>_USER and <NAME>_PASSWORD,
-# uppercased — the "personal" account below would read PERSONAL_USER and
-# PERSONAL_PASSWORD.
+# uppercased with punctuation replaced by _ — "gmail-alt" below reads
+# GMAIL_ALT_USER and GMAIL_ALT_PASSWORD.
+#
+# Ask the tool which keys your config needs rather than copying this file:
+#   fetch_mail.py --env-template
 #
 # Account names key the dedupe state, so keep them stable and unique. Renaming
 # one makes its history look unseen and you will get a day of repeats.
@@ -35,17 +38,15 @@ folder = "INBOX"            # a Gmail label also works, e.g. "Job Alerts"
 name = "gmail-alt"
 provider = "gmail"
 
-# Microsoft 365 / Outlook. Read the note below before assuming these connect.
-[[account]]
-name = "school"
-provider = "m365"
-# Any [mail] key can be overridden per account. A university inbox carries
-# career-services digests that the shared allowlist would drop:
-senders = ["linkedin.com", "handshake", "joinhandshake.com", "careers", "edu"]
-
+# Microsoft 365 / Outlook. Read the note below before assuming this connects.
+# `provider` also accepts "m365" for a work or university tenant.
 [[account]]
 name = "outlook-personal"
 provider = "outlook"
+# Any [mail] key can be overridden per account, which is how one mailbox gets a
+# different allowlist — a university inbox, say, that carries career-services
+# digests the shared list would drop:
+senders = ["linkedin.com", "joinhandshake.com", "careers"]
 
 # Microsoft disabled basic auth for Exchange Online, and most school and work
 # tenants never re-enabled it. If a 365 account fails with AUTHENTICATIONFAILED
