@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from html import unescape
 
 from workspace import (DEFAULT_WORKSPACE, infer_provider, is_placeholder,
-                       load_env, load_state, mail_config, save_state)
+                       load_env, load_state, mail_config, resolve, save_state)
 
 TRACKING_PARAMS = re.compile(
     r"[?&](utm_[a-z]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga)=[^&]*",
@@ -393,7 +393,7 @@ def main():
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
-    ws = os.path.expanduser(args.workspace)
+    ws = resolve(args.workspace)
     env = load_env(ws)
     cfg = mail_config(ws)
     accounts = cfg["accounts"]

@@ -27,7 +27,7 @@ import re
 import sys
 from datetime import datetime, timedelta
 
-from workspace import DEFAULT_WORKSPACE, load_state, save_state
+from workspace import DEFAULT_WORKSPACE, load_state, resolve, save_state
 
 # Suffixes and decorations that differ between job boards but mean the same role.
 NOISE = re.compile(
@@ -70,7 +70,7 @@ def main():
                     help="for `list`, and the repeat-suppression window for `filter`")
     args = ap.parse_args()
 
-    ws = os.path.expanduser(args.workspace)
+    ws = resolve(args.workspace)
     state = load_state(ws)
     seen = state["seen_jobs"]
     today = datetime.now().strftime("%Y-%m-%d")

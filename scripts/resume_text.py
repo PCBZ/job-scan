@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from workspace import DEFAULT_WORKSPACE, resume_config  # noqa: E402
+from workspace import DEFAULT_WORKSPACE, resolve, resume_config  # noqa: E402
 
 SUPPORTED = (".tex", ".pdf", ".md", ".markdown", ".txt")
 
@@ -162,10 +162,10 @@ def main():
     ap.add_argument("--force", action="store_true", help="ignore the cache")
     args = ap.parse_args()
 
-    ws = os.path.expanduser(args.workspace)
+    ws = resolve(args.workspace)
     cfg = resume_config(ws)
     if args.lib:
-        cfg["lib"] = os.path.expanduser(args.lib)
+        cfg["lib"] = resolve(args.lib)
 
     if not os.path.exists(cfg["lib"]):
         print(json.dumps({

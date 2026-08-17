@@ -51,6 +51,28 @@ SEEN_JOB_DAYS = 365
 # paths
 # --------------------------------------------------------------------------- #
 
+def resolve(path, base=None):
+    """Turn user-supplied path input into an absolute path.
+
+    Paths were only run through expanduser, so a bare relative value resolved
+    against the current working directory. `resume.lib = "my-resume"` therefore
+    found the library when run from the repo and reported lib_not_found from
+    anywhere else — including the scheduled run, whose cwd is arbitrary. Same
+    config, three directories, three outcomes.
+
+    `base` is for values that came out of config.toml: they resolve against the
+    workspace, where that config lives, which is what makes them cwd-independent.
+    CLI arguments pass no base and keep the conventional cwd-relative behaviour,
+    but are frozen to absolute immediately so nothing later can reinterpret them.
+    """
+    path = os.path.expanduser(str(path))
+    if os.path.isabs(path):
+        return os.path.normpath(path)
+    if base:
+        return os.path.normpath(os.path.join(base, path))
+    return os.path.abspath(path)
+
+
 def config_path(workspace):
     return os.path.join(workspace, "config.toml")
 
@@ -249,7 +271,9 @@ def resume_config(workspace):
     for key in ("lib", "variants", "default"):
         if resume.get(key):
             merged[key] = resume[key]
-    merged["lib"] = os.path.expanduser(str(merged["lib"]))
+    # Config-supplied, so relative means "relative to the workspace", not to
+    # whatever directory the scheduled task happened to start in.
+    merged["lib"] = resolve(merged["lib"], base=workspace)
     return merged
 
 

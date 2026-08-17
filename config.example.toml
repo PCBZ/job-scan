@@ -67,6 +67,8 @@ provider = "outlook"
 # ---------------------------------------------------------------------------
 [resume]
 lib = "~/Developer/my-resume"      # TODO — path to your resume repo
+# A relative value resolves against this workspace directory, not the
+# current working directory, so a scheduled run finds the same library.
 variants = ["*.tex", "src/*.tex"]  # globs, relative to lib
 default = "resume"                 # variant name (filename without extension)
 
