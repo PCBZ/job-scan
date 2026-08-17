@@ -140,8 +140,8 @@ name = "gmail-alt"
 provider = "gmail"        # reads GMAIL_ALT_USER / GMAIL_ALT_PASSWORD
 
 [[account]]
-name = "school"
-provider = "m365"
+name = "outlook-personal"
+provider = "outlook"      # "m365" for a work or university tenant
 senders = ["linkedin.com", "joinhandshake.com", "careers"]  # per-account override
 ```
 
