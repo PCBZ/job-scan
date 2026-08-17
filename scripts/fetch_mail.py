@@ -37,6 +37,25 @@ TRACKING_PARAMS = re.compile(
 # --------------------------------------------------------------------------- #
 
 def html_to_text(html):
+    """Render an email's HTML part to plain text.
+
+    Unlike the footer stripping that used to live here, this step is
+    load-bearing rather than a token optimisation. Measured on an alert with
+    three postings and the bulk real marketing HTML carries — an inlined style
+    block with media queries, MSO conditionals, per-element inline styles,
+    nested tables — 23k chars of HTML render to 694 chars of text, a 33x
+    reduction.
+
+    The reason it cannot be skipped is the interaction with
+    max_chars_per_message. Feeding raw HTML, the first 6000 characters are still
+    inside <style>, so the model sees CSS and finds 0 of 3 job titles; rendered
+    first, it finds 3 of 3. Raising the cap does not rescue it either: 48 raw
+    messages is ~275k tokens against ~8k rendered.
+
+    Uses bs4 when available and falls back to stdlib regex plus html.unescape.
+    Both paths were byte-identical on the test fixture, which is what keeps the
+    LaTeX-resume path free of third-party dependencies.
+    """
     try:
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(html, "html.parser")
