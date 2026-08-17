@@ -352,6 +352,30 @@ ENV_GUIDANCE = {
 }
 
 
+# What actually goes in the PASSWORD field, which is not the same everywhere.
+# Writing "app password" for every provider is wrong: a university or
+# self-hosted IMAP server wants the account password, and saying otherwise sends
+# someone hunting for a setting that does not exist.
+PASSWORD_HINT = {
+    "gmail": ("16-character App Password, NOT the account password. Google "
+              "disabled plain-password IMAP in 2022, so this is the only option, "
+              "and it requires 2-Step Verification. Shown as four groups: "
+              "abcd efgh ijkl mnop"),
+    "m365": ("app password if the tenant permits one. Many work and university "
+             "tenants disable basic auth outright, in which case nothing entered "
+             "here will connect — run --check before hunting for a password"),
+    "outlook": ("app password, created after enabling two-step verification on "
+                "the Microsoft account"),
+    "icloud": ("app-specific password from appleid.apple.com. The account "
+               "password will not work"),
+    "yahoo": "app password generated under Account Security, not the account password",
+    "fastmail": ("app password with IMAP access, from Settings > Privacy & "
+                 "Security"),
+    "imap": ("the account password — unless this provider requires an "
+             "app-specific one, which most large webmail services now do"),
+}
+
+
 def env_template(workspace, accounts):
     """Print the .env skeleton this config actually needs.
 
@@ -389,8 +413,7 @@ def env_template(workspace, accounts):
         lines.append("# account %r (%s)" % (account["name"], account["host"]))
         lines.append("# full email address")
         lines.append("%s=" % account["user_env"])
-        lines.append("# 16-character app password, shown as four groups: "
-                     "abcd efgh ijkl mnop")
+        lines.append("# %s" % PASSWORD_HINT.get(provider, PASSWORD_HINT["imap"]))
         lines.append("%s=" % account["password_env"])
         lines.append("")
     print("\n".join(lines).rstrip() + "\n")
