@@ -204,6 +204,20 @@ def mail_config(workspace):
             "password_env": entry.get("password_env", "%s_PASSWORD" % slug),
         })
 
+        # A present-but-empty allowlist slipped past the missing-file check and
+        # produced exactly the outcome that check exists to prevent: with no
+        # senders and no keywords the IMAP search is bare SINCE, matching every
+        # message in the window. The invariant is "at least one filter", not
+        # "a config file exists".
+        if not (account["senders"] or account["subject_keywords"]):
+            raise SystemExit(
+                "error: account %r in %s has neither senders nor "
+                "subject_keywords.\n       With both empty the IMAP search "
+                "matches every recent message, which would pull ordinary "
+                "personal mail into data/raw/.\n       Set at least one filter, "
+                "under [mail] or on the account." % (name, path)
+            )
+
         # Distinct names can flatten to the same env slug ("gmail-work" and
         # "gmail.work" both give GMAIL_WORK_USER). Two accounts silently
         # reading one mailbox's credentials is worse than a startup error.
