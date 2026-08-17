@@ -32,23 +32,33 @@ DEFAULT_WORKSPACE = os.path.expanduser("~/.job-scan")
 # email and contains no job data, so cutting it is mostly about noise — the
 # model should not be parsing "you are receiving this" as a posting.
 #
-# This is hand-rolled on purpose. The obvious libraries were measured against a
+# This is hand-rolled on purpose. The libraries were measured against a
 # representative LinkedIn alert (15 job facts to keep, 10 boilerplate strings to
-# drop) and all lost:
+# drop) rather than assumed better, and all lost:
 #
-#   markers here      keep 15/15   boilerplate left  1/10    579 chars
-#   trafilatura       keep 15/15   boilerplate left 10/10   1090   (any options)
-#   html2text         keep 15/15   boilerplate left 10/10   1259
-#   inscriptis        keep 15/15   boilerplate left 10/10   5735
-#   boilerpy3         keep  0/15   boilerplate left  3/10    355
-#   justext           keep  0/15   boilerplate left  0/10      0
+#   markers here        keep 15/15   boilerplate left  1/10    579 chars
+#   email-reply-parser  keep 15/15   boilerplate left  9/10   1297
+#   trafilatura         keep 15/15   boilerplate left 10/10   1090  (any options)
+#   html2text           keep 15/15   boilerplate left 10/10   1259
+#   inscriptis          keep 15/15   boilerplate left 10/10   5735
+#   boilerpy3           keep  0/15   boilerplate left  3/10    355
+#   justext             keep  0/15   boilerplate left  0/10      0
+#   talon               could not be installed (see below)
 #
-# The extractors (trafilatura) treat an email footer as part of the body, since
-# there is no article structure separating them. The classifiers (justext,
-# boilerpy3) are worse: they detect boilerplate by short text at high link
-# density, which is exactly what a job listing looks like — justext labelled
-# every posting BOILER and returned nothing. These tools target news articles;
-# an alert email is structurally the inverse. Re-measure before swapping one in.
+# The open-source email-cleaning ecosystem targets *conversational* mail —
+# stripping quoted replies and personal signatures — because that is the corpus
+# it was built on. A job alert has neither, so email-reply-parser removes almost
+# nothing. Marketing/notification footer removal is a different problem with no
+# maintained library: talon is the only email-specific candidate and it pins
+# cchardet, an unmaintained C extension that fails to build on 3.14.
+#
+# The web tools mismatch differently. Extractors (trafilatura) treat an email
+# footer as part of the body, since no article structure separates them.
+# Classifiers (justext, boilerpy3) are worse: they detect boilerplate by short
+# text at high link density, which describes a job listing exactly — justext
+# labelled every posting BOILER and returned an empty string.
+#
+# Re-measure before swapping one in.
 #
 # Two tiers, because one list forced a bad trade-off. A marker trusted anywhere
 # risks truncating real content; a marker trusted only near the end leaves the
