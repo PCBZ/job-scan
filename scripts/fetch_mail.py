@@ -81,8 +81,38 @@ def html_to_text(html):
         return unescape(text)
 
 
-def extract_links(html, limit=40):
-    """Pull (anchor_text, url) pairs, de-tracked and deduped, preserving order."""
+def dedupe_key(url):
+    """Path plus whatever query params survived tracking removal.
+
+    Keying on the path alone silently collapsed entire job boards. LinkedIn puts
+    the posting id in the path (/jobs/view/3912847561), but Indeed uses ?jk= and
+    Glassdoor ?jl=, so every Indeed posting shared the key
+    "https://www.indeed.com/viewjob" and only the first one survived — a 20-job
+    Indeed alert yielded exactly one link, and looked like Indeed simply doesn't
+    link its postings.
+
+    Params are sorted so the same posting keys identically regardless of order.
+    This errs toward keeping a duplicate rather than dropping a distinct URL: a
+    repeated link costs one line in the report, a missing one costs the user a
+    manual search.
+    """
+    base, _, query = url.partition("?")
+    if not query:
+        return base
+    return base + "?" + "&".join(sorted(p for p in query.split("&") if p))
+
+
+def extract_links(html, limit=60):
+    """Pull (anchor_text, url) pairs, de-tracked and deduped, preserving order.
+
+    This is how a posting in the report gets a clickable URL: the body text has
+    lost every href by the time it is rendered, so titles and links are carried
+    separately and matched on anchor text. It runs on the HTML part even when the
+    body came from text/plain, which is why the HTML part is always parsed.
+
+    Footer and nav anchors (unsubscribe, app-store badges) land here too and eat
+    into `limit`; 60 leaves room for a 25-posting alert plus its chrome.
+    """
     links, seen = [], set()
     for match in re.finditer(
         r'<a\s[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', html, re.I | re.S
@@ -93,7 +123,7 @@ def extract_links(html, limit=40):
         url = TRACKING_PARAMS.sub("", url).rstrip("?&")
         label = re.sub(r"<[^>]+>", " ", label)
         label = re.sub(r"\s+", " ", label).strip()
-        key = url.split("?")[0]
+        key = dedupe_key(url)
         if key in seen:
             continue
         seen.add(key)
