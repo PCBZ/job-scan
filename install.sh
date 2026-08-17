@@ -52,7 +52,11 @@ case "$PY" in
     JOB_SCAN_PYTHON=\$HOME/.pyenv/versions/3.14.4/bin/python3.14 ./install.sh" ;;
 esac
 
-mkdir -p "$WORKSPACE"/{data/raw,reports,cache,profile,bin}
+# No profile/ here. It is only the fallback resume.lib when that key is unset,
+# and creating it empty made resume_text.py report "no_variants — check your
+# variants globs" when the real problem is that resume.lib points nowhere.
+# Leaving it absent produces "lib_not_found" instead, which names the fix.
+mkdir -p "$WORKSPACE"/{data/raw,reports,cache,bin}
 ln -sfn "$PY" "$WORKSPACE/bin/python"
 say "interpreter pinned: $("$PY" -V 2>&1) at $PY"
 
