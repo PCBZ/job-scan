@@ -79,9 +79,26 @@ rejected at import with a message naming the version they ran under. Config is
 TOML via stdlib `tomllib`, HTML is cleaned with `html.parser` + `html.unescape`,
 and LaTeX is handled by `scripts/latex_text.py` in this repo.
 
-`install.sh` locates a 3.14+ interpreter and pins it at
-`~/.job-scan/bin/python`, which is what the skill and the scheduled task
-invoke. Never call bare `python3` — on macOS that is the 3.9 system build.
+`install.sh` locates a 3.14+ interpreter, builds a virtualenv at
+`~/.job-scan/venv/`, and pins it at `~/.job-scan/bin/python`, which is what the
+skill and the scheduled task invoke. Never call bare `python3` — on macOS that
+is the 3.9 system build.
+
+**There is nothing to activate.** Every entry point calls the pinned
+interpreter by absolute path, which is why the scheduled task works from any
+directory. `source ~/.job-scan/venv/bin/activate` exists if you want a shell
+session inside it, but no workflow requires it.
+
+The venv is not about resolving dependencies — there are none. It is about where
+an optional one would land: without it, `pip install pypdf` for a PDF resume
+library goes into the base interpreter's global `site-packages`, which on a
+pyenv build is shared with every other project on that version.
+
+`bin/python` is a wrapper that `exec`s the venv, not a symlink to it. CPython
+locates `pyvenv.cfg` from the path it was invoked with and does not resolve
+symlinks first, so a symlink would look beside the *link*, find nothing, and
+silently run as the base interpreter with the venv inert. `install.sh` asserts
+`sys.prefix != sys.base_prefix` after writing it.
 
 The installer resolves pyenv shims to their real binary before pinning. A shim
 picks its version from the *current directory's* `.python-version` and
