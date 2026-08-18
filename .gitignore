@@ -35,3 +35,6 @@ __pycache__/
 .DS_Store
 .venv/
 venv/
+
+# Workspace living in-tree: the interpreter wrapper (venv/ is above)
+bin/

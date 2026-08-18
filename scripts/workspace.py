@@ -22,7 +22,11 @@ import re
 import tomllib
 from datetime import datetime, timedelta, timezone
 
-DEFAULT_WORKSPACE = os.path.expanduser("~/.job-scan")
+# The workspace is the repo directory itself: config.toml sits beside
+# config.example.toml, .env beside .env.example. Everything private is
+# gitignored and guarded by .githooks/pre-commit — see "Code and data together"
+# in the README for what that costs.
+DEFAULT_WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Keys under [mail] that an individual [[account]] may override.
 SHARED_KEYS = ("senders", "subject_keywords", "exclude_senders",

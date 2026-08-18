@@ -135,6 +135,32 @@ def extract_links(html, limit=60):
     return links
 
 
+# A text/plain alternative has no hyperlinks, so senders inline the full
+# tracking URL as visible text — and wrap it across lines, leaving fragments
+# like "dl?jk=1413c25943b4973f&from=ja&qd=RnZhMy..." that are not URLs on their
+# own. Measured on a real Indeed/LinkedIn sample this was 63% of all body text,
+# and 90% of the worst message, pushing actual postings past
+# max_chars_per_message so they were truncated away.
+#
+# Dropping them loses nothing: extract_links() already carries every URL,
+# de-tracked, from the HTML part.
+URL_INLINE = re.compile(r"(?:https?://|www\.)\S+", re.I)
+# A wrapped continuation is one long unbroken token. Real prose always has
+# spaces, so requiring no whitespace plus URL punctuation keeps job text safe.
+URL_FRAGMENT = re.compile(r"\S{28,}")
+
+
+def strip_inline_urls(text):
+    text = URL_INLINE.sub(" ", text)
+    kept = []
+    for line in text.split("\n"):
+        bare = line.strip()
+        if URL_FRAGMENT.fullmatch(bare) and any(c in bare for c in "?&=/%"):
+            continue
+        kept.append(line)
+    return "\n".join(kept)
+
+
 def clean_text(text, max_chars):
     """Normalise whitespace and enforce the per-message size cap.
 
@@ -148,6 +174,7 @@ def clean_text(text, max_chars):
     is unrelated to footer detection.
     """
     text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = strip_inline_urls(text)
     text = re.sub(r"[ \t ]+", " ", text)
     text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
     lines = [ln.strip() for ln in text.split("\n")]

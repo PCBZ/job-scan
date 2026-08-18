@@ -4,7 +4,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE="${JOB_SCAN_WORKSPACE:-$HOME/.job-scan}"
+WORKSPACE="${JOB_SCAN_WORKSPACE:-$REPO}"   # config and data live in the repo
 SKILLS="$HOME/.claude/skills"
 
 say()  { printf '\033[32m✓\033[0m %s\n' "$1"; }
