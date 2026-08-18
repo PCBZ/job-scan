@@ -6,7 +6,7 @@ description: Scan job-alert emails over IMAP, match the postings against the use
 # Job Scan
 
 Pull recent job-alert emails, extract the postings, match them against the
-resume library, and write a ranked report to ``reports/<date>.md` in the repo`.
+resume library, and write a ranked report to `reports/<date>.md` in the repo.
 
 - **Repo and workspace are the same directory**: `~/.claude/skills/job-scan/`
   is a symlink to it. `config.toml`, `.env`, `data/` and `reports/` live there,
@@ -54,7 +54,7 @@ because there may be several mailboxes and they fail independently.
   Password is required. On a university or work M365 tenant it can also mean
   IMAP basic auth is disabled outright, which no password will fix. Say so;
   don't retry in a loop.
-- `lib_not_found` / `no_variants` → `resume.lib` in `the repo's `config.toml``
+- `lib_not_found` / `no_variants` → `resume.lib` in the repo's `config.toml`
   isn't pointing at the resume repo, or the `variants` globs match nothing.
 
 If `config.toml` still contains `TODO` placeholders, read the default resume
@@ -68,7 +68,7 @@ writing them. Never silently invent visa status, salary floor, or seniority.
 ```
 
 Scans every configured mailbox in one pass (add `--account <name>` for just
-one). Writes ``data/raw/<date>.json`` and records message IDs,
+one). Writes `data/raw/<date>.json` and records message IDs,
 namespaced per account, so tomorrow skips them. Read that file.
 
 **Check `failures[]` before anything else.** One mailbox failing does not stop
@@ -121,7 +121,7 @@ Two staleness signals, and the second is the dangerous one:
   and `git pull` as the fix. `upstream_checked: false` means the number predates
   this run — treat it as a lower bound, not as zero.
 
-Also read `the repo's `config.toml`` for `[profile]` and `[report]`.
+Also read the repo's `config.toml` for `[profile]` and `[report]`.
 
 ### 4. Extract postings
 
@@ -226,7 +226,7 @@ manufacturing a distinction.
 
 ### 7. Write the report
 
-To ``reports/<date>.md` in the repo`:
+To `reports/<date>.md` in the repo:
 
 ```markdown
 # Job Scan — 2026-08-15
