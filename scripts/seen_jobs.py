@@ -18,7 +18,6 @@ import _bootstrap  # noqa: F401  — must precede any import that assumes 3.14
 
 import argparse
 import json
-import os
 import re
 import sys
 from datetime import datetime, timedelta
