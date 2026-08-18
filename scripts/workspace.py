@@ -262,7 +262,11 @@ def mail_config(workspace):
     # number of mailboxes — six accounts can hand the model half a million
     # tokens of email. Cap the run as a whole.
     return {"accounts": accounts,
-            "max_total_messages": int(mail.get("max_total_messages", 150))}
+            "max_total_messages": int(mail.get("max_total_messages", 150)),
+            # Lookback window. A preference, so it belongs in config rather than
+            # in whatever --days the caller last happened to type; --days still
+            # wins when given.
+            "days": int(mail.get("days", 2))}
 
 
 def resume_config(workspace):

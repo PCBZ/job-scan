@@ -88,7 +88,6 @@ senders = [
   "ziprecruiter.com",
   "dice.com",
   "wellfound.com",
-  "builtin.com",
   "otta.com",
 ]
 
@@ -100,6 +99,10 @@ subject_keywords = [
 ]
 
 exclude_senders = ["noreply@github.com", "notifications@slack.com"]
+
+# How far back each run looks. Overlap is harmless — Message-ID dedupe drops
+# anything already seen.
+days = 7
 
 max_messages = 60           # PER ACCOUNT, newest first
 max_chars_per_message = 6000
@@ -124,7 +127,10 @@ max_total_messages = 150
 target_titles = ["Software Engineer", "Backend Engineer"]  # TODO
 seniority = "all"           # all | new-grad | junior | mid | senior | staff
 years_experience = "unknown"
-locations = ["Boston, MA", "Remote (US)"]                  # TODO
+# TODO — the places you will actually work, not a region. This gate has no
+# "off" sentinel: "Boston, MA" does not admit New York, and a nearby suburb is
+# only in scope if you list it.
+locations = ["Boston, MA", "Cambridge", "Remote (US)"]
 open_to_remote = true
 open_to_relocation = false
 

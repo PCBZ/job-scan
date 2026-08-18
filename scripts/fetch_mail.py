@@ -492,8 +492,8 @@ def auth_hint(detail, workspace, account):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--workspace", default=DEFAULT_WORKSPACE)
-    ap.add_argument("--days", type=int, default=2,
-                    help="lookback window; overlap is fine, dedupe handles it")
+    ap.add_argument("--days", type=int, default=None,
+                    help="lookback window; overrides [mail] days in config")
     ap.add_argument("--account", help="scan only this account (default: all)")
     ap.add_argument("--max-total", type=int, dest="max_total",
                     help="global message ceiling across all accounts")
@@ -510,6 +510,7 @@ def main():
     cfg = mail_config(ws)
     accounts = cfg["accounts"]
     budget = args.max_total or cfg["max_total_messages"]
+    days = args.days if args.days is not None else cfg["days"]
 
     if args.account:
         wanted = args.account.lower()
@@ -573,7 +574,7 @@ def main():
             })
             continue
         try:
-            got, stats = fetch(account, user, password, args.days, state,
+            got, stats = fetch(account, user, password, days, state,
                                verbose=not args.quiet)
         except Exception as exc:  # noqa: BLE001
             # One bad mailbox must not sink the run — an expired password on
@@ -613,7 +614,7 @@ def main():
     today = datetime.now().strftime("%Y-%m-%d")
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
-        "window_days": args.days,
+        "window_days": days,
         "stats": {
             "accounts_scanned": len(per_account),
             "accounts_failed": len(failures),
