@@ -27,6 +27,7 @@ DROP_WITH_ARGS = {
     "geometry", "input", "include", "label", "ref", "pagenumbering",
     "urlstyle", "raggedbottom", "raggedright", "newlength", "setcounter",
     "AtBeginDocument", "phantom", "vphantom", "hphantom", "rule",
+    "raisebox",
 }
 
 # Commands with a fixed arity, so a following brace group is real content
@@ -38,6 +39,17 @@ ARITY = {
     "footnotesize": 1, "scriptsize": 1, "normalsize": 1,
     "section": 1, "subsection": 1, "subsubsection": 1, "paragraph": 1,
     "href": 2, "textcolor": 2, "colorbox": 2,
+    # begin/end take exactly one argument: the environment name. Without this
+    # they were unbounded, so `\begin{center}` collected the *next* brace group
+    # too — `{\Huge \scshape Wenshuang Zhou}` became begin's second argument and
+    # was discarded with it. The resume header lost the candidate's name, and
+    # every `\begin{env}` immediately followed by a group had the same hole.
+    "begin": 1, "end": 1,
+    # \raisebox{lift}{text}: the lift is layout. Pinning the arity to 1 makes
+    # the whole call drop, since the icon usages in resume headers are
+    # `\raisebox{-0.2\height}\faGithub` — one group, no text argument — and the
+    # bare offset was leaking into the output as "-0.2".
+    "raisebox": 1,
 }
 
 # Arg-less spacing/font switches: replace with a single space.
