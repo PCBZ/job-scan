@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Flatten LaTeX resume source into plain text suitable for semantic matching.
+"""Flatten LaTeX resume source to plain text.
 
-Resume templates (Jake's Resume and its many forks) are built out of custom
-macros -- `\\resumeSubheading{Role}{Dates}{Company}{Location}` -- so a naive
-regex strip either eats the content along with the command or leaves macro
-noise that pollutes skill matching. This walks the source with a brace-aware
-parser instead: known formatting commands are unwrapped, layout commands are
-dropped with their arguments, and unknown macros (which in a resume are almost
-always content carriers) keep their arguments joined by ' | '.
+Resume templates are built from custom macros like
+`\\resumeSubheading{Role}{Dates}{Company}{Location}`, which a regex strip either
+eats along with the command or leaves as noise. This walks the source
+brace-aware instead: formatting macros unwrap, layout macros drop with their
+arguments, and unknown macros keep every argument joined by ' | ' — in a resume
+they are content carriers, not layout.
 
-Usage:
     python3 latex_text.py resume.tex
 """
 
@@ -39,16 +37,11 @@ ARITY = {
     "footnotesize": 1, "scriptsize": 1, "normalsize": 1,
     "section": 1, "subsection": 1, "subsubsection": 1, "paragraph": 1,
     "href": 2, "textcolor": 2, "colorbox": 2,
-    # begin/end take exactly one argument: the environment name. Without this
-    # they were unbounded, so `\begin{center}` collected the *next* brace group
-    # too — `{\Huge \scshape Wenshuang Zhou}` became begin's second argument and
-    # was discarded with it. The resume header lost the candidate's name, and
-    # every `\begin{env}` immediately followed by a group had the same hole.
+    # Unbounded, `\begin{center}` swallowed the following group and the resume
+    # header lost the candidate's name. One argument: the environment name.
     "begin": 1, "end": 1,
-    # \raisebox{lift}{text}: the lift is layout. Pinning the arity to 1 makes
-    # the whole call drop, since the icon usages in resume headers are
-    # `\raisebox{-0.2\height}\faGithub` — one group, no text argument — and the
-    # bare offset was leaking into the output as "-0.2".
+    # `\raisebox{-0.2\height}\faGithub` has no text argument, so the bare offset
+    # leaked into the output. Arity 1 drops the whole call.
     "raisebox": 1,
 }
 

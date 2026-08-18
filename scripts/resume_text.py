@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-"""Load resume variants from a resume library and flatten them to plain text.
+"""Load resume variants from the library and flatten them to plain text.
 
-The library is a directory -- typically a separate git repo of LaTeX sources --
-holding one or more resume variants (backend.tex, ml.tex, ...). Each variant is
-extracted once and cached; re-extraction happens only when the source is newer
-than its cache, so the daily scan is a no-op after the first run.
-
-Git metadata travels with each variant so the report can say which commit a
-recommendation was matched against, and warn when a resume has gone stale.
+The library is a directory — usually its own git repo — of variants. Extraction
+is cached against source mtime, so the daily run is a no-op after the first.
+Git metadata travels with each variant so the report can name the commit it
+matched against.
 
 Usage:
     python3 resume_text.py --list             # variants + git info, as JSON
@@ -52,16 +49,10 @@ def _git(directory, *args, timeout=5):
 def git_info(path, fetch=False):
     """Commit, date, dirty state and upstream position for one file.
 
-    `behind_upstream` matters more than it looks. A library cloned from GitHub
-    and edited on another machine leaves this clone with an older HEAD, and every
-    other signal here says it is fine: committed_at and days_since_commit
-    describe the local commit, and dirty is False because nothing is uncommitted.
-    So a clone several commits behind reports as freshly updated, and the scan
-    matches against a resume missing whatever was added upstream — silently.
-
-    Without a fetch this only knows what the last fetch learned, so
-    `upstream_checked` says whether the comparison is meaningful. Pass
-    fetch=True to refresh first; it is a network call, so it is opt-in.
+    `behind_upstream` is the one that matters: a clone edited on another
+    machine reports as freshly updated by every other signal, since they all
+    describe the local commit. Without fetch=True the count only reflects the
+    last fetch, which `upstream_checked` records.
     """
     directory = os.path.dirname(os.path.abspath(path))
     name = os.path.basename(path)

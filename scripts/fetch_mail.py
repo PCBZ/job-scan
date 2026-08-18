@@ -1,237 +1,32 @@
 #!/usr/bin/env python3
-"""Fetch recent job-alert emails over IMAP and emit cleaned, deduped JSON.
+"""Fetch job-alert emails over IMAP and emit cleaned, deduped JSON.
 
-Strictly read-only against the mailbox: it SEARCHes and FETCHes with BODY.PEEK
-so the \\Seen flag is never set, and it never moves, flags, or deletes anything.
+Read-only: BODY.PEEK throughout, so \\Seen is never set, and nothing is moved,
+flagged or deleted.
 
-Usage:
-    python3 fetch_mail.py --env-template          # print the .env keys this config needs
-    python3 fetch_mail.py --check                 # verify credentials only
-    python3 fetch_mail.py --days 2                # fetch and write data/raw/<date>.json
-    python3 fetch_mail.py --days 7 --stdout       # print to stdout, don't touch state
+    fetch_mail.py --env-template   # the .env keys this config needs
+    fetch_mail.py --check          # verify logins only
+    fetch_mail.py                  # fetch into data/raw/<date>.json
+    fetch_mail.py --stdout         # print instead; leaves state untouched
 """
+
+import _bootstrap  # noqa: F401  — must precede any import that assumes 3.14
 
 import argparse
 import email
-import email.header
 import email.utils
 import imaplib
 import json
 import os
-import re
 import ssl
 import sys
 from datetime import datetime, timedelta, timezone
-from html import unescape
 
+from mail_text import (clean_text, decode_header_value, extract_links,
+                       html_to_text, message_body)
 from workspace import (DEFAULT_WORKSPACE, config_path, infer_provider,
                        is_placeholder, load_env, load_state, mail_config,
                        resolve, save_state)
-
-TRACKING_PARAMS = re.compile(
-    r"[?&](utm_[a-z]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga)=[^&]*",
-    re.I,
-)
-
-
-# --------------------------------------------------------------------------- #
-# text extraction
-# --------------------------------------------------------------------------- #
-
-def html_to_text(html):
-    """Render an email's HTML part to plain text. Conditional fallback only.
-
-    Not on the main path. The caller prefers the text/plain alternative and only
-    reaches here when that part is missing or under 200 characters, so for a
-    multipart sender this never runs — verified at zero calls in test_mime.
-    Whether it matters therefore depends entirely on who mails you:
-
-        multipart + real plain part   -> not called (most large job boards)
-        multipart + stub plain part   -> called ("view this in your browser")
-        text/html only               -> called (common for direct recruiter mail)
-
-    `stats.body_from_plain` / `body_from_html` report the split per run, which is
-    the only honest way to know which case your inbox is.
-
-    When it does run it is load-bearing, not a token optimisation. On an alert
-    carrying the bulk real marketing HTML has — inlined style block with media
-    queries, MSO conditionals, per-element inline styles, nested tables — 23k
-    chars of HTML render to 694 chars of text, a 33x reduction. More to the
-    point, fed raw HTML the first 6000 characters (max_chars_per_message) are
-    still inside <style>, so the model sees CSS and finds 0 of 3 job titles;
-    rendered first it finds 3 of 3. Raising the cap does not rescue that — 48 raw
-    messages is ~275k tokens against ~8k rendered.
-
-    Uses bs4 when available and falls back to stdlib regex plus html.unescape.
-    Both paths were byte-identical on the test fixture, which is what keeps the
-    LaTeX-resume path free of third-party dependencies.
-    """
-    try:
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(html, "html.parser")
-        for tag in soup(["script", "style", "head", "meta", "link"]):
-            tag.decompose()
-        return soup.get_text("\n")
-    except ImportError:
-        # stdlib path — equivalent for alert emails, and keeps the LaTeX
-        # pipeline dependency-free.
-        text = re.sub(r"(?is)<(script|style|head).*?</\1>", " ", html)
-        text = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</tr>|</li>|</td>", "\n", text)
-        text = re.sub(r"<[^>]+>", " ", text)
-        # Full entity table, not a hand-picked handful: job alerts are dense
-        # with &middot;, &bull;, &#8217; and friends as visual separators.
-        return unescape(text)
-
-
-def dedupe_key(url):
-    """Path plus whatever query params survived tracking removal.
-
-    Keying on the path alone silently collapsed entire job boards. LinkedIn puts
-    the posting id in the path (/jobs/view/3912847561), but Indeed uses ?jk= and
-    Glassdoor ?jl=, so every Indeed posting shared the key
-    "https://www.indeed.com/viewjob" and only the first one survived — a 20-job
-    Indeed alert yielded exactly one link, and looked like Indeed simply doesn't
-    link its postings.
-
-    Params are sorted so the same posting keys identically regardless of order.
-    This errs toward keeping a duplicate rather than dropping a distinct URL: a
-    repeated link costs one line in the report, a missing one costs the user a
-    manual search.
-    """
-    base, _, query = url.partition("?")
-    if not query:
-        return base
-    return base + "?" + "&".join(sorted(p for p in query.split("&") if p))
-
-
-def extract_links(html, limit=60):
-    """Pull (anchor_text, url) pairs, de-tracked and deduped, preserving order.
-
-    This is how a posting in the report gets a clickable URL: the body text has
-    lost every href by the time it is rendered, so titles and links are carried
-    separately and matched on anchor text. It runs on the HTML part even when the
-    body came from text/plain, which is why the HTML part is always parsed.
-
-    Footer and nav anchors (unsubscribe, app-store badges) land here too and eat
-    into `limit`; 60 leaves room for a 25-posting alert plus its chrome.
-    """
-    links, seen = [], set()
-    for match in re.finditer(
-        r'<a\s[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', html, re.I | re.S
-    ):
-        url, label = match.group(1), match.group(2)
-        if not url.lower().startswith("http"):
-            continue
-        url = TRACKING_PARAMS.sub("", url).rstrip("?&")
-        label = re.sub(r"<[^>]+>", " ", label)
-        label = re.sub(r"\s+", " ", label).strip()
-        key = dedupe_key(url)
-        if key in seen:
-            continue
-        seen.add(key)
-        links.append({"text": label[:120], "url": url})
-        if len(links) >= limit:
-            break
-    return links
-
-
-# A text/plain alternative has no hyperlinks, so senders inline the full
-# tracking URL as visible text — and wrap it across lines, leaving fragments
-# like "dl?jk=1413c25943b4973f&from=ja&qd=RnZhMy..." that are not URLs on their
-# own. Measured on a real Indeed/LinkedIn sample this was 63% of all body text,
-# and 90% of the worst message, pushing actual postings past
-# max_chars_per_message so they were truncated away.
-#
-# Dropping them loses nothing: extract_links() already carries every URL,
-# de-tracked, from the HTML part.
-URL_INLINE = re.compile(r"(?:https?://|www\.)\S+", re.I)
-# A wrapped continuation is one long unbroken token. Real prose always has
-# spaces, so requiring no whitespace plus URL punctuation keeps job text safe.
-URL_FRAGMENT = re.compile(r"\S{28,}")
-
-
-def strip_inline_urls(text):
-    text = URL_INLINE.sub(" ", text)
-    kept = []
-    for line in text.split("\n"):
-        bare = line.strip()
-        if URL_FRAGMENT.fullmatch(bare) and any(c in bare for c in "?&=/%"):
-            continue
-        kept.append(line)
-    return "\n".join(kept)
-
-
-def clean_text(text, max_chars):
-    """Normalise whitespace and enforce the per-message size cap.
-
-    Deliberately does not strip unsubscribe footers. That was implemented and
-    measured — ~135 tokens saved per message, and every candidate library did
-    worse than the hand-rolled version — but neither number justified owning a
-    marker list. Footers now reach the model intact, so SKILL.md carries the one
-    instruction that matters: a sender's own corporate address is not a posting.
-
-    The remaining truncation is `max_chars`, which bounds the token budget and
-    is unrelated to footer detection.
-    """
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = strip_inline_urls(text)
-    text = re.sub(r"[ \t ]+", " ", text)
-    text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
-    lines = [ln.strip() for ln in text.split("\n")]
-    text = "\n".join(ln for ln in lines if ln)
-
-    if len(text) > max_chars:
-        text = text[:max_chars] + "\n[...truncated]"
-    return text
-
-
-def decode_header_value(raw):
-    if not raw:
-        return ""
-    try:
-        return str(email.header.make_header(email.header.decode_header(raw)))
-    except (UnicodeDecodeError, LookupError, ValueError):
-        return str(raw)
-
-
-def message_body(msg):
-    """Return (text, html). Prefers text/plain, keeps html for link extraction."""
-    plain, html = "", ""
-    if msg.is_multipart():
-        for part in msg.walk():
-            if part.get_content_maintype() == "multipart":
-                continue
-            disp = str(part.get("Content-Disposition") or "")
-            if "attachment" in disp.lower():
-                continue
-            ctype = part.get_content_type()
-            if ctype not in ("text/plain", "text/html"):
-                continue
-            payload = part.get_payload(decode=True)
-            if not payload:
-                continue
-            charset = part.get_content_charset() or "utf-8"
-            try:
-                decoded = payload.decode(charset, errors="replace")
-            except LookupError:
-                decoded = payload.decode("utf-8", errors="replace")
-            if ctype == "text/plain":
-                plain += decoded + "\n"
-            else:
-                html += decoded + "\n"
-    else:
-        payload = msg.get_payload(decode=True) or b""
-        charset = msg.get_content_charset() or "utf-8"
-        try:
-            decoded = payload.decode(charset, errors="replace")
-        except LookupError:
-            decoded = payload.decode("utf-8", errors="replace")
-        if msg.get_content_type() == "text/html":
-            html = decoded
-        else:
-            plain = decoded
-    return plain, html
-
 
 # --------------------------------------------------------------------------- #
 # IMAP
@@ -296,8 +91,7 @@ def fetch(cfg, user, password, days, state, verbose=False):
             msg_id = (msg.get("Message-ID") or "").strip()
             if not msg_id:
                 msg_id = "no-id:%s:%s" % (msg.get("Date", ""), msg.get("Subject", ""))
-            # Namespaced by account: the same alert delivered to two mailboxes
-            # is two messages, and each account tracks its own history.
+            # Namespaced: one alert in two mailboxes is two messages.
             if "%s|%s" % (account_name, msg_id) in seen:
                 skipped_seen += 1
                 continue
@@ -324,11 +118,8 @@ def fetch(cfg, user, password, days, state, verbose=False):
                 date_iso = ""
 
             plain, html = message_body(msg)
-            # Most big job boards send multipart/alternative, so the plain part
-            # usually wins and html_to_text never runs. Record which path was
-            # taken: whether rendering is load-bearing or dead weight depends
-            # entirely on who mails you, and that is a fact about the inbox,
-            # not something to guess at.
+            # Whether rendering runs at all depends on who mails you, so
+            # record it rather than assume.
             if len(plain.strip()) > 200:
                 body, body_source = plain, "plain"
             else:
@@ -365,84 +156,56 @@ def fetch(cfg, user, password, days, state, verbose=False):
 
 # --------------------------------------------------------------------------- #
 
-ENV_GUIDANCE = {
-    "gmail": ("Gmail: needs an App Password, not the account password, and each "
-              "account needs its own.\n#   Enable 2-Step Verification, then "
-              "https://myaccount.google.com/apppasswords\n#   Paste the 16 "
-              "characters as shown; spaces are stripped."),
-    "m365": ("Microsoft 365: most school and work tenants have basic auth "
-             "disabled, in which\n#   case no password here will connect. Run "
-             "--check to find out before hunting for one."),
-    "outlook": ("Outlook.com: needs an app password with two-step verification "
-                "enabled.\n#   Microsoft is also tightening basic auth here, so "
-                "verify with --check."),
-}
-
-
-# What actually goes in the PASSWORD field, which is not the same everywhere.
-# Writing "app password" for every provider is wrong: a university or
-# self-hosted IMAP server wants the account password, and saying otherwise sends
-# someone hunting for a setting that does not exist.
+# What goes in the PASSWORD field, which is not the same everywhere: a
+# university or self-hosted IMAP server wants the account password, so telling
+# everyone "app password" sends some of them hunting for a setting that does
+# not exist.
 PASSWORD_HINT = {
     "gmail": ("16-character App Password, NOT the account password. Google "
-              "disabled plain-password IMAP in 2022, so this is the only option, "
-              "and it requires 2-Step Verification. Shown as four groups: "
+              "disabled plain-password IMAP in 2022, so this is the only "
+              "option and it needs 2-Step Verification. Four groups: "
               "abcd efgh ijkl mnop"),
     "m365": ("app password if the tenant permits one. Many work and university "
-             "tenants disable basic auth outright, in which case nothing entered "
-             "here will connect — run --check before hunting for a password"),
+             "tenants disable basic auth outright — run --check before hunting"),
     "outlook": ("app password, created after enabling two-step verification on "
                 "the Microsoft account"),
-    "icloud": ("app-specific password from appleid.apple.com. The account "
-               "password will not work"),
-    "yahoo": "app password generated under Account Security, not the account password",
-    "fastmail": ("app password with IMAP access, from Settings > Privacy & "
-                 "Security"),
+    "icloud": "app-specific password from appleid.apple.com",
+    "yahoo": "app password from Account Security, not the account password",
+    "fastmail": "app password with IMAP access, Settings > Privacy & Security",
     "imap": ("the account password — unless this provider requires an "
-             "app-specific one, which most large webmail services now do"),
+             "app-specific one, which most large webmail now does"),
 }
 
 
 def env_template(workspace, accounts):
-    """Print the .env skeleton this config actually needs.
+    """Print the .env skeleton this config needs.
 
-    Hand-maintaining .env.example against config.toml means the two drift the
-    moment an account is renamed — and a renamed account changes its derived key
-    names, which is exactly when you need to know them. Derive instead of
-    document.
-
-    Deliberately never reads the existing .env: it emits placeholders only, so
-    running it can never echo a credential to a terminal or a log.
+    Derived, not documented: a renamed account changes its key names, which is
+    exactly when you need to know them. Never reads the existing .env, so it
+    cannot echo a credential.
     """
     lines = [
         "# Generated by: fetch_mail.py --env-template",
         "# One USER/PASSWORD pair per [[account]] in %s" % config_path(workspace),
         "# Values are left empty on purpose — fill each one in yourself.",
-        "#",
         "# USER is the full email address, not a username.",
-        "# This file is read-only credentials for IMAP. The scan never sends,",
-        "# replies to, or deletes mail.",
+        "#",
+        "# Read-only IMAP credentials. The scan never sends, replies or deletes.",
         "",
     ]
-    seen_guidance = set()
     for account in accounts:
         provider = account.get("provider") or "imap"
-        note = ENV_GUIDANCE.get(provider)
-        if note and provider not in seen_guidance:
-            seen_guidance.add(provider)
-            lines.append("# %s" % note)
-        # Values are left EMPTY rather than filled with a dummy string. Sixteen
-        # x's read as a value someone already redacted, not as a blank waiting
-        # to be filled; an empty one cannot be misread, and is_placeholder()
-        # treats it as unset. The format goes in a comment, never inline after
-        # the value — this parser does not strip trailing comments, because a
-        # real password may legitimately contain '#'.
-        lines.append("# account %r (%s)" % (account["name"], account["host"]))
-        lines.append("# full email address")
-        lines.append("%s=" % account["user_env"])
-        lines.append("# %s" % PASSWORD_HINT.get(provider, PASSWORD_HINT["imap"]))
-        lines.append("%s=" % account["password_env"])
-        lines.append("")
+        # Empty, not a dummy string: sixteen x's read as a redacted value rather
+        # than a blank. The format hint goes on its own line because this parser
+        # does not strip trailing comments — a real password may contain '#'.
+        lines += [
+            "# account %r (%s)" % (account["name"], account["host"]),
+            "# full email address",
+            "%s=" % account["user_env"],
+            "# %s" % PASSWORD_HINT.get(provider, PASSWORD_HINT["imap"]),
+            "%s=" % account["password_env"],
+            "",
+        ]
     print("\n".join(lines).rstrip() + "\n")
 
 
@@ -454,7 +217,7 @@ def credentials_for(account, env):
 
 
 def auth_hint(detail, workspace, account):
-    """Provider-specific advice — the two failures need opposite responses."""
+    """Provider-specific advice: the two failures need opposite responses."""
     upper = detail.upper()
     if not any(sig in upper for sig in
                ("AUTHENTICATIONFAILED", "AUTHENTICATE FAILED", "LOGIN FAILED",
@@ -464,9 +227,7 @@ def auth_hint(detail, workspace, account):
     provider = account.get("provider") or infer_provider(account.get("host"))
 
     if provider in ("m365", "outlook"):
-        # Microsoft turned off basic auth for Exchange Online; most school and
-        # work tenants never turned it back on. No password fixes that, so say
-        # so rather than sending the user round the app-password loop.
+        # No password fixes a tenant policy, so don't send them hunting.
         return ("IMAP rejected the login for %r. Microsoft disabled basic auth "
                 "for Exchange Online and most school/work tenants leave it off "
                 "— if yours has, no app password will help. Confirm the tenant "
@@ -577,8 +338,7 @@ def main():
             got, stats = fetch(account, user, password, days, state,
                                verbose=not args.quiet)
         except Exception as exc:  # noqa: BLE001
-            # One bad mailbox must not sink the run — an expired password on
-            # the school account should still let the personal one through.
+            # One bad mailbox must not sink the run.
             detail = str(exc)[:300]
             entry = {"account": account["name"], "error": type(exc).__name__,
                      "detail": detail}
@@ -595,8 +355,7 @@ def main():
                          indent=2))
         return 1
 
-    # Enforce the whole-run ceiling, newest first. Undated mail sorts last:
-    # a message with no parseable Date is the least trustworthy thing to keep.
+    # Whole-run ceiling, newest first; undated mail sorts last.
     dropped_by_account = {}
     if len(messages) > budget:
         messages.sort(key=lambda m: (bool(m["date"]), m["date"]), reverse=True)
@@ -622,7 +381,6 @@ def main():
             "already_seen": sum(s["already_seen"] for s in per_account),
             "filtered_out": sum(s["filtered_out"] for s in per_account),
             "total_chars": sum(len(m["body"]) for m in messages),
-            # Answers "is html_to_text actually doing anything for my mail?"
             "body_from_plain": sum(1 for m in messages
                                    if m["body_source"] == "plain"),
             "body_from_html": sum(1 for m in messages

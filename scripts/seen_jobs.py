@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
-"""Job-level dedupe so the same posting isn't recommended day after day.
+"""Job-level dedupe. Fingerprint is a normalised "company|title", which
+survives the wording drift between boards.
 
-A job's fingerprint is a normalized "company|title" pair, which survives the
-minor title/formatting drift between LinkedIn, Indeed, and recruiter emails.
-
-`filter` splits its input three ways:
+`filter` splits three ways:
     new         first sighting, rank these
     repeat      recommended on an earlier day, inside --days
-    duplicates  the same posting twice in one batch, which is what happens
-                when an alert is delivered to two of your mailboxes
+    duplicates  twice in one batch — one alert reaching two mailboxes
 
-Usage:
-    python3 seen_jobs.py filter < jobs.json
-    python3 seen_jobs.py add    < jobs.json   # record as seen
-    python3 seen_jobs.py list --days 30       # what's been recommended lately
+    seen_jobs.py filter < jobs.json
+    seen_jobs.py add    < jobs.json
+    seen_jobs.py list --days 30
 
-Input JSON is a list of objects each having at least "company" and "title".
+Input is a list of objects with at least "company" and "title".
 """
 
 import _bootstrap  # noqa: F401  — must precede any import that assumes 3.14
@@ -87,9 +83,6 @@ def main():
     if args.command == "filter":
         cutoff = (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%d")
         new, repeat, duplicates = [], [], []
-        # Two buckets of duplication, and they mean different things:
-        # `repeat` was recommended on an earlier day; `duplicates` arrived
-        # twice today because the same alert went to two mailboxes.
         batch = {}
         for job in jobs:
             fp = fingerprint(job)

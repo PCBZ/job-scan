@@ -1,16 +1,8 @@
 #!/usr/bin/env python3
-"""Single owner of everything read from or written to the workspace.
+"""Single owner of config, credentials and dedupe state.
 
-Config, credentials and dedupe state all live in ~/.job-scan/, and before this
-module three scripts each reached in on their own. Two things had drifted:
-
-  * `load_config` existed twice with the same name and different semantics —
-    one hard-failed on a missing file, the other quietly defaulted.
-  * `load_state` and `save_state` existed twice over the *same* JSON file with
-    different invariants: one pruned old message ids, the other did not, and
-    neither ever pruned job fingerprints.
-
-Everything here takes an explicit workspace path so tests can point at a
+Three scripts used to reach into the workspace on their own and had drifted
+apart. Every function takes an explicit workspace path so tests can point at a
 temporary directory.
 """
 
@@ -22,19 +14,14 @@ import re
 import tomllib
 from datetime import datetime, timedelta, timezone
 
-# The workspace is the repo directory itself: config.toml sits beside
-# config.example.toml, .env beside .env.example. Everything private is
-# gitignored and guarded by .githooks/pre-commit — see "Code and data together"
-# in the README for what that costs.
+# The repo directory is the workspace; private files there are gitignored.
 DEFAULT_WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Keys under [mail] that an individual [[account]] may override.
 SHARED_KEYS = ("senders", "subject_keywords", "exclude_senders",
                "max_messages", "max_chars_per_message")
 
-# Saves repeating host strings across half a dozen accounts, where one typo
-# turns into a confusing connection error. Also tells the caller which auth
-# advice to give without sniffing the hostname.
+# Saves repeating host strings, and names the provider for auth advice.
 PROVIDERS = {
     "gmail":    {"host": "imap.gmail.com", "port": 993},
     "m365":     {"host": "outlook.office365.com", "port": 993},
@@ -44,9 +31,7 @@ PROVIDERS = {
     "fastmail": {"host": "imap.fastmail.com", "port": 993},
 }
 
-# Retention for the two halves of state.json. Message ids only matter inside
-# the fetch window; job fingerprints must outlive any repeat-suppression
-# setting, so they get a full year rather than the suppression window itself.
+# Job fingerprints must outlive any repeat_suppression_days setting.
 SEEN_MESSAGE_DAYS = 90
 SEEN_JOB_DAYS = 365
 
@@ -56,18 +41,11 @@ SEEN_JOB_DAYS = 365
 # --------------------------------------------------------------------------- #
 
 def resolve(path, base=None):
-    """Turn user-supplied path input into an absolute path.
+    """User path input -> absolute path.
 
-    Paths were only run through expanduser, so a bare relative value resolved
-    against the current working directory. `resume.lib = "my-resume"` therefore
-    found the library when run from the repo and reported lib_not_found from
-    anywhere else — including the scheduled run, whose cwd is arbitrary. Same
-    config, three directories, three outcomes.
-
-    `base` is for values that came out of config.toml: they resolve against the
-    workspace, where that config lives, which is what makes them cwd-independent.
-    CLI arguments pass no base and keep the conventional cwd-relative behaviour,
-    but are frozen to absolute immediately so nothing later can reinterpret them.
+    Config values pass base=workspace so they are cwd-independent; the
+    scheduled run starts in an arbitrary directory. CLI arguments pass no base,
+    keeping cwd-relative behaviour, but are frozen to absolute at once.
     """
     path = os.path.expanduser(str(path))
     if os.path.isabs(path):
@@ -129,11 +107,9 @@ def is_placeholder(value):
 def load_toml(workspace, required):
     """Parse config.toml. `required` decides whether absence is fatal.
 
-    The asymmetry is deliberate and is the reason this lives in one place:
-    mail config carries the sender allowlist, and running without it collapses
-    the IMAP search to "everything since <date>", pulling ordinary personal
-    mail into data/raw/. Resume config only decides which file to read, so a
-    missing one costs a feature, not privacy.
+    Asymmetric on purpose: mail config carries the sender allowlist, and
+    without it the IMAP search matches every recent message. Resume config
+    only picks a file.
     """
     path = config_path(workspace)
     if not os.path.exists(path):
@@ -163,13 +139,10 @@ def infer_provider(host):
 
 
 def mail_config(workspace):
-    """Return {"accounts": [...], "max_total_messages": int}.
+    """Accounts fully populated from [mail] defaults, provider presets and
+    per-account overrides, so callers never test whether a key is set.
 
-    Each account is fully populated: [mail] defaults, then provider presets,
-    then its own overrides. Callers never have to test whether a key is set.
-
-    Credentials are not here. An account names the .env keys to read, so
-    config.toml stays safe to share and only .env needs chmod 600.
+    Credentials are not here — an account names the .env keys to read.
     """
     path = config_path(workspace)
     cfg = load_toml(workspace, required=True)
@@ -230,11 +203,8 @@ def mail_config(workspace):
             "password_env": entry.get("password_env", "%s_PASSWORD" % slug),
         })
 
-        # A present-but-empty allowlist slipped past the missing-file check and
-        # produced exactly the outcome that check exists to prevent: with no
-        # senders and no keywords the IMAP search is bare SINCE, matching every
-        # message in the window. The invariant is "at least one filter", not
-        # "a config file exists".
+        # The invariant is "at least one filter", not "a config file exists":
+        # with neither, the IMAP search is bare SINCE and matches everything.
         if not (account["senders"] or account["subject_keywords"]):
             raise SystemExit(
                 "error: account %r in %s has neither senders nor "
@@ -244,9 +214,8 @@ def mail_config(workspace):
                 "under [mail] or on the account." % (name, path)
             )
 
-        # Distinct names can flatten to the same env slug ("gmail-work" and
-        # "gmail.work" both give GMAIL_WORK_USER). Two accounts silently
-        # reading one mailbox's credentials is worse than a startup error.
+        # "gmail-work" and "gmail.work" both slug to GMAIL_WORK_USER; two
+        # accounts silently sharing credentials is worse than a startup error.
         env_key = (account["user_env"], account["password_env"])
         if env_key in seen_env:
             raise SystemExit(
@@ -258,14 +227,9 @@ def mail_config(workspace):
         seen_env[env_key] = name
         accounts.append(account)
 
-    # max_messages is per account, so total volume grows linearly with the
-    # number of mailboxes — six accounts can hand the model half a million
-    # tokens of email. Cap the run as a whole.
+    # max_messages is per account, so the whole-run ceiling caps total volume.
     return {"accounts": accounts,
             "max_total_messages": int(mail.get("max_total_messages", 150)),
-            # Lookback window. A preference, so it belongs in config rather than
-            # in whatever --days the caller last happened to type; --days still
-            # wins when given.
             "days": int(mail.get("days", 2))}
 
 
@@ -279,19 +243,7 @@ def resume_config(workspace):
     for key in ("lib", "variants", "default"):
         if resume.get(key):
             merged[key] = resume[key]
-    # Config-supplied, so relative means "relative to the workspace", not to
-    # whatever directory the scheduled task happened to start in.
     merged["lib"] = resolve(merged["lib"], base=workspace)
-    return merged
-
-
-def report_config(workspace):
-    """The [report] section, with defaults, for whoever writes the report."""
-    cfg = load_toml(workspace, required=False)
-    merged = {"max_top_picks": 5, "min_score_to_recommend": 60,
-              "repeat_suppression_days": 30, "suggest_variant": True}
-    merged.update({k: v for k, v in (cfg.get("report") or {}).items()
-                   if v is not None})
     return merged
 
 
@@ -315,7 +267,7 @@ def load_state(workspace):
 
 
 def save_state(workspace, state):
-    """Write atomically, applying one retention policy for both writers."""
+    """Atomic write, one retention policy for both writers."""
     path = state_path(workspace)
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
@@ -327,7 +279,6 @@ def save_state(workspace, state):
         k: v for k, v in state.get("seen_messages", {}).items()
         if v >= msg_cutoff
     }
-    # Previously never pruned by either writer, so this dict grew forever.
     state["seen_jobs"] = {
         k: v for k, v in state.get("seen_jobs", {}).items()
         if str(v.get("last_seen", "")) >= job_cutoff
