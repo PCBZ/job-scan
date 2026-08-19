@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """Load resume variants from the library and flatten them to plain text.
 
-The library is a directory — usually its own git repo — of variants. Extraction
-is cached against source mtime, so the daily run is a no-op after the first.
-Git metadata travels with each variant so the report can name the commit it
-matched against.
+The library is any directory of variant files. Extraction is cached against
+source mtime, so the daily run is a no-op after the first.
 
 Usage:
-    python3 resume_text.py --list             # variants + git info, as JSON
+    python3 resume_text.py --list             # variants + mtime, as JSON
     python3 resume_text.py                    # text of the default variant
     python3 resume_text.py --variant backend  # text of one variant
     python3 resume_text.py --all              # {name: text} for every variant
@@ -19,9 +17,8 @@ import argparse
 import glob
 import json
 import os
-import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -30,57 +27,8 @@ from workspace import DEFAULT_WORKSPACE, resolve, resume_config  # noqa: E402
 
 SUPPORTED = (".tex", ".pdf", ".md", ".markdown", ".txt")
 
-# Files a LaTeX resume repo carries that are not themselves resumes.
+# Files a resume library carries that are not themselves resumes.
 NOT_A_VARIANT = {"preamble", "macros", "commands", "styles", "header", "config"}
-
-
-def _git(directory, *args, timeout=5):
-    """Run git in `directory`; return stripped stdout, or None on any failure."""
-    try:
-        out = subprocess.run(["git", "-C", directory, *args],
-                             capture_output=True, text=True, timeout=timeout)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if out.returncode != 0:
-        return None
-    return out.stdout.strip()
-
-
-def git_info(path, fetch=False):
-    """Commit, date, dirty state and upstream position for one file.
-
-    `behind_upstream` is the one that matters: a clone edited on another
-    machine reports as freshly updated by every other signal, since they all
-    describe the local commit. Without fetch=True the count only reflects the
-    last fetch, which `upstream_checked` records.
-    """
-    directory = os.path.dirname(os.path.abspath(path))
-    name = os.path.basename(path)
-
-    head = _git(directory, "log", "-1", "--format=%h%x1f%cI", "--", name)
-    if not head:
-        return {}
-    commit, _, iso = head.partition("\x1f")
-    info = {"commit": commit, "committed_at": iso,
-            "dirty": bool(_git(directory, "status", "--porcelain", "--", name))}
-    try:
-        info["days_since_commit"] = (
-            datetime.now(timezone.utc) - datetime.fromisoformat(iso)).days
-    except ValueError:
-        pass
-
-    upstream = _git(directory, "rev-parse", "--abbrev-ref", "@{upstream}")
-    if not upstream:
-        info["upstream"] = None          # no remote tracking branch configured
-        return info
-    info["upstream"] = upstream
-    if fetch:
-        _git(directory, "fetch", "--quiet", timeout=20)
-    info["upstream_checked"] = bool(fetch)
-    behind = _git(directory, "rev-list", "--count", "HEAD..@{upstream}")
-    if behind is not None and behind.isdigit():
-        info["behind_upstream"] = int(behind)
-    return info
 
 
 def discover(cfg):
@@ -176,8 +124,6 @@ def main():
     ap.add_argument("--list", action="store_true", help="list variants as JSON")
     ap.add_argument("--all", action="store_true", help="{name: text} as JSON")
     ap.add_argument("--force", action="store_true", help="ignore the cache")
-    ap.add_argument("--fetch", action="store_true",
-                    help="git fetch the library first, so behind_upstream is real")
     args = ap.parse_args()
 
     ws = resolve(args.workspace)
@@ -214,7 +160,6 @@ def main():
                 "modified": datetime.fromtimestamp(
                     os.path.getmtime(path)).strftime("%Y-%m-%d"),
                 "is_default": path == pick_default(variants, cfg),
-                "git": git_info(path, fetch=args.fetch),
             })
         print(json.dumps({"lib": cfg["lib"], "variants": rows}, indent=2,
                          ensure_ascii=False))

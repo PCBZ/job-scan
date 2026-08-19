@@ -74,26 +74,15 @@ When tuning `senders`, add `--stdout`: same payload to stdout, touching neither
 ### 2. Load the resume library
 
 ```bash
-bin/python scripts/resume_text.py --list --fetch   # variants + git metadata
-bin/python scripts/resume_text.py --all            # {name: text}
+bin/python scripts/resume_text.py --list   # variants + mtime
+bin/python scripts/resume_text.py --all    # {name: text}
 ```
 
 `--all` is the matching corpus; `--variant <name>` reads one. Extraction is
 cached against mtime, so this is nearly free after the first run.
 
-`--fetch` refreshes remote refs so `behind_upstream` is current rather than
-whatever the last fetch knew.
-
-Two staleness signals, and the second is the dangerous one:
-
-- `days_since_commit` — the resume hasn't been edited. If the variant you're
-  recommending is 90+ days old, say so.
-- `behind_upstream > 0` — **this clone is out of date.** Every other signal
-  looks healthy, because they all describe the local commit. You would match
-  against a resume missing whatever was pushed elsewhere, and call it current.
-  Put it at the top of the report with `git pull` as the fix.
-  `upstream_checked: false` means the count predates this run — a lower bound,
-  not zero.
+If the variant you are about to recommend has a `modified` date months old,
+say so — a stale resume is something the user can act on.
 
 Then read `config.toml` for `[profile]` (the gates) and `[report]`
 (`max_top_picks` caps the ranked section, `min_score_to_recommend` is the floor
