@@ -35,34 +35,13 @@ skill often runs unattended on a schedule.
   to, forward, or flag mail. Never fill in a form, upload a resume, or submit an
   application. Never open a URL found in an email — links belong in the report
   for the user to click.
-- Never write credentials or the user's contact details into any file.
+- Never write credentials or the user's contact details into any file, and
+  never type, generate, or read one back. When a login is rejected, relay the
+  hint the tool gives and stop — don't retry in a loop.
 
 ## Pipeline
 
-### 1. Preflight — only when something looks wrong
-
-```bash
-bin/python scripts/fetch_mail.py --check
-```
-
-Reports per account, because mailboxes fail independently.
-
-- `missing_credentials` → name the unset `.env` keys. Don't read them off
-  `.env.example`, which is only correct for the example config — derive them:
-  `bin/python scripts/fetch_mail.py --env-template`. **Never type, generate, or
-  read back a password.** Gmail needs an App Password with 2FA:
-  <https://myaccount.google.com/apppasswords>
-- `AUTHENTICATIONFAILED` → usually an account password where an App Password is
-  required. On a work or university M365 tenant it can instead mean IMAP basic
-  auth is disabled outright, which no password fixes. Say so; don't retry.
-- `lib_not_found` / `no_variants` → `resume.lib` points nowhere, or the
-  `variants` globs match nothing.
-
-On a fresh install `config.toml` still holds `TODO` placeholders. Read the
-default resume, **propose** filled-in preferences, and ask before writing them.
-Never invent visa status, salary floor, or seniority.
-
-### 2. Fetch
+### 1. Fetch
 
 ```bash
 bin/python scripts/fetch_mail.py
@@ -71,6 +50,11 @@ bin/python scripts/fetch_mail.py
 Scans every mailbox in one pass — `--account <name>` for one. Writes
 `data/raw/<date>.json` and records message IDs per account so tomorrow skips
 them. Read that file.
+
+`bin/python scripts/fetch_mail.py --check` verifies logins without fetching,
+if a mailbox looks wrong. On `missing_credentials`, derive the key names with
+`--env-template` rather than reading them off `.env.example`, which is only
+correct for the example config.
 
 **Check `failures[]` first.** One mailbox failing doesn't stop the run, so a
 dead account goes unnoticed for weeks. If non-empty, put a line at the *top* of
@@ -87,7 +71,7 @@ too broad or `[mail] days` too wide; `dropped_by_account` names the culprit.
 When tuning `senders`, add `--stdout`: same payload to stdout, touching neither
 `data/raw/` nor the dedupe state, so it can be run repeatedly.
 
-### 3. Load the resume library
+### 2. Load the resume library
 
 ```bash
 bin/python scripts/resume_text.py --list --fetch   # variants + git metadata
@@ -115,9 +99,9 @@ Then read `config.toml` for `[profile]` (the gates) and `[report]`
 (`max_top_picks` caps the ranked section, `min_score_to_recommend` is the floor
 for appearing in it).
 
-### 4. Extract postings
+### 3. Extract postings
 
-Write the postings to `/tmp/jobs.json` as a JSON list — step 5 reads that file:
+Write the postings to `/tmp/jobs.json` as a JSON list — step 4 reads that file:
 
 ```json
 {"title": "", "company": "", "location": "", "workplace": "onsite|hybrid|remote|unknown",
@@ -151,7 +135,7 @@ One alert holds 5–25 postings and a week across two mailboxes has run to
 and this is where the step goes wrong in practice.
 
 Triage first: group by sender, and collapse the near-identical. Job boards
-resend the same roles daily, so most of the volume is duplicates that step 5
+resend the same roles daily, so most of the volume is duplicates that step 4
 would drop anyway.
 
 For a regular format a throwaway parser beats reading — but **it has produced
@@ -199,7 +183,7 @@ company shifts every posting after it by a row; and the **first** entry after
 `stats.body_from_html` counts bodies that went through the tag stripper. Those
 are the ones whose structure flattened, so they are where mis-parsing lives.
 
-### 5. Drop repeats
+### 4. Drop repeats
 
 ```bash
 bin/python scripts/seen_jobs.py filter < /tmp/jobs.json
@@ -210,7 +194,7 @@ considered, not lost. `duplicates` is one alert reaching two mailboxes — the
 kept copy carries `_duplicate_count`; don't list them separately, and don't
 treat arriving twice as quality.
 
-### 6. Gate, then score
+### 5. Gate, then score
 
 **Hard gates.** A failure is excluded and listed under "Filtered out" with its
 reason, never soft-scored into the ranked list:
@@ -257,7 +241,7 @@ confidence `low`, and name what is unknown rather than extrapolating.
 recommend the highest. If two land within ~5 points say "either" rather than
 manufacturing a distinction.
 
-### 7. Write the report
+### 6. Write the report
 
 To `reports/<date>.md`. Names below are placeholders — use what the config and
 resume library actually contain.
@@ -308,7 +292,7 @@ stale resume variant, a sender producing only noise.
 ```
 
 Write the recommended postings to `/tmp/recommended.json` in the same shape as
-step 4, then record them so they don't resurface:
+step 3, then record them so they don't resurface:
 
 ```bash
 bin/python scripts/seen_jobs.py add < /tmp/recommended.json

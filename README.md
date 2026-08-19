@@ -35,7 +35,7 @@ resume repo ──▶ resume_text.py ──────────┘
 6. **Gate, then score.** Work authorization, seniority, and location are hard
    filters, not soft penalties — a role you legally cannot take is excluded and
    listed with a reason, never scored into the main list.
-7. **Report** to `~/.job-scan/reports/<date>.md`, with the resume variant to use
+7. **Report** to `reports/<date>.md`, with the resume variant to use
    and the specific gap to address for each pick.
 
 ## Trust boundary
@@ -60,9 +60,9 @@ git clone https://github.com/<you>/job-scan.git ~/Developer/job-scan
 cd ~/Developer/job-scan && ./install.sh
 ```
 
-This links the skill into `~/.claude/skills/`, creates the private workspace at
-`~/.job-scan/`, and arms a pre-commit hook that blocks credentials and personal
-data from reaching this repo.
+This links the skill into `~/.claude/skills/`, creates the private files
+alongside the code, and arms a pre-commit hook that blocks credentials and
+personal data from reaching this repo.
 
 ## Requirements
 
@@ -79,15 +79,13 @@ rejected at import with a message naming the version they ran under. Config is
 TOML via stdlib `tomllib`, HTML is cleaned with `html.parser` + `html.unescape`,
 and LaTeX is handled by `scripts/latex_text.py` in this repo.
 
-`install.sh` locates a 3.14+ interpreter, builds a virtualenv at
-`~/.job-scan/venv/`, and pins it at `~/.job-scan/bin/python`, which is what the
-skill and the scheduled task invoke. Never call bare `python3` — on macOS that
-is the 3.9 system build.
+`install.sh` locates a 3.14+ interpreter, builds a virtualenv at `venv/`, and
+pins it at `bin/python`, which is what the skill and the scheduled task invoke.
+Never call bare `python3` — on macOS that is the 3.9 system build.
 
-**There is nothing to activate.** Every entry point calls the pinned
-interpreter by absolute path, which is why the scheduled task works from any
-directory. `source ~/.job-scan/venv/bin/activate` exists if you want a shell
-session inside it, but no workflow requires it.
+**There is nothing to activate.** `source venv/bin/activate` exists if you want
+a shell session inside it, but no workflow requires it — commands are run from
+this directory via `bin/python`.
 
 The venv is not about resolving dependencies — there are none. It is about where
 an optional one would land: without it, `pip install pypdf` for a PDF resume
@@ -109,22 +107,23 @@ Missing or unparseable config is a hard error, never a fallback to defaults.
 Config carries the sender allowlist, so defaulting would widen the IMAP search
 to *every* recent message and pull ordinary personal mail into `data/raw/`.
 
-## Code here, data there
+## Code and data in one directory
 
 | | Path | Contents |
 |---|---|---|
-| **Repo** (public) | this directory | skill, scripts, config template |
-| **Workspace** (private) | `~/.job-scan/` | `.env`, real config, email bodies, reports |
+| **Repo + workspace** | this directory | scripts and skill, plus `.env`, `config.toml`, `data/`, `reports/` |
 | **Resume library** (yours) | wherever you keep it | `.tex` sources, its own repo |
 
-Nothing personal is ever written into the repo. `data/raw/*.json` holds full
-email bodies — that is the file to worry about, and it lives in the workspace.
+The private half is gitignored and guarded by `.githooks/pre-commit`, and that
+is now the *only* thing keeping it out of a public repo — there is no physical
+separation to fall back on, so edit `.gitignore` carefully. `data/raw/*.json`
+holds full email bodies and is the file to worry about.
 
 ## Configure
 
 ```bash
-$EDITOR ~/.job-scan/config.toml   # resume.lib, then every TODO under [profile]
-$EDITOR ~/.job-scan/.env          # one USER/PASSWORD pair per account
+$EDITOR config.toml   # resume.lib, then every TODO under [profile]
+$EDITOR .env          # one USER/PASSWORD pair per account
 ```
 
 Edit `config.toml` first: account names there derive the `.env` key names. Ask
@@ -132,7 +131,7 @@ the tool which keys yours needs rather than copying the example, which is only
 correct for the example config:
 
 ```bash
-~/.job-scan/bin/python scripts/fetch_mail.py --env-template
+bin/python scripts/fetch_mail.py --env-template
 ```
 
 It reads your `config.toml` and emits the exact skeleton with per-provider notes.
@@ -184,7 +183,7 @@ Accounts fail independently. An expired password on one is reported and the
 rest still run. Check them with:
 
 ```bash
-~/.job-scan/bin/python scripts/fetch_mail.py --check
+bin/python scripts/fetch_mail.py --check
 ```
 
 `max_messages` is per mailbox, so total volume grows linearly with account
@@ -242,14 +241,14 @@ catches it; pass `--fetch` so the number reflects this moment rather than the
 last time you happened to fetch:
 
 ```bash
-~/.job-scan/bin/python scripts/resume_text.py --list --fetch
+bin/python scripts/resume_text.py --list --fetch
 ```
 
 Verify:
 
 ```bash
-~/.job-scan/bin/python scripts/fetch_mail.py --check
-~/.job-scan/bin/python scripts/resume_text.py --list
+bin/python scripts/fetch_mail.py --check
+bin/python scripts/resume_text.py --list
 ```
 
 ## Run
@@ -267,14 +266,14 @@ tasks fire only while Claude Code is open; a missed run happens at next launch.
 
 | Script | Job |
 |---|---|
-| `workspace.py` | Config, credentials and dedupe state — everything read from or written to `~/.job-scan/` |
+| `workspace.py` | Config, credentials and dedupe state — everything read from or written to the workspace |
 | `fetch_mail.py` | Multi-account IMAP fetch, HTML→text, size cap, message dedupe |
 | `resume_text.py` | Discover variants, extract, cache, attach git metadata |
 | `latex_text.py` | Brace-aware LaTeX→text (handles `\resumeSubheading`-style macros) |
 | `seen_jobs.py` | Job-level dedupe across rewordings |
 | `_bootstrap.py` | The Python floor, enforced at import |
 
-`workspace.py` exists because three scripts each reached into `~/.job-scan/` on
+`workspace.py` exists because three scripts each reached into the workspace on
 their own and had started to disagree. `load_config` existed twice under one
 name with different semantics — one hard-failing on a missing file, the other
 quietly defaulting — and `load_state`/`save_state` existed twice over the *same*
