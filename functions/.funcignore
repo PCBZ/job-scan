@@ -1,0 +1,10 @@
+# Deploy only the compiled app and its runtime dependencies.
+.azurite/
+src/
+test/
+*.ts
+!*.d.ts
+tsconfig*.json
+biome.json
+local.settings*.json
+*.map
