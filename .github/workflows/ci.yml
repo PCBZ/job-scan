@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python skill
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          # The repo's floor; scripts/_bootstrap.py rejects anything older.
+          python-version: "3.14"
+
+      - name: Byte-compile
+        run: python -m compileall -q scripts
+
+      - name: CLI smoke test
+        run: |
+          for s in fetch_mail resume_text seen_jobs; do
+            python "scripts/$s.py" --help > /dev/null
+          done
+
+  shell:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: shellcheck
+        run: shellcheck install.sh .githooks/pre-commit
