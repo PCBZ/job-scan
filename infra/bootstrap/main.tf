@@ -38,6 +38,11 @@ resource "azurerm_storage_account" "tfstate" {
       days = 30
     }
   }
+
+  # Holds the remote state for infra/. Remove this deliberately to delete it.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "azurerm_storage_container" "tfstate" {

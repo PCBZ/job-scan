@@ -16,4 +16,7 @@ terraform {
 provider "azurerm" {
   features {}
   storage_use_azuread = true
+
+  # azurerm 5.x registers no resource providers by default.
+  resource_providers_to_register = ["Microsoft.Storage"]
 }

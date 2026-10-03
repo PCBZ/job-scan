@@ -32,9 +32,15 @@ resource "azurerm_function_app_flex_consumption" "this" {
     application_insights_connection_string = var.application_insights_connection_string
   }
 
-  # Host storage over managed identity instead of a connection string.
+  # Host storage over managed identity. azurerm always writes
+  # AzureWebJobsStorage as a connection string, with an empty AccountKey under
+  # identity auth; the host would prefer it and fail. Blanking it (user values
+  # override the provider's) makes the host use __accountName instead.
   app_settings = merge(
-    { "AzureWebJobsStorage__accountName" = var.storage_account_name },
+    {
+      "AzureWebJobsStorage"              = ""
+      "AzureWebJobsStorage__accountName" = var.storage_account_name
+    },
     var.app_settings,
   )
 
