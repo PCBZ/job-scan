@@ -17,3 +17,13 @@ output "storage_account_name" {
 output "key_vault_uri" {
   value = module.key_vault.uri
 }
+
+# Repository variables for .github/workflows/deploy.yml. Identifiers, not secrets.
+output "github_variables" {
+  value = {
+    AZURE_CLIENT_ID        = module.github_oidc.client_id
+    AZURE_TENANT_ID        = data.azurerm_client_config.current.tenant_id
+    AZURE_SUBSCRIPTION_ID  = data.azurerm_client_config.current.subscription_id
+    AZURE_FUNCTIONAPP_NAME = module.function_app.name
+  }
+}
