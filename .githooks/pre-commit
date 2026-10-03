@@ -15,6 +15,8 @@ for f in $staged; do
       [ "$f" = ".env.example" ] || note "$f" "credentials file" ;;
     config.toml|config.yaml)
       note "$f" "real config — commit config.example.toml instead" ;;
+    local.settings.json|*/local.settings.json)
+      note "$f" "Functions local settings hold secrets" ;;
     data/*|reports/*|profile/*|cache/*)
       note "$f" "workspace data (emails / reports / resume)" ;;
     *.eml|*.mbox|*.pdf)
