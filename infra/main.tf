@@ -8,8 +8,7 @@ resource "random_string" "suffix" {
 }
 
 locals {
-  compact_name = replace(var.name, "-", "")
-  suffix       = random_string.suffix.result
+  suffix = random_string.suffix.result
 }
 
 resource "azurerm_resource_group" "main" {

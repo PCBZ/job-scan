@@ -5,31 +5,6 @@
 # Its own state stays local (gitignored). It holds three resources and can be
 # re-imported if lost.
 
-terraform {
-  required_version = ">= 1.13"
-
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 5.8"
-    }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.9"
-    }
-  }
-}
-
-provider "azurerm" {
-  features {}
-  storage_use_azuread = true
-}
-
-variable "location" {
-  type    = string
-  default = "canadacentral"
-}
-
 data "azurerm_client_config" "current" {}
 
 resource "random_string" "suffix" {
@@ -76,15 +51,4 @@ resource "azurerm_role_assignment" "operator_blob_contributor" {
   scope                = azurerm_storage_account.tfstate.id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = data.azurerm_client_config.current.object_id
-}
-
-output "backend_hcl" {
-  description = "Paste into infra/backend.hcl."
-  value       = <<-EOT
-    resource_group_name  = "${azurerm_resource_group.tfstate.name}"
-    storage_account_name = "${azurerm_storage_account.tfstate.name}"
-    container_name       = "${azurerm_storage_container.tfstate.name}"
-    key                  = "job-scan.tfstate"
-    use_azuread_auth     = true
-  EOT
 }

@@ -3,17 +3,17 @@ output "resource_group_name" {
 }
 
 output "function_app_name" {
-  value = azurerm_function_app_flex_consumption.main.name
+  value = module.function_app.name
 }
 
 output "function_app_hostname" {
-  value = azurerm_function_app_flex_consumption.main.default_hostname
+  value = module.function_app.default_hostname
 }
 
 output "storage_account_name" {
-  value = azurerm_storage_account.main.name
+  value = module.storage.name
 }
 
 output "key_vault_uri" {
-  value = azurerm_key_vault.main.vault_uri
+  value = module.key_vault.uri
 }
