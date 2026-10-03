@@ -1,0 +1,7 @@
+# Copy to backend.hcl (gitignored) with the values printed by infra/bootstrap,
+# then: terraform init -backend-config=backend.hcl
+resource_group_name  = "job-scan-tfstate-rg"
+storage_account_name = "<from bootstrap output>"
+container_name       = "tfstate"
+key                  = "job-scan.tfstate"
+use_azuread_auth     = true
