@@ -28,6 +28,13 @@ jobs:
       - name: Byte-compile
         run: python -m compileall -q scripts
 
+      - name: Ruff
+        # Ruff's classic default rules (pyflakes + syntax-level pycodestyle),
+        # pinned here since newer ruff defaults are much broader.
+        run: |
+          pip install ruff==0.16.10
+          ruff check --select E4,E7,E9,F scripts
+
       - name: CLI smoke test
         run: |
           for s in fetch_mail resume_text seen_jobs; do
@@ -43,3 +50,35 @@ jobs:
 
       - name: shellcheck
         run: shellcheck install.sh .githooks/pre-commit
+
+  functions:
+    name: Functions app (TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          # The newest runtime Flex Consumption offers.
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
