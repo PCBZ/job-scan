@@ -1,0 +1,33 @@
+{
+  "name": "job-scan-functions",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Azure Functions app for the job-scan daily pipeline",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/functions/*.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "azurite": "azurite --silent --location .azurite --skipApiVersionCheck",
+    "prestart": "npm run build",
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "4.16.5",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "24.19.1",
+    "azurite": "3.37.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}
