@@ -6,7 +6,8 @@ export async function daily(timer: Timer, context: InvocationContext): Promise<v
 }
 
 app.timer("daily", {
-  // NCRONTAB with seconds, in UTC: 14:00 UTC is 07:00 in Vancouver (PDT).
-  schedule: "0 0 14 * * *",
+  // NCRONTAB with seconds, in UTC: 15:00 UTC is 08:00 PDT. Fixed UTC, so it
+  // runs at 07:00 once Vancouver falls back to PST.
+  schedule: "0 0 15 * * *",
   handler: daily,
 });
