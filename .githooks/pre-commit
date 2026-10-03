@@ -2,7 +2,7 @@
 # Block accidental commits of credentials or personal data.
 # Install with ./install.sh, or: git config core.hooksPath .githooks
 
-staged=$(git diff --cached --name-only --diff-filter=ACM)
+staged=$(git diff --cached --name-only --diff-filter=ACMRT)
 [ -z "$staged" ] && exit 0
 
 fail=0
