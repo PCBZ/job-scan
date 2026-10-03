@@ -18,6 +18,8 @@ description: Scan job-alert emails over IMAP, rank the postings against the user
   Use its `bin/python` — a wrapper around the repo venv, pinned to Python 3.14+.
   Never bare `python3`, which on macOS is the 3.9 system build.
 - **Resume library** is a separate repo of the user's; `resume.lib` points at it.
+- **`functions/` is the Azure Functions app, not part of this skill.** Don't
+  read or search it during a scan; its `node_modules/` alone would swamp a grep.
 - **Config drives behaviour**, not flags. The lookback window is `[mail] days`;
   don't pass `--days` unless overriding deliberately.
 

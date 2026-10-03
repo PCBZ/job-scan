@@ -14,11 +14,12 @@ config.toml
 config.yaml
 !config.example.toml
 
-# Anything that could carry personal data if the workspace is ever copied in
-data/
-reports/
-profile/
-cache/
+# Anything that could carry personal data if the workspace is ever copied in.
+# Anchored to the root: unanchored, these would also hide functions/src/data/.
+/data/
+/reports/
+/profile/
+/cache/
 *.eml
 *.mbox
 
@@ -26,8 +27,12 @@ cache/
 *.pdf
 *.tex
 !tests/fixtures/*.tex
-resume*
-!scripts/resume_text.py
+*.docx
+# Root only: unanchored, resume* would hide source files like resume.ts.
+# Resume documents deeper in the tree are still caught by extension.
+/resume*
+resume*.md
+resume*.txt
 
 # Noise
 __pycache__/
@@ -37,4 +42,9 @@ __pycache__/
 venv/
 
 # Workspace living in-tree: the interpreter wrapper (venv/ is above)
-bin/
+/bin/
+
+# Azure Functions app. local.settings.json holds secrets for `func start`.
+node_modules/
+functions/dist/
+local.settings.json
