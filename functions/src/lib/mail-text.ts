@@ -8,13 +8,13 @@
 
 import { decodeHTML } from "entities";
 import {
-  PY_NON_SPACE as NS,
-  pyCompare,
-  pyLen,
-  pySlice,
-  pyStrip,
-  PY_SPACE as S,
-} from "./python-re.js";
+  codePointLength,
+  compareCodePoints,
+  NON_WHITESPACE as NS,
+  WHITESPACE as S,
+  sliceCodePoints,
+  stripWhitespace,
+} from "./unicode.js";
 
 const TRACKING_PARAMS =
   /[?&](utm_[a-z]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga)=[^&]*/giu;
@@ -42,7 +42,7 @@ export function stripInlineUrls(text: string): string {
     .replace(URL_INLINE, " ")
     .split("\n")
     .filter((line) => {
-      const bare = pyStrip(line);
+      const bare = stripWhitespace(line);
       // A wrapped continuation is one long token with URL punctuation.
       return !(URL_FRAGMENT.test(bare) && /[?&=/%]/.test(bare));
     })
@@ -59,11 +59,11 @@ export function cleanText(text: string, maxChars: number): string {
   out = out.replace(BLANK_RUN, "\n\n");
   out = out
     .split("\n")
-    .map(pyStrip)
+    .map(stripWhitespace)
     .filter((line) => line !== "")
     .join("\n");
-  if (pyLen(out) > maxChars) {
-    out = `${pySlice(out, maxChars)}\n[...truncated]`;
+  if (codePointLength(out) > maxChars) {
+    out = `${sliceCodePoints(out, maxChars)}\n[...truncated]`;
   }
   return out;
 }
@@ -79,7 +79,7 @@ export function dedupeKey(url: string): string {
   const query = url.slice(at + 1);
   if (query === "") return base;
   const params = query.split("&").filter((p) => p !== "");
-  return `${base}?${params.sort(pyCompare).join("&")}`;
+  return `${base}?${params.sort(compareCodePoints).join("&")}`;
 }
 
 export interface Link {
@@ -99,11 +99,11 @@ export function extractLinks(html: string, limit = 60): Link[] {
     const rawLabel = match[2] ?? "";
     if (!rawUrl.toLowerCase().startsWith("http")) continue;
     const url = rawUrl.replace(TRACKING_PARAMS, "").replace(/[?&]+$/u, "");
-    const label = pyStrip(rawLabel.replace(TAGS, " ").replace(SPACE_RUN, " "));
+    const label = stripWhitespace(rawLabel.replace(TAGS, " ").replace(SPACE_RUN, " "));
     const key = dedupeKey(url);
     if (seen.has(key)) continue;
     seen.add(key);
-    links.push({ text: pySlice(label, 120), url });
+    links.push({ text: sliceCodePoints(label, 120), url });
     if (links.length >= limit) break;
   }
   return links;

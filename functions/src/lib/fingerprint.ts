@@ -1,8 +1,8 @@
 // Port of normalize() / fingerprint() in scripts/seen_jobs.py. Both must give
 // identical output; tests/fixtures/fingerprints.json holds Python's results.
-// Regex classes come from python-re.ts so they match Python's Unicode rules.
+// Regex classes come from unicode.ts so they match Python's Unicode rules.
 
-import { PY_BOUNDARY as B, PY_DIGIT as D, pyStrip, PY_SPACE as S } from "./python-re.js";
+import { WORD_BOUNDARY as B, DIGIT as D, WHITESPACE as S, stripWhitespace } from "./unicode.js";
 
 // Suffixes and decorations that differ between job boards but mean the same role.
 const NOISE = new RegExp(
@@ -23,7 +23,7 @@ export function normalize(value: string | null | undefined): string {
   let v = (value ?? "").toLowerCase();
   v = v.replace(REQ_ID, " ");
   v = v.replace(NOISE, " ");
-  return pyStrip(v.replace(SPACE_RUN, " "));
+  return stripWhitespace(v.replace(SPACE_RUN, " "));
 }
 
 export interface JobIdentity {
