@@ -11,7 +11,7 @@ variable "location" {
 }
 
 variable "repository" {
-  description = "GitHub repository as owner/name."
+  description = "Repository part of the OIDC subject: owner@id/name@id when the repository uses immutable subjects, else owner/name."
   type        = string
 }
 
