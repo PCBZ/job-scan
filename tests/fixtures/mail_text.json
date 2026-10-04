@@ -1,0 +1,242 @@
+{
+  "_note": "Generated from scripts/mail_text.py (stdlib html path). Synthetic alerts; no real mail.",
+  "html_to_text": [
+    {
+      "name": "linkedin alert",
+      "html": "<html><head><title>Jobs for you</title><style>.btn{color:#0a66c2}</style></head>\n<body><table><tr><td>\n<p>Your job alert for <b>backend engineer</b> in Vancouver</p>\n<table>\n<tr><td><a href=\"https://www.linkedin.com/comm/jobs/view/4100000001/?trackingId=abc%3D%3D&amp;refId=xyz&amp;trk=eml-email_job_alert_digest\">Senior Backend Engineer</a></td></tr>\n<tr><td>Northwind Traders &middot; Vancouver, BC (Hybrid)</td></tr>\n<tr><td>12 alumni</td></tr>\n<tr><td><a href=\"https://www.linkedin.com/comm/jobs/view/4100000002/?trk=eml&amp;midToken=AQ123&amp;midSig=0x\">Platform Engineer</a></td></tr>\n<tr><td>Contoso Ltd. &middot; Remote (Canada)</td></tr>\n</table>\n<script>track('open')</script>\n<p><a href=\"https://www.linkedin.com/comm/jobs/search?keywords=backend&amp;utm_source=alert&amp;utm_medium=email\">See all jobs</a></p>\n<p>You are receiving job alert emails. <a href=\"https://www.linkedin.com/comm/jobs/alerts?trk=unsub\">Unsubscribe</a></p>\n<p>LinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085</p>\n</td></tr></table></body></html>",
+      "expected": "  \n    \n Your job alert for  backend engineer  in Vancouver\n\n \n   Senior Backend Engineer \n\n\n  Northwind Traders · Vancouver, BC (Hybrid)\n\n\n  12 alumni\n\n\n   Platform Engineer \n\n\n  Contoso Ltd. · Remote (Canada)\n\n\n \n \n  See all jobs \n\n You are receiving job alert emails.  Unsubscribe \n\n LinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085\n\n\n\n   "
+    },
+    {
+      "name": "indeed alert",
+      "html": "<html><body>\n<div><h2><a href=\"https://ca.indeed.com/rc/clk?jk=a1b2c3d4e5&amp;from=ja&amp;utm_campaign=job_alerts\">Full Stack Developer</a></h2>\n<div>Fabrikam Inc. - Vancouver, BC</div>\n<div>$100,000&ndash;$120,000 a year</div></div>\n<div><h2><a href=\"https://ca.indeed.com/rc/clk?jk=f6g7h8i9j0&amp;from=ja\">Backend Developer (Python)</a></h2>\n<div>Tailspin Toys - Burnaby, BC</div>\n<div>&#36;45 an hour</div></div>\n<div><a href=\"https://ca.indeed.com/rc/clk?jk=a1b2c3d4e5&amp;from=ja&amp;utm_source=dup\">Full Stack Developer</a></div>\n<p><a href=\"mailto:alerts@example.com\">Contact</a> &copy; 2026 Indeed</p>\n</body></html>",
+      "expected": "  \n   Full Stack Developer  \n Fabrikam Inc. - Vancouver, BC\n\n $100,000–$120,000 a year\n\n\n   Backend Developer (Python)  \n Tailspin Toys - Burnaby, BC\n\n $45 an hour\n\n\n  Full Stack Developer \n\n  Contact  © 2026 Indeed\n\n  "
+    },
+    {
+      "name": "glassdoor alert",
+      "html": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>td{padding:0}</style></head><body>\n<table><tr><td>Your job listings for October 3, 2026</td></tr>\n<tr><td>backend engineer vancouver</td></tr>\n<tr><td>Wingtip Credit Union 3.7 &#9733;</td></tr>\n<tr><td><a href=\"https://www.glassdoor.ca/partner/jobListing.htm?jl=1009000001&amp;ao=11&amp;utm_source=jobalert&amp;_ga=2.1\">Senior Full Stack Developer</a></td></tr>\n<tr><td>British Columbia</td></tr>\n<tr><td>$105K - $125K (Employer Est.)</td></tr>\n<tr><td>Easy Apply</td></tr><tr><td>4d</td></tr>\n<tr><td>Adventure Works 4.1 &#x2605;</td></tr>\n<tr><td><a href='https://www.glassdoor.ca/partner/jobListing.htm?jl=1009000002&amp;ct=99'>Cloud&nbsp;Engineer</a></td></tr>\n<tr><td>Vancouver,&nbsp;BC</td></tr><tr><td>Just posted</td></tr>\n</table></body></html>",
+      "expected": "    \n   Your job listings for October 3, 2026\n\n\n  backend engineer vancouver\n\n\n  Wingtip Credit Union 3.7 ★\n\n\n   Senior Full Stack Developer \n\n\n  British Columbia\n\n\n  $105K - $125K (Employer Est.)\n\n\n  Easy Apply\n\n  4d\n\n\n  Adventure Works 4.1 ★\n\n\n   Cloud Engineer \n\n\n  Vancouver, BC\n\n  Just posted\n\n\n   "
+    },
+    {
+      "name": "br and closing block tags",
+      "html": "a<br>b<BR/>c<br />d</p>e</DIV>f</tr>g</li>h</td>i",
+      "expected": "a\nb\nc\nd\ne\nf\ng\nh\ni"
+    },
+    {
+      "name": "entities, legacy without semicolon",
+      "html": "Q&amp;A &copy 2026 &lt;tag&gt; &#8211; &#x2014; &bogus; &#0;",
+      "expected": "Q&A © 2026 <tag> – — &bogus; �"
+    },
+    {
+      "name": "uppercase script tag",
+      "html": "x<SCRIPT type='t'>evil()</script>y<Style>s</STYLE>z",
+      "expected": "x y z"
+    },
+    {
+      "name": "unclosed tag survives as text",
+      "html": "price < 100 and a<b>bold</b>",
+      "expected": "price  bold "
+    }
+  ],
+  "clean_text": [
+    {
+      "name": "linkedin html end to end",
+      "text": "  \n    \n Your job alert for  backend engineer  in Vancouver\n\n \n   Senior Backend Engineer \n\n\n  Northwind Traders · Vancouver, BC (Hybrid)\n\n\n  12 alumni\n\n\n   Platform Engineer \n\n\n  Contoso Ltd. · Remote (Canada)\n\n\n \n \n  See all jobs \n\n You are receiving job alert emails.  Unsubscribe \n\n LinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085\n\n\n\n   ",
+      "max_chars": 4000,
+      "expected": "Your job alert for backend engineer in Vancouver\nSenior Backend Engineer\nNorthwind Traders · Vancouver, BC (Hybrid)\n12 alumni\nPlatform Engineer\nContoso Ltd. · Remote (Canada)\nSee all jobs\nYou are receiving job alert emails. Unsubscribe\nLinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085"
+    },
+    {
+      "name": "indeed html end to end",
+      "text": "  \n   Full Stack Developer  \n Fabrikam Inc. - Vancouver, BC\n\n $100,000–$120,000 a year\n\n\n   Backend Developer (Python)  \n Tailspin Toys - Burnaby, BC\n\n $45 an hour\n\n\n  Full Stack Developer \n\n  Contact  © 2026 Indeed\n\n  ",
+      "max_chars": 4000,
+      "expected": "Full Stack Developer\nFabrikam Inc. - Vancouver, BC\n$100,000–$120,000 a year\nBackend Developer (Python)\nTailspin Toys - Burnaby, BC\n$45 an hour\nFull Stack Developer\nContact © 2026 Indeed"
+    },
+    {
+      "name": "glassdoor html end to end",
+      "text": "    \n   Your job listings for October 3, 2026\n\n\n  backend engineer vancouver\n\n\n  Wingtip Credit Union 3.7 ★\n\n\n   Senior Full Stack Developer \n\n\n  British Columbia\n\n\n  $105K - $125K (Employer Est.)\n\n\n  Easy Apply\n\n  4d\n\n\n  Adventure Works 4.1 ★\n\n\n   Cloud Engineer \n\n\n  Vancouver, BC\n\n  Just posted\n\n\n   ",
+      "max_chars": 4000,
+      "expected": "Your job listings for October 3, 2026\nbackend engineer vancouver\nWingtip Credit Union 3.7 ★\nSenior Full Stack Developer\nBritish Columbia\n$105K - $125K (Employer Est.)\nEasy Apply\n4d\nAdventure Works 4.1 ★\nCloud Engineer\nVancouver, BC\nJust posted"
+    },
+    {
+      "name": "linkedin plain text with wrapped urls",
+      "text": "Senior Backend Engineer\r\nNorthwind Traders\r\nVancouver, BC\r\nView job: https://www.linkedin.com/comm/jobs/view/4100000001/?trackingId=abc%3D%3D&refId=xyz\r\n%3D%3D&trk=eml-email_job_alert_digest_01-job_card-0-view_job&lipi=urn%3Ali%3Apage\r\n\r\n\r\n\r\nPlatform Engineer\t\t  Contoso\r\nwww.linkedin.com/jobs\r\n",
+      "max_chars": 4000,
+      "expected": "Senior Backend Engineer\nNorthwind Traders\nVancouver, BC\nView job:\nPlatform Engineer Contoso"
+    },
+    {
+      "name": "truncation counts code points",
+      "text": "職位 🚀 Backend Engineer at Northwind 🚀🚀🚀",
+      "max_chars": 12,
+      "expected": "職位 🚀 Backend\n[...truncated]"
+    },
+    {
+      "name": "nbsp and tabs collapse, blank lines squeezed",
+      "text": "a  b\t\tc\n\n\n\n\nd\n \n \ne",
+      "max_chars": 100,
+      "expected": "a b c\nd\ne"
+    },
+    {
+      "name": "unicode whitespace lines are dropped",
+      "text": "x\n　 \ny\n\u001c\nz",
+      "max_chars": 100,
+      "expected": "x\ny\nz"
+    },
+    {
+      "name": "inline url ends at python whitespace only",
+      "text": "see https://example.com/jobnext words\nand https://example.com/a﻿word here",
+      "max_chars": 200,
+      "expected": "see next words\nand here"
+    },
+    {
+      "name": "long token without url punctuation is kept",
+      "text": "Supercalifragilisticexpialidocious_engineering_role",
+      "max_chars": 200,
+      "expected": "Supercalifragilisticexpialidocious_engineering_role"
+    },
+    {
+      "name": "long token with url punctuation is dropped",
+      "text": "line\nabcdefghijklmnopqrstuvwxyz0123456789?a=b\nend",
+      "max_chars": 200,
+      "expected": "line\nend"
+    }
+  ],
+  "extract_links": [
+    {
+      "name": "linkedin alert",
+      "html": "<html><head><title>Jobs for you</title><style>.btn{color:#0a66c2}</style></head>\n<body><table><tr><td>\n<p>Your job alert for <b>backend engineer</b> in Vancouver</p>\n<table>\n<tr><td><a href=\"https://www.linkedin.com/comm/jobs/view/4100000001/?trackingId=abc%3D%3D&amp;refId=xyz&amp;trk=eml-email_job_alert_digest\">Senior Backend Engineer</a></td></tr>\n<tr><td>Northwind Traders &middot; Vancouver, BC (Hybrid)</td></tr>\n<tr><td>12 alumni</td></tr>\n<tr><td><a href=\"https://www.linkedin.com/comm/jobs/view/4100000002/?trk=eml&amp;midToken=AQ123&amp;midSig=0x\">Platform Engineer</a></td></tr>\n<tr><td>Contoso Ltd. &middot; Remote (Canada)</td></tr>\n</table>\n<script>track('open')</script>\n<p><a href=\"https://www.linkedin.com/comm/jobs/search?keywords=backend&amp;utm_source=alert&amp;utm_medium=email\">See all jobs</a></p>\n<p>You are receiving job alert emails. <a href=\"https://www.linkedin.com/comm/jobs/alerts?trk=unsub\">Unsubscribe</a></p>\n<p>LinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085</p>\n</td></tr></table></body></html>",
+      "limit": 60,
+      "expected": [
+        {
+          "text": "Senior Backend Engineer",
+          "url": "https://www.linkedin.com/comm/jobs/view/4100000001/?trackingId=abc%3D%3D&amp;refId=xyz&amp;trk=eml-email_job_alert_digest"
+        },
+        {
+          "text": "Platform Engineer",
+          "url": "https://www.linkedin.com/comm/jobs/view/4100000002/&amp;midToken=AQ123&amp;midSig=0x"
+        },
+        {
+          "text": "See all jobs",
+          "url": "https://www.linkedin.com/comm/jobs/search?keywords=backend&amp;utm_source=alert&amp;utm_medium=email"
+        },
+        {
+          "text": "Unsubscribe",
+          "url": "https://www.linkedin.com/comm/jobs/alerts"
+        }
+      ]
+    },
+    {
+      "name": "indeed alert (dedupe by query id)",
+      "html": "<html><body>\n<div><h2><a href=\"https://ca.indeed.com/rc/clk?jk=a1b2c3d4e5&amp;from=ja&amp;utm_campaign=job_alerts\">Full Stack Developer</a></h2>\n<div>Fabrikam Inc. - Vancouver, BC</div>\n<div>$100,000&ndash;$120,000 a year</div></div>\n<div><h2><a href=\"https://ca.indeed.com/rc/clk?jk=f6g7h8i9j0&amp;from=ja\">Backend Developer (Python)</a></h2>\n<div>Tailspin Toys - Burnaby, BC</div>\n<div>&#36;45 an hour</div></div>\n<div><a href=\"https://ca.indeed.com/rc/clk?jk=a1b2c3d4e5&amp;from=ja&amp;utm_source=dup\">Full Stack Developer</a></div>\n<p><a href=\"mailto:alerts@example.com\">Contact</a> &copy; 2026 Indeed</p>\n</body></html>",
+      "limit": 60,
+      "expected": [
+        {
+          "text": "Full Stack Developer",
+          "url": "https://ca.indeed.com/rc/clk?jk=a1b2c3d4e5&amp;from=ja&amp;utm_campaign=job_alerts"
+        },
+        {
+          "text": "Backend Developer (Python)",
+          "url": "https://ca.indeed.com/rc/clk?jk=f6g7h8i9j0&amp;from=ja"
+        },
+        {
+          "text": "Full Stack Developer",
+          "url": "https://ca.indeed.com/rc/clk?jk=a1b2c3d4e5&amp;from=ja&amp;utm_source=dup"
+        }
+      ]
+    },
+    {
+      "name": "glassdoor alert",
+      "html": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>td{padding:0}</style></head><body>\n<table><tr><td>Your job listings for October 3, 2026</td></tr>\n<tr><td>backend engineer vancouver</td></tr>\n<tr><td>Wingtip Credit Union 3.7 &#9733;</td></tr>\n<tr><td><a href=\"https://www.glassdoor.ca/partner/jobListing.htm?jl=1009000001&amp;ao=11&amp;utm_source=jobalert&amp;_ga=2.1\">Senior Full Stack Developer</a></td></tr>\n<tr><td>British Columbia</td></tr>\n<tr><td>$105K - $125K (Employer Est.)</td></tr>\n<tr><td>Easy Apply</td></tr><tr><td>4d</td></tr>\n<tr><td>Adventure Works 4.1 &#x2605;</td></tr>\n<tr><td><a href='https://www.glassdoor.ca/partner/jobListing.htm?jl=1009000002&amp;ct=99'>Cloud&nbsp;Engineer</a></td></tr>\n<tr><td>Vancouver,&nbsp;BC</td></tr><tr><td>Just posted</td></tr>\n</table></body></html>",
+      "limit": 60,
+      "expected": [
+        {
+          "text": "Senior Full Stack Developer",
+          "url": "https://www.glassdoor.ca/partner/jobListing.htm?jl=1009000001&amp;ao=11&amp;utm_source=jobalert&amp;_ga=2.1"
+        },
+        {
+          "text": "Cloud&nbsp;Engineer",
+          "url": "https://www.glassdoor.ca/partner/jobListing.htm?jl=1009000002&amp;ct=99"
+        }
+      ]
+    },
+    {
+      "name": "limit is applied",
+      "html": "<html><head><title>Jobs for you</title><style>.btn{color:#0a66c2}</style></head>\n<body><table><tr><td>\n<p>Your job alert for <b>backend engineer</b> in Vancouver</p>\n<table>\n<tr><td><a href=\"https://www.linkedin.com/comm/jobs/view/4100000001/?trackingId=abc%3D%3D&amp;refId=xyz&amp;trk=eml-email_job_alert_digest\">Senior Backend Engineer</a></td></tr>\n<tr><td>Northwind Traders &middot; Vancouver, BC (Hybrid)</td></tr>\n<tr><td>12 alumni</td></tr>\n<tr><td><a href=\"https://www.linkedin.com/comm/jobs/view/4100000002/?trk=eml&amp;midToken=AQ123&amp;midSig=0x\">Platform Engineer</a></td></tr>\n<tr><td>Contoso Ltd. &middot; Remote (Canada)</td></tr>\n</table>\n<script>track('open')</script>\n<p><a href=\"https://www.linkedin.com/comm/jobs/search?keywords=backend&amp;utm_source=alert&amp;utm_medium=email\">See all jobs</a></p>\n<p>You are receiving job alert emails. <a href=\"https://www.linkedin.com/comm/jobs/alerts?trk=unsub\">Unsubscribe</a></p>\n<p>LinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085</p>\n</td></tr></table></body></html>",
+      "limit": 2,
+      "expected": [
+        {
+          "text": "Senior Backend Engineer",
+          "url": "https://www.linkedin.com/comm/jobs/view/4100000001/?trackingId=abc%3D%3D&amp;refId=xyz&amp;trk=eml-email_job_alert_digest"
+        },
+        {
+          "text": "Platform Engineer",
+          "url": "https://www.linkedin.com/comm/jobs/view/4100000002/&amp;midToken=AQ123&amp;midSig=0x"
+        }
+      ]
+    },
+    {
+      "name": "nested tags and whitespace in label",
+      "html": "<a class=\"x\"\n href=\"https://example.com/j?id=7&amp;trk=1\"><span>Data\n  <b>Engineer</b></span></a>",
+      "limit": 60,
+      "expected": [
+        {
+          "text": "Data Engineer",
+          "url": "https://example.com/j?id=7&amp;trk=1"
+        }
+      ]
+    },
+    {
+      "name": "label truncated to 120 code points",
+      "html": "<a href=\"https://example.com/x\">职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职</a>",
+      "limit": 60,
+      "expected": [
+        {
+          "text": "职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职职",
+          "url": "https://example.com/x"
+        }
+      ]
+    },
+    {
+      "name": "label truncation counts astral code points",
+      "html": "<a href=\"https://example.com/y\">🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀</a>",
+      "limit": 60,
+      "expected": [
+        {
+          "text": "🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀",
+          "url": "https://example.com/y"
+        }
+      ]
+    },
+    {
+      "name": "tracking param first then real param",
+      "html": "<a href=\"https://example.com/j?utm_source=a&id=5\">x</a>",
+      "limit": 60,
+      "expected": [
+        {
+          "text": "x",
+          "url": "https://example.com/j&id=5"
+        }
+      ]
+    }
+  ],
+  "dedupe_key": [
+    {
+      "url": "https://ca.indeed.com/rc/clk?jk=a1b2&from=ja",
+      "expected": "https://ca.indeed.com/rc/clk?from=ja&jk=a1b2"
+    },
+    {
+      "url": "https://ca.indeed.com/rc/clk?from=ja&jk=a1b2",
+      "expected": "https://ca.indeed.com/rc/clk?from=ja&jk=a1b2"
+    },
+    {
+      "url": "https://www.linkedin.com/jobs/view/123/",
+      "expected": "https://www.linkedin.com/jobs/view/123/"
+    },
+    {
+      "url": "https://example.com/p?b=2&&a=1&",
+      "expected": "https://example.com/p?a=1&b=2"
+    },
+    {
+      "url": "https://example.com/p?",
+      "expected": "https://example.com/p"
+    }
+  ]
+}
