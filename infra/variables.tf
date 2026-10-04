@@ -17,3 +17,15 @@ variable "tags" {
     project = "job-scan"
   }
 }
+
+variable "github_repository" {
+  description = "Repository allowed to deploy, as owner/name."
+  type        = string
+  default     = "PCBZ/job-scan"
+}
+
+variable "github_branch" {
+  description = "Branch whose workflow runs may deploy."
+  type        = string
+  default     = "main"
+}
