@@ -1,65 +1,13 @@
 name: CD
 
+# Placeholder. Deployment will be added later, triggered by release tags.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "functions/**"
-      - ".github/workflows/cd.yml"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  id-token: write # OIDC token for azure/login
-
-# Never cancel a deployment halfway; queue the next one instead.
-concurrency:
-  group: deploy-functions
-  cancel-in-progress: false
+permissions: {}
 
 jobs:
-  deploy:
-    name: Build and deploy to Azure
-    # Skipped until `terraform output github_variables` is copied into the
-    # repository variables.
-    if: vars.AZURE_CLIENT_ID != ''
+  placeholder:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: functions
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: functions/package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      - name: Build and test
-        run: |
-          npm run build
-          npm test
-
-      # Ship only what the runtime needs: compiled output, host config and
-      # production dependencies.
-      - name: Stage package
-        run: |
-          npm prune --omit=dev
-          mkdir -p "$RUNNER_TEMP/package"
-          cp -r dist host.json package.json package-lock.json node_modules "$RUNNER_TEMP/package/"
-
-      - uses: azure/login@v3
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-      - uses: Azure/functions-action@v1
-        with:
-          app-name: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
-          package: ${{ runner.temp }}/package
+      - run: echo "No deployment configured yet."
