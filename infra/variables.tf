@@ -18,10 +18,14 @@ variable "tags" {
   }
 }
 
+# GitHub puts immutable owner and repository IDs in the OIDC subject
+# (use_immutable_subject), so a renamed or re-created repository can't reuse
+# the trust. Read the current prefix with:
+#   gh api repos/PCBZ/job-scan/actions/oidc/customization/sub
 variable "github_repository" {
-  description = "Repository allowed to deploy, as owner/name."
+  description = "Repository part of the OIDC subject, as owner@id/name@id."
   type        = string
-  default     = "PCBZ/job-scan"
+  default     = "PCBZ@15225052/job-scan@1339064873"
 }
 
 variable "github_branch" {
