@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copy `terraform output github_variables` into the GitHub repository
-# variables that .github/workflows/deploy.yml reads. Run after apply:
+# variables that .github/workflows/cd.yml reads. Run after apply:
 #
 #   infra/set-github-vars.sh [owner/repo]
 #

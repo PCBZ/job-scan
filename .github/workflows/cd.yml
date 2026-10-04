@@ -1,11 +1,11 @@
-name: Deploy functions
+name: CD
 
 on:
   push:
     branches: [main]
     paths:
       - "functions/**"
-      - ".github/workflows/deploy.yml"
+      - ".github/workflows/cd.yml"
   workflow_dispatch:
 
 permissions:

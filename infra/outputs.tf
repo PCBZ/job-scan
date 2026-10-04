@@ -18,7 +18,7 @@ output "key_vault_uri" {
   value = module.key_vault.uri
 }
 
-# Repository variables for .github/workflows/deploy.yml. Identifiers, not secrets.
+# Repository variables for .github/workflows/cd.yml. Identifiers, not secrets.
 output "github_variables" {
   value = {
     AZURE_CLIENT_ID        = module.github_oidc.client_id
