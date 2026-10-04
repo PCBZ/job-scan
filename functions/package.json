@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@azure/functions": "4.16.5",
+    "entities": "8.1.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

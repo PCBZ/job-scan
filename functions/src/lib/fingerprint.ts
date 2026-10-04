@@ -1,15 +1,8 @@
 // Port of normalize() / fingerprint() in scripts/seen_jobs.py. Both must give
 // identical output; tests/fixtures/fingerprints.json holds Python's results.
-//
-// Python's `re` is Unicode-aware for str patterns, JavaScript's is ASCII by
-// default, so its classes are spelled out here:
-//   \w → [\p{L}\p{N}_]    \d → \p{Nd}    \s → Python's str.isspace() set
-//   \b → lookarounds on \w    re.I → the `iu` flags (Unicode case folding)
+// Regex classes come from python-re.ts so they match Python's Unicode rules.
 
-const W = String.raw`[\p{L}\p{N}_]`;
-const B = `(?:(?<=${W})(?!${W})|(?<!${W})(?=${W}))`;
-const S = String.raw`[\t\n\v\f\r \x1c-\x1f\x85\xa0  -     　]`;
-const D = String.raw`\p{Nd}`;
+import { PY_BOUNDARY as B, PY_DIGIT as D, pyStrip, PY_SPACE as S } from "./python-re.js";
 
 // Suffixes and decorations that differ between job boards but mean the same role.
 const NOISE = new RegExp(
@@ -30,7 +23,7 @@ export function normalize(value: string | null | undefined): string {
   let v = (value ?? "").toLowerCase();
   v = v.replace(REQ_ID, " ");
   v = v.replace(NOISE, " ");
-  return v.replace(SPACE_RUN, " ").replace(new RegExp(`^${S}+|${S}+$`, "gu"), "");
+  return pyStrip(v.replace(SPACE_RUN, " "));
 }
 
 export interface JobIdentity {
