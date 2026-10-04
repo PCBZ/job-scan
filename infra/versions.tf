@@ -30,5 +30,6 @@ provider "azurerm" {
     "Microsoft.Insights",            # Application Insights
     "Microsoft.AlertsManagement",    # Application Insights
     "Microsoft.OperationalInsights", # Log Analytics
+    "Microsoft.CognitiveServices",   # Azure OpenAI
   ]
 }
