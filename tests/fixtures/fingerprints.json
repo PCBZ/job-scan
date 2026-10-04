@@ -1,0 +1,185 @@
+[
+  {
+    "name": "plain",
+    "job": {
+      "company": "Stripe",
+      "title": "Backend Engineer"
+    },
+    "fingerprint": "stripe|backend engineer"
+  },
+  {
+    "name": "case and surrounding whitespace",
+    "job": {
+      "company": "  STRIPE ",
+      "title": "  backend   ENGINEER  "
+    },
+    "fingerprint": "stripe|backend engineer"
+  },
+  {
+    "name": "legal suffix Inc.",
+    "job": {
+      "company": "Stripe, Inc.",
+      "title": "Backend Engineer"
+    },
+    "fingerprint": "stripe|backend engineer"
+  },
+  {
+    "name": "legal suffixes LLC Ltd Corp",
+    "job": {
+      "company": "Acme Holdings LLC",
+      "title": "Data Engineer"
+    },
+    "fingerprint": "acme|data engineer"
+  },
+  {
+    "name": "suffix words as whole words only",
+    "job": {
+      "company": "Incubator Labs Co",
+      "title": "Company Liaison"
+    },
+    "fingerprint": "incubator|liaison"
+  },
+  {
+    "name": "leading The",
+    "job": {
+      "company": "The Home Depot",
+      "title": "Software Developer"
+    },
+    "fingerprint": "home depot|software developer"
+  },
+  {
+    "name": "technologies / technology",
+    "job": {
+      "company": "Unity Technologies",
+      "title": "Technology Lead"
+    },
+    "fingerprint": "unity|lead"
+  },
+  {
+    "name": "req id with hash",
+    "job": {
+      "company": "Stripe",
+      "title": "Senior Backend Engineer (Req #12345)"
+    },
+    "fingerprint": "stripe|senior backend engineer"
+  },
+  {
+    "name": "requisition id with a letter-dash prefix is not stripped (current behaviour)",
+    "job": {
+      "company": "Shopify",
+      "title": "Staff Engineer - Requisition ID: R-20931"
+    },
+    "fingerprint": "shopify|staff engineer requisition id r 20931"
+  },
+  {
+    "name": "job id with letters",
+    "job": {
+      "company": "Amazon",
+      "title": "SDE II, Job ID: AMZ1234567"
+    },
+    "fingerprint": "amazon|sde ii"
+  },
+  {
+    "name": "bare hash number",
+    "job": {
+      "company": "Microsoft",
+      "title": "Software Engineer #998877"
+    },
+    "fingerprint": "microsoft|software engineer"
+  },
+  {
+    "name": "posting id",
+    "job": {
+      "company": "Telus",
+      "title": "Cloud Developer Posting ID 45678"
+    },
+    "fingerprint": "telus|cloud developer"
+  },
+  {
+    "name": "short number is kept",
+    "job": {
+      "company": "Rivian",
+      "title": "Engineer 2"
+    },
+    "fingerprint": "rivian|engineer 2"
+  },
+  {
+    "name": "two-digit req is kept",
+    "job": {
+      "company": "Rivian",
+      "title": "Engineer Req 42"
+    },
+    "fingerprint": "rivian|engineer req 42"
+  },
+  {
+    "name": "punctuation and slashes",
+    "job": {
+      "company": "Ernst & Young",
+      "title": "Full-Stack/Back-End Dev (Remote)"
+    },
+    "fingerprint": "ernst young|full stack back end dev remote"
+  },
+  {
+    "name": "tabs and newlines",
+    "job": {
+      "company": "Stripe\t",
+      "title": "Backend\nEngineer"
+    },
+    "fingerprint": "stripe|backend engineer"
+  },
+  {
+    "name": "unicode accents dropped",
+    "job": {
+      "company": "Société Générale",
+      "title": "Développeur Back-End"
+    },
+    "fingerprint": "soci t g n rale|d veloppeur back end"
+  },
+  {
+    "name": "word boundary is Unicode-aware (é is a word character)",
+    "job": {
+      "company": "Caféinc",
+      "title": "Backend Engineer"
+    },
+    "fingerprint": "caf inc|backend engineer"
+  },
+  {
+    "name": "cjk dropped entirely",
+    "job": {
+      "company": "株式会社メルカリ",
+      "title": "エンジニア"
+    },
+    "fingerprint": "|"
+  },
+  {
+    "name": "non-breaking and em spaces",
+    "job": {
+      "company": "Stripe Inc",
+      "title": "Backend Engineer"
+    },
+    "fingerprint": "stripe|backend engineer"
+  },
+  {
+    "name": "arabic-indic digits in req id",
+    "job": {
+      "company": "Careem",
+      "title": "Engineer Req #١٢٣٤"
+    },
+    "fingerprint": "careem|engineer"
+  },
+  {
+    "name": "missing company",
+    "job": {
+      "title": "Backend Engineer"
+    },
+    "fingerprint": "|backend engineer"
+  },
+  {
+    "name": "empty strings",
+    "job": {
+      "company": "",
+      "title": ""
+    },
+    "fingerprint": "|"
+  }
+]
