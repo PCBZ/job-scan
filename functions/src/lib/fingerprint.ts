@@ -1,5 +1,5 @@
 // Port of normalize() / fingerprint() in scripts/seen_jobs.py. Both must give
-// identical output: tests/fixtures/fingerprints.json is shared by their tests.
+// identical output; tests/fixtures/fingerprints.json holds Python's results.
 //
 // Python's `re` is Unicode-aware for str patterns, JavaScript's is ASCII by
 // default, so its classes are spelled out here:
