@@ -18,6 +18,14 @@ output "key_vault_uri" {
   value = module.key_vault.uri
 }
 
+output "openai_endpoint" {
+  value = module.openai.endpoint
+}
+
+output "openai_deployment" {
+  value = module.openai.deployment_name
+}
+
 # Repository variables for .github/workflows/cd.yml. Identifiers, not secrets.
 output "github_variables" {
   value = {

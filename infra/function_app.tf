@@ -13,6 +13,8 @@ module "function_app" {
   application_insights_connection_string = module.monitoring.connection_string
 
   app_settings = {
-    "KEY_VAULT_URI" = module.key_vault.uri
+    "KEY_VAULT_URI"           = module.key_vault.uri
+    "AZURE_OPENAI_ENDPOINT"   = module.openai.endpoint
+    "AZURE_OPENAI_DEPLOYMENT" = module.openai.deployment_name
   }
 }
