@@ -106,6 +106,34 @@ describe("processMessage", () => {
     expect(out.message.body).toBe("Senior Backend Engineer\nNorthwind · Vancouver, BC\nApply");
   });
 
+  it("takes plain and html from their own parts only (mixed: short plain, long html)", async () => {
+    const posting = `Senior Backend Engineer at Northwind, Vancouver. ${"Build distributed services. ".repeat(12)}`;
+    const raw = [
+      "From: alerts@linkedin.com",
+      "Subject: Jobs",
+      "Message-ID: <mixed@x>",
+      "Date: Sat, 3 Oct 2026 15:00:00 +0000",
+      "MIME-Version: 1.0",
+      'Content-Type: multipart/mixed; boundary="M"',
+      "",
+      "--M",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Hi, here are your jobs.",
+      "--M",
+      "Content-Type: text/html; charset=utf-8",
+      "",
+      `<p>${posting}</p>`,
+      "--M--",
+      "",
+    ].join("\r\n");
+    const out = await processMessage(new TextEncoder().encode(raw), account(), none);
+    if (out.kind !== "kept") throw new Error(out.kind);
+    // Python's message_body sees a 23-character plain part, so it renders the HTML.
+    expect(out.message.body_source).toBe("html");
+    expect(out.message.body).toBe(posting.trim());
+  });
+
   it("drops bodies shorter than 40 characters", async () => {
     const out = await processMessage(eml({ plain: "Too short to be an alert" }), account(), none);
     expect(out).toEqual({ kind: "filtered" });

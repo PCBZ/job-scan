@@ -1,10 +1,39 @@
 // One raw message → a kept message, or the reason it was dropped. Mirrors the
 // per-message loop in scripts/fetch_mail.py.
 
-import PostalMime, { decodeWords } from "postal-mime";
+import PostalMime, { decodeWords, type Email } from "postal-mime";
 import { cleanText, extractLinks, htmlToText } from "../mail-text.js";
 import { codePointLength, stripWhitespace } from "../unicode.js";
 import type { FetchedMessage, MailAccount } from "./types.js";
+
+// postal-mime fills a part's missing plain or html from the other type, so a
+// short plain intro next to a long HTML posting reads as a long plain body.
+// scripts/mail_text.message_body takes each type from its own parts only, so
+// this parser does too. It overrides postal-mime internals (pinned at 4.0.4);
+// the mixed-part test in message.test.ts fails if an upgrade changes them.
+type TextEntry = { type: "text"; value: string } | { type: "subMessage"; value: Email };
+interface ParserInternals {
+  textMap: Map<unknown, Partial<Record<"plain" | "html", TextEntry[]>>>;
+  textTypes: Set<"plain" | "html">;
+  textContent: Record<string, string>;
+}
+
+class OwnPartsParser extends PostalMime {
+  renderTextContent(): void {
+    const self = this as unknown as ParserInternals;
+    const out: Record<string, string[]> = {};
+    self.textMap.forEach((entry) => {
+      for (const type of self.textTypes) {
+        out[type] ??= [];
+        for (const item of entry[type] ?? []) {
+          const sub = type === "html" ? (item.value as Email).html : (item.value as Email).text;
+          out[type].push(item.type === "text" ? item.value : (sub ?? ""));
+        }
+      }
+    });
+    for (const [type, parts] of Object.entries(out)) self.textContent[type] = parts.join("\n");
+  }
+}
 
 export type MessageOutcome =
   | { kind: "kept"; message: FetchedMessage }
@@ -23,7 +52,7 @@ export async function processMessage(
   account: MailAccount,
   seenIds: ReadonlySet<string>,
 ): Promise<MessageOutcome> {
-  const email = await PostalMime.parse(source);
+  const email = await new OwnPartsParser().parse(source);
   const header = (key: string) => email.headers.find((h) => h.key === key)?.value ?? "";
 
   // Namespaced by account upstream: one alert in two mailboxes is two messages.

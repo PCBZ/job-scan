@@ -34,30 +34,58 @@ export function toImapSearch(query: SearchQuery): SearchObject {
   return { since: query.since, or: from.map((f) => ({ from: f })) };
 }
 
-export const connectImap: ConnectMailbox = async (account, user, password) => {
-  const client = new ImapFlow({
+/** The parts of ImapFlow the adapter uses, so tests can supply a fake client. */
+export type ImapClient = Pick<
+  ImapFlow,
+  "connect" | "mailboxOpen" | "search" | "fetchOne" | "logout" | "on"
+>;
+
+export type CreateImapClient = (account: MailAccount, user: string, password: string) => ImapClient;
+
+const createImapFlow: CreateImapClient = (account, user, password) =>
+  new ImapFlow({
     host: account.host,
     port: account.port,
     secure: true,
     auth: { user, pass: password },
     logger: false,
   });
-  await client.connect();
-  return {
-    async open(folder) {
-      await client.mailboxOpen(folder, { readOnly: true });
-    },
-    async search(query) {
-      const uids = await client.search(toImapSearch(query), { uid: true });
-      if (!uids) throw new Error("IMAP SEARCH failed");
-      return [...uids].sort((a, b) => a - b);
-    },
-    async fetchSource(uid) {
-      const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
-      return msg && msg.source !== undefined ? new Uint8Array(msg.source) : null;
-    },
-    async close() {
-      await client.logout();
-    },
+
+export function imapConnector(create: CreateImapClient = createImapFlow): ConnectMailbox {
+  return async (account, user, password) => {
+    const client = create(account, user, password);
+    // ImapFlow emits "error" when the connection fails after connect().
+    // Unhandled, that event would crash the process; instead the next call
+    // throws it, and runFetch records it as this account's failure.
+    let failure: Error | undefined;
+    client.on("error", (err: Error) => {
+      failure = err;
+    });
+    const live = () => {
+      if (failure) throw failure;
+    };
+    await client.connect();
+    return {
+      async open(folder) {
+        live();
+        await client.mailboxOpen(folder, { readOnly: true });
+      },
+      async search(query) {
+        live();
+        const uids = await client.search(toImapSearch(query), { uid: true });
+        if (!uids) throw new Error("IMAP SEARCH failed");
+        return [...uids].sort((a, b) => a - b);
+      },
+      async fetchSource(uid) {
+        live();
+        const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
+        return msg && msg.source !== undefined ? new Uint8Array(msg.source) : null;
+      },
+      async close() {
+        if (!failure) await client.logout();
+      },
+    };
   };
-};
+}
+
+export const connectImap: ConnectMailbox = imapConnector();
