@@ -14,3 +14,11 @@ export interface ResumeSource {
   /** A file's contents as text. */
   readFile(path: string): Promise<string>;
 }
+
+/**
+ * A path that doesn't exist. Sources throw this for "no such path" only;
+ * authorization and network failures stay ordinary errors.
+ */
+export class ResumeNotFoundError extends Error {
+  override name = "ResumeNotFoundError";
+}

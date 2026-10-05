@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { DirEntry, ResumeSource } from "../../src/lib/resume/source.js";
+import {
+  type DirEntry,
+  ResumeNotFoundError,
+  type ResumeSource,
+} from "../../src/lib/resume/source.js";
 import {
   discoverVariants,
   pickDefault,
@@ -15,6 +19,10 @@ function repo(paths: string[]): ResumeSource & { listed: string[] } {
     async listDir(dir) {
       listed.push(dir);
       const prefix = dir ? `${dir}/` : "";
+      // Like GitHub: a directory that doesn't exist is a 404.
+      if (dir && !paths.some((x) => x.startsWith(prefix))) {
+        throw new ResumeNotFoundError(`GitHub contents 404 for "${dir}"`);
+      }
       const entries = new Map<string, DirEntry>();
       for (const p of paths.filter((x) => x.startsWith(prefix))) {
         const rest = p.slice(prefix.length);
@@ -63,10 +71,35 @@ describe("discoverVariants", () => {
     ]);
   });
 
-  it("takes a literal path without listing", async () => {
+  it("keeps a literal path only if the file exists", async () => {
     const source = repo(files);
-    expect(await discoverVariants(source, ["General/resume.tex"])).toEqual(["General/resume.tex"]);
-    expect(source.listed).toEqual([]);
+    expect(await discoverVariants(source, ["General/resume.tex", "General/deleted.tex"])).toEqual([
+      "General/resume.tex",
+    ]);
+    expect(source.listed).toEqual(["General", "General"]);
+  });
+
+  it("treats a missing directory as no matches and keeps the others", async () => {
+    expect(await discoverVariants(repo(files), ["General/*.tex", "src/*.tex"])).toEqual([
+      "General/backend.tex",
+      "General/resume.tex",
+    ]);
+  });
+
+  it("does not swallow errors other than not-found", async () => {
+    const source: ResumeSource = {
+      listDir: async () => {
+        throw new Error('GitHub contents 403 for "General": Resource not accessible');
+      },
+      readFile: async () => "",
+    };
+    await expect(discoverVariants(source, ["General/*.tex"])).rejects.toThrow("403");
+  });
+
+  it("fails when nothing matches, pointing at repo, ref and token", async () => {
+    await expect(discoverVariants(repo(files), ["missing/*.tex"])).rejects.toThrow(
+      'no resume variants match ["missing/*.tex"]. Check [resume] repo, ref and variants',
+    );
   });
 
   it("rejects wildcards in directory segments", async () => {

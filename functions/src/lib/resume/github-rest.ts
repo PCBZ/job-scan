@@ -2,7 +2,7 @@
 // with read-only Contents on the resume repository, so it can read that
 // repository and nothing else.
 
-import type { DirEntry, ResumeSource } from "./source.js";
+import { type DirEntry, ResumeNotFoundError, type ResumeSource } from "./source.js";
 
 export interface RepoRef {
   owner: string;
@@ -18,6 +18,8 @@ export class GithubRestResumeSource implements ResumeSource {
     private readonly token: string,
     private readonly repo: RepoRef,
     private readonly fetchFn: typeof fetch = fetch,
+    /** Per request, so a stalled response can't hold the run. */
+    private readonly timeoutMs = 30_000,
   ) {}
 
   private async get(path: string, accept: string): Promise<Response> {
@@ -36,15 +38,19 @@ export class GithubRestResumeSource implements ResumeSource {
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "job-scan",
       },
+      signal: AbortSignal.timeout(this.timeoutMs),
     });
     if (!res.ok) {
-      // 404 also means "this token can't see the repository".
       const body = await res.text();
       let message = body.slice(0, 200);
       try {
         message = (JSON.parse(body) as { message?: string }).message ?? message;
       } catch {}
-      throw new Error(`GitHub contents ${res.status} for "${path || "/"}": ${message}`);
+      const error = `GitHub contents ${res.status} for "${path || "/"}": ${message}`;
+      // GitHub answers 404 both for a missing path and for a repository the
+      // token can't see; discoverVariants tells the two apart.
+      if (res.status === 404) throw new ResumeNotFoundError(error);
+      throw new Error(error);
     }
     return res;
   }
