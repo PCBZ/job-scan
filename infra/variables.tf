@@ -33,3 +33,9 @@ variable "github_branch" {
   type        = string
   default     = "main"
 }
+
+variable "config_toml_path" {
+  description = "config.toml to upload. Defaults to the one at the repository root (gitignored)."
+  type        = string
+  default     = null
+}

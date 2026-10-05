@@ -16,5 +16,6 @@ module "function_app" {
     "KEY_VAULT_URI"           = module.key_vault.uri
     "AZURE_OPENAI_ENDPOINT"   = module.openai.endpoint
     "AZURE_OPENAI_DEPLOYMENT" = module.openai.deployment_name
+    "CONFIG_BLOB_URL"         = module.config_blob.url
   }
 }

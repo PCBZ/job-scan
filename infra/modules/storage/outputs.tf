@@ -13,3 +13,7 @@ output "container_endpoints" {
     key => "${azurerm_storage_account.this.primary_blob_endpoint}${c.name}"
   }
 }
+
+output "container_ids" {
+  value = { for key, c in azurerm_storage_container.this : key => c.id }
+}
