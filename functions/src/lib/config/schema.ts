@@ -54,10 +54,15 @@ const report = z.strictObject({
   suggest_variant: z.boolean().optional(),
 });
 
-// Local-only: `lib` is a path on the operator's machine. Parsed so the shared
-// file validates; the cloud reads resumes from GitHub instead.
+// `lib` is a path on the operator's machine, used only by the local skill. The
+// cloud reads the same variants from the GitHub repository in `repo` at `ref`.
 const resume = z.strictObject({
   lib: z.string().optional(),
+  repo: z
+    .string()
+    .regex(/^[\w.-]+\/[\w.-]+$/, 'expected "owner/name"')
+    .optional(),
+  ref: z.string().min(1).optional(),
   variants: strings.optional(),
   default: z.string().optional(),
 });
@@ -74,3 +79,4 @@ export type RawConfig = z.infer<typeof rawConfig>;
 export type RawAccount = z.infer<typeof account>;
 export type ProfileConfig = z.infer<typeof profile>;
 export type ReportConfig = z.infer<typeof report>;
+export type RawResume = z.infer<typeof resume>;

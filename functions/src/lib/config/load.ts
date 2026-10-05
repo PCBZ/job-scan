@@ -9,12 +9,14 @@ import { parse, TomlError } from "smol-toml";
 import type { MailRunConfig } from "../mail/types.js";
 import { ConfigError } from "./error.js";
 import { mailConfig } from "./mail.js";
+import { type ResumeConfig, resumeConfig } from "./resume.js";
 import { type ProfileConfig, type ReportConfig, rawConfig } from "./schema.js";
 
 export { ConfigError } from "./error.js";
 
 export interface AppConfig {
   mail: MailRunConfig;
+  resume: ResumeConfig;
   profile: ProfileConfig;
   report: ReportConfig;
 }
@@ -63,7 +65,12 @@ export function parseConfig(text: string, origin: string): AppConfig {
     throw new ConfigError(`${origin} is invalid:\n${problems.join("\n")}`);
   }
   const raw = result.data;
-  return { mail: mailConfig(raw, origin), profile: raw.profile ?? {}, report: raw.report ?? {} };
+  return {
+    mail: mailConfig(raw, origin),
+    resume: resumeConfig(raw.resume, origin),
+    profile: raw.profile ?? {},
+    report: raw.report ?? {},
+  };
 }
 
 export async function loadConfig(source: ConfigSource): Promise<AppConfig> {
