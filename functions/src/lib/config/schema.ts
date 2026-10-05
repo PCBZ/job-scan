@@ -1,0 +1,76 @@
+// The shape of config.toml, the same file the local skill reads. Every table is
+// strict: an unknown key is an error, so a typo like `sender =` fails loudly
+// instead of silently dropping a setting.
+
+import { z } from "zod";
+
+const strings = z.array(z.string());
+const positiveInt = z.number().int().positive();
+
+/** Keys under [mail] that an individual [[account]] may override. */
+const sharedMail = {
+  senders: strings.optional(),
+  subject_keywords: strings.optional(),
+  exclude_senders: strings.optional(),
+  max_messages: positiveInt.optional(),
+  max_chars_per_message: positiveInt.optional(),
+};
+
+const account = z.strictObject({
+  name: z.string().trim().min(1).optional(),
+  provider: z.string().optional(),
+  host: z.string().min(1).optional(),
+  port: z.number().int().min(1).max(65535).optional(),
+  folder: z.string().min(1).optional(),
+  user_env: z.string().min(1).optional(),
+  password_env: z.string().min(1).optional(),
+  ...sharedMail,
+});
+
+const mail = z.strictObject({
+  ...sharedMail,
+  days: positiveInt.optional(),
+  max_total_messages: positiveInt.optional(),
+});
+
+// Sentinels switch a gate off: seniority "all", "unknown", 0, an empty list.
+const profile = z.strictObject({
+  target_titles: strings.optional(),
+  seniority: z.enum(["all", "new-grad", "junior", "mid", "senior", "staff"]).optional(),
+  years_experience: z.union([z.number().nonnegative(), z.literal("unknown")]).optional(),
+  locations: strings.optional(),
+  open_to_remote: z.boolean().optional(),
+  open_to_relocation: z.boolean().optional(),
+  needs_sponsorship: z.union([z.boolean(), z.literal("unknown")]).optional(),
+  min_salary_usd: z.number().nonnegative().optional(),
+  core_skills: strings.optional(),
+  exclude_keywords: strings.optional(),
+});
+
+const report = z.strictObject({
+  max_top_picks: positiveInt.optional(),
+  min_score_to_recommend: z.number().min(0).max(100).optional(),
+  repeat_suppression_days: z.number().int().nonnegative().optional(),
+  suggest_variant: z.boolean().optional(),
+});
+
+// Local-only: `lib` is a path on the operator's machine. Parsed so the shared
+// file validates; the cloud reads resumes from GitHub instead.
+const resume = z.strictObject({
+  lib: z.string().optional(),
+  variants: strings.optional(),
+  default: z.string().optional(),
+});
+
+export const rawConfig = z.strictObject({
+  account: z.array(account).optional(),
+  mail: mail.optional(),
+  profile: profile.optional(),
+  report: report.optional(),
+  resume: resume.optional(),
+});
+
+export type RawConfig = z.infer<typeof rawConfig>;
+export type RawAccount = z.infer<typeof account>;
+export type ProfileConfig = z.infer<typeof profile>;
+export type ReportConfig = z.infer<typeof report>;

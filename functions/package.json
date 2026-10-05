@@ -23,9 +23,11 @@
     "@azure/data-tables": "13.3.2",
     "@azure/functions": "4.16.5",
     "@azure/identity": "4.13.3",
+    "@azure/storage-blob": "12.34.0",
     "entities": "8.1.0",
     "imapflow": "2.2.5",
     "postal-mime": "4.0.4",
+    "smol-toml": "1.9.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
