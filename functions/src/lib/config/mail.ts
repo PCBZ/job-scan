@@ -60,13 +60,14 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
         .replace(/^_+|_+$/g, "") || "ACCOUNT";
 
     const provider = (entry.provider ?? "").trim().toLowerCase();
-    if (provider && !(provider in PROVIDERS)) {
+    // hasOwn, not `in`: "constructor" or "__proto__" must not pass as a provider.
+    if (provider && !Object.hasOwn(PROVIDERS, provider)) {
       throw new ConfigError(
         `account "${name}" has unknown provider "${provider}" in ${origin}. ` +
           `Known: ${Object.keys(PROVIDERS).sort().join(", ")}; or set host directly.`,
       );
     }
-    const preset = PROVIDERS[provider];
+    const preset = provider ? PROVIDERS[provider] : undefined;
     const host = entry.host ?? preset?.host;
     if (!host) {
       throw new ConfigError(
