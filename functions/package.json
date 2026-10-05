@@ -24,7 +24,6 @@
     "@azure/functions": "4.16.5",
     "@azure/identity": "4.13.3",
     "@azure/storage-blob": "12.34.0",
-    "@modelcontextprotocol/sdk": "1.32.1",
     "entities": "8.1.0",
     "imapflow": "2.2.5",
     "postal-mime": "4.0.4",

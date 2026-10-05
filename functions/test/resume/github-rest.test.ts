@@ -1,0 +1,63 @@
+import { describe, expect, it } from "vitest";
+import { GithubRestResumeSource } from "../../src/lib/resume/github-rest.js";
+
+const REPO = { owner: "PCBZ", repo: "Resume", ref: "main" };
+
+function fake(status: number, body: unknown, contentType = "application/json") {
+  const calls: { url: string; headers: Record<string, string> }[] = [];
+  const fetchFn = (async (url: string, init?: RequestInit) => {
+    calls.push({ url, headers: init?.headers as Record<string, string> });
+    const text = typeof body === "string" ? body : JSON.stringify(body);
+    return new Response(text, { status, headers: { "content-type": contentType } });
+  }) as typeof fetch;
+  return { calls, source: new GithubRestResumeSource("t0ken", REPO, fetchFn) };
+}
+
+describe("GithubRestResumeSource", () => {
+  it("lists a directory through the contents API", async () => {
+    const { calls, source } = fake(200, [
+      { name: "Resume.tex", path: "General/Resume.tex", type: "file", size: 10 },
+      { name: "old", path: "General/old", type: "dir" },
+      { name: "link", path: "General/link", type: "symlink" },
+    ]);
+    expect(await source.listDir("General")).toEqual([
+      { name: "Resume.tex", path: "General/Resume.tex", type: "file" },
+      { name: "old", path: "General/old", type: "dir" },
+    ]);
+    expect(calls[0]?.url).toBe(
+      "https://api.github.com/repos/PCBZ/Resume/contents/General?ref=main",
+    );
+    expect(calls[0]?.headers).toMatchObject({
+      Authorization: "Bearer t0ken",
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    });
+  });
+
+  it("lists the repository root and encodes path segments", async () => {
+    const root = fake(200, []);
+    await root.source.listDir("");
+    expect(root.calls[0]?.url).toBe("https://api.github.com/repos/PCBZ/Resume/contents?ref=main");
+    const spaced = fake(200, []);
+    await spaced.source.listDir("My Resumes/2026#1");
+    expect(spaced.calls[0]?.url).toContain("/contents/My%20Resumes/2026%231?ref=main");
+  });
+
+  it("reads a file with the raw media type", async () => {
+    const { calls, source } = fake(200, "\\section{Experience} é", "application/vnd.github.raw");
+    expect(await source.readFile("General/Resume.tex")).toBe("\\section{Experience} é");
+    expect(calls[0]?.headers.Accept).toBe("application/vnd.github.raw+json");
+  });
+
+  it("reports GitHub's message on failure", async () => {
+    const { source } = fake(404, { message: "Not Found" });
+    await expect(source.readFile("General/nope.tex")).rejects.toThrow(
+      'GitHub contents 404 for "General/nope.tex": Not Found',
+    );
+  });
+
+  it("rejects listing a path that is a file", async () => {
+    const { source } = fake(200, { type: "file", name: "Resume.tex", path: "Resume.tex" });
+    await expect(source.listDir("Resume.tex")).rejects.toThrow('"Resume.tex" is not a directory');
+  });
+});
