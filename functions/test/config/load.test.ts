@@ -105,8 +105,16 @@ describe("parseConfig rejects", () => {
     ["an unknown top-level table", `${MIN}\n[extras]\nx = 1\n`, 'Unrecognized key: "extras"'],
     ["a config with no accounts", `[mail]\nsenders = ["x"]\n`, "no [[account]] block"],
     ["an unknown provider", MIN.replace('"gmail"', '"hotmail"'), 'unknown provider "hotmail"'],
-    ["an inherited property name as provider", MIN.replace('"gmail"', '"constructor"'), 'unknown provider "constructor"'],
-    ["__proto__ as provider", MIN.replace('"gmail"', '"__proto__"'), 'unknown provider "__proto__"'],
+    [
+      "an inherited property name as provider",
+      MIN.replace('"gmail"', '"constructor"'),
+      'unknown provider "constructor"',
+    ],
+    [
+      "__proto__ as provider",
+      MIN.replace('"gmail"', '"__proto__"'),
+      'unknown provider "__proto__"',
+    ],
     [
       "an account with neither provider nor host",
       `[mail]\nsenders = ["x"]\n[[account]]\nname = "a"\n`,
