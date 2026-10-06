@@ -17,5 +17,6 @@ module "function_app" {
     "AZURE_OPENAI_ENDPOINT"   = module.openai.endpoint
     "AZURE_OPENAI_DEPLOYMENT" = module.openai.deployment_name
     "CONFIG_BLOB_URL"         = module.config_blob.url
+    "RESUME_CACHE_URL"        = module.storage.container_endpoints["resume-cache"]
   }
 }

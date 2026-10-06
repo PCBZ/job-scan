@@ -1,0 +1,117 @@
+{
+  "_note": "Generated from scripts/latex_text.py and resume_text.text_for's normalisation. Synthetic sources; no real resume.",
+  "latex_to_text": [
+    {
+      "name": "full resume template",
+      "tex": "\\documentclass[letterpaper,11pt]{article}\n\\usepackage[hidelinks]{hyperref}\n\\newcommand{\\resumeSubheading}[4]{\\item \\textbf{#1} \\hfill #2 \\\\ \\textit{#3} \\hfill #4}\n\\definecolor{accent}{RGB}{0,90,160}\n\\begin{document}\n%-------- HEADING --------\n\\begin{center}\n    \\textbf{\\Huge \\scshape Alex Rivera} \\\\ \\vspace{1pt}\n    \\small 604-555-0100 $|$ \\href{mailto:alex@example.com}{\\underline{alex@example.com}} $|$\n    \\href{https://github.com/example}{\\raisebox{-0.2\\height}\\faGithub\\ \\underline{github.com/example}}\n\\end{center}\n\n\\section{Experience}\n  \\resumeSubHeadingListStart\n    \\resumeSubheading\n      {Northwind Traders}{Jan 2024 -- Present}\n      {Senior Backend Engineer}{Vancouver, BC}\n      \\resumeItemListStart\n        \\resumeItem{Cut p99 latency 40\\% by moving hot paths to Go \\& gRPC}\n        \\resumeItem{Owned \\textbf{Postgres} migrations; on-call for 3 services} % internal note\n      \\resumeItemListEnd\n  \\resumeSubHeadingListEnd\n\n\\section{Technical Skills}\n \\begin{itemize}[leftmargin=0.15in, label={}]\n    \\small{\\item{\n     \\textbf{Languages}{: Python, Go, TypeScript, SQL} \\\\\n     \\textbf{Cloud}{: Azure Functions, Terraform, \\textcolor{accent}{Kubernetes}}\n    }}\n \\end{itemize}\n\\end{document}\n",
+      "expected": "Alex Rivera\n604-555-0100 | alex@example.com |\ngithub.com/example\n## Experience\nNorthwind Traders | Jan 2024 -- Present | Senior Backend Engineer | Vancouver, BC\n- Cut p99 latency 40% by moving hot paths to Go & gRPC\n- Owned Postgres migrations; on-call for 3 services\n## Technical Skills\n[leftmargin=0.15in, label=]\n- Languages: Python, Go, TypeScript, SQL\nCloud: Azure Functions, Terraform, Kubernetes"
+    },
+    {
+      "name": "no begin{document}: whole source is content",
+      "tex": "\\section{Summary} Backend engineer with \\emph{five} years.",
+      "expected": "## Summary\nBackend engineer with five years."
+    },
+    {
+      "name": "escapes and specials",
+      "tex": "R\\&D at A\\_B \\#1 for 50\\% \\$ off~now \\{x\\} a$\\cdot$b",
+      "expected": "R&D at A_B #1 for 50% $ off now {x} a b"
+    },
+    {
+      "name": "comments stripped but escaped percent kept",
+      "tex": "Top 10\\% performer % hidden remark\nNext line",
+      "expected": "Top 10% performer\nNext line"
+    },
+    {
+      "name": "line breaks and spacing switches",
+      "tex": "Line one\\\\Line two \\hfill right \\quad gap \\newline three",
+      "expected": "Line one\nLine two right gap three"
+    },
+    {
+      "name": "unknown multi-arg macro keeps every argument",
+      "tex": "\\project{Job Scan}{TypeScript, Azure}{2026}",
+      "expected": "Job Scan | TypeScript, Azure | 2026"
+    },
+    {
+      "name": "arity 1 keeps the following group as content",
+      "tex": "\\textbf{Languages}{: Java, Go}",
+      "expected": "Languages: Java, Go"
+    },
+    {
+      "name": "optional args skipped",
+      "tex": "\\cventry[3mm]{2020}{Engineer}{Contoso}",
+      "expected": "2020 | Engineer | Contoso"
+    },
+    {
+      "name": "href shows the link text, url shows the url",
+      "tex": "\\href{https://x.example}{Portfolio} and \\url{https://y.example}",
+      "expected": "Portfolio and https://y.example"
+    },
+    {
+      "name": "begin/end become newlines",
+      "tex": "\\begin{center}Name\\end{center}Rest",
+      "expected": "Name\nRest"
+    },
+    {
+      "name": "starred commands",
+      "tex": "\\section*{Projects}\\subsection*{Side}",
+      "expected": "## Projects\n## Side"
+    },
+    {
+      "name": "dropped layout commands with args",
+      "tex": "\\vspace{-4pt}\\setlength{\\tabcolsep}{0in}\\includegraphics[width=1in]{me.png}Kept",
+      "expected": "Kept"
+    },
+    {
+      "name": "punctuation-only leftover lines removed",
+      "tex": "Real line\n| , . ;\n· •\n-\nAnother",
+      "expected": "Real line\nAnother"
+    },
+    {
+      "name": "nested braces",
+      "tex": "\\textbf{Outer {inner {deep}} end}",
+      "expected": "Outer inner deep end"
+    },
+    {
+      "name": "unterminated group",
+      "tex": "\\textbf{never closed",
+      "expected": "never closed"
+    },
+    {
+      "name": "unicode content passes through",
+      "tex": "\\section{Expérience} Développeur — Zürich · 東京 🚀",
+      "expected": "## Expérience\nDéveloppeur — Zürich · 東京 🚀"
+    },
+    {
+      "name": "item variants",
+      "tex": "\\begin{itemize}\\item First\\item[*] Second \\resumeItem{Third}\\end{itemize}",
+      "expected": "- First\n- Second\n- Third"
+    }
+  ],
+  "normalize": [
+    {
+      "name": "trailing spaces and triple newlines",
+      "text": "a  \n\n\n\nb\t\nc",
+      "expected": "a\n\nb\nc"
+    },
+    {
+      "name": "python splitlines boundaries",
+      "text": "a\rb\r\nc\u000bd\fe\u001cfg h i",
+      "expected": "a\nb\nc\nd\ne\nf\ng\nh\ni"
+    },
+    {
+      "name": "trailing newline dropped like splitlines",
+      "text": "a\nb\n",
+      "expected": "a\nb"
+    },
+    {
+      "name": "unicode trailing whitespace",
+      "text": "x　 \ny",
+      "expected": "x\ny"
+    },
+    {
+      "name": "empty",
+      "text": "",
+      "expected": ""
+    }
+  ]
+}
