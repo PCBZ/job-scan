@@ -30,6 +30,7 @@
     "@unified-latex/unified-latex-util-parse": "1.8.4",
     "entities": "8.1.0",
     "imapflow": "2.2.5",
+    "openai": "7.28.0",
     "postal-mime": "4.0.4",
     "smol-toml": "1.9.0",
     "zod": "4.6.5"
