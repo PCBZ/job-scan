@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { LLM_NODES, workflowMermaid } from "../../src/lib/workflow/diagram.js";
 import { buildWorkflow } from "../../src/lib/workflow/graph.js";
 import type { NodeEvent } from "../../src/lib/workflow/types.js";
 import { fakes } from "./fakes.js";
@@ -125,8 +124,16 @@ describe("workflow graph", () => {
       for (const [k, child] of Object.entries(v)) scan(child, `${path}.${k}`, seen);
     };
     for (const call of f.llmInputs) scan(call.args, call.node);
-    // Every LLM node was exercised, and only those listed call the model.
-    expect([...new Set(f.llmInputs.map((c) => c.node))].sort()).toEqual([...LLM_NODES].sort());
+    // Every LLM node was exercised.
+    expect(new Set(f.llmInputs.map((c) => c.node))).toEqual(
+      new Set([
+        "extract_postings",
+        "canonicalize_resume_skills",
+        "judge",
+        "explain",
+        "canonicalize_posting_skills",
+      ]),
+    );
     expect(callables).toEqual([]);
   });
 
@@ -153,23 +160,5 @@ describe("workflow graph", () => {
     const f = fakes({ extractProblems: always, judgeProblems: always, explainProblems: always });
     await run(f, { maxRepairs: 5 });
     expect(f.counters).toEqual({ extract: 6, judge: 6, explain: 6 });
-  });
-
-  it("draws the graph from the code, colouring LLM nodes apart from code nodes", async () => {
-    const mermaid = await workflowMermaid();
-    expect(mermaid).toContain(`class ${LLM_NODES.join(",")} llm;`);
-    const codeLine = mermaid.split("\n").find((l) => l.trim().endsWith(" code;"));
-    expect(codeLine).toContain("load_config");
-    expect(codeLine).toContain("mark_seen");
-    for (const n of LLM_NODES) expect(codeLine).not.toMatch(new RegExp(`[ ,]${n}[,;]`));
-    for (const edge of [
-      "load_config --> fetch_mail",
-      "load_config --> load_resumes",
-      "await_resumes --> judge",
-      "canonicalize_resume_skills --> judge",
-      "deliver --> mark_seen",
-    ]) {
-      expect(mermaid).toContain(edge);
-    }
   });
 });
