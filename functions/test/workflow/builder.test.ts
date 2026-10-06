@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { END, START, WorkflowBuilder } from "../../src/lib/workflow/builder.js";
+import { posting } from "../postings/helpers.js";
 
 // A one-loop graph: extract_postings → validate, failing the first `fails` checks.
 function loop(fails: number, maxRepairs = 2) {
   let attempts = 0;
   let checks = 0;
   const graph = new WorkflowBuilder({ maxRepairs })
-    .node("extract_postings", () => ({ extracted: [{ attempt: ++attempts }] }))
+    .node("extract_postings", () => ({ extracted: [posting({ row: ++attempts })] }))
     .edge(START, "extract_postings")
     .repairLoop("extract", {
       generate: "extract_postings",
@@ -30,8 +31,8 @@ describe("WorkflowBuilder.repairLoop", () => {
     expect(attempts()).toBe(3);
     expect(out.loops.extract).toEqual({
       turns: [
-        { previous: [{ attempt: 1 }], problems: ["bad 1"] },
-        { previous: [{ attempt: 2 }], problems: ["bad 2"] },
+        { previous: [posting({ row: 1 })], problems: ["bad 1"] },
+        { previous: [posting({ row: 2 })], problems: ["bad 2"] },
       ],
       problems: [],
       retry: false,

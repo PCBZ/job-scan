@@ -64,7 +64,11 @@ export function buildWorkflow(
           s.loops.extract.turns,
           signal,
         );
-        return { extracted: r.value, usage: { extract_postings: r.usage } };
+        return {
+          extracted: r.value,
+          usage: { extract_postings: r.usage },
+          ...(r.warnings?.length ? { warnings: r.warnings } : {}),
+        };
       })
       .repairLoop("extract", {
         generate: "extract_postings",
@@ -72,8 +76,8 @@ export function buildWorkflow(
         next: "dedupe",
         output: (s) => s.extracted,
         run: (s) => {
-          const { valid, problems } = steps.validatePostings(s.extracted);
-          return { problems, update: { postings: valid } };
+          const { valid, problems, dropped } = steps.validatePostings(s.extracted);
+          return { problems, update: { postings: valid, dropped } };
         },
       })
       .node("dedupe", async (s) => {
@@ -150,6 +154,7 @@ export function buildWorkflow(
           mail: s.mail,
           repeats: s.repeats,
           filtered: s.filtered,
+          dropped: s.dropped,
           top: s.top,
           explanations: s.explanations,
           coverage: s.coverage,

@@ -8,11 +8,12 @@
 import type { AppConfig } from "../config/load.js";
 import type { AllAccountsFailed, FetchedMessage, FetchPayload } from "../mail/types.js";
 import type { RepairTurn, TokenUsage } from "../model/types.js";
+import type { Posting, Source } from "../postings/types.js";
 import type { ResumeSet, ResumeVariant } from "../resume/load.js";
 
+export type { Posting };
+
 // Shapes the node issues define; the graph only moves them between nodes.
-/** A posting extracted from alert mail. Shape: #14. */
-export type Posting = Record<string, unknown>;
 /** A posting with gates, rubric score, variant and evidence. Shape: #17. */
 export type Judgement = Record<string, unknown>;
 /** A judged posting after weighting and the floor. Shape: #17. */
@@ -31,6 +32,8 @@ export type Report = Record<string, unknown>;
 export interface LlmResult<T> {
   value: T;
   usage: TokenUsage;
+  /** What went wrong but didn't stop the step, for the report. */
+  warnings?: string[];
 }
 
 /** Steps that call the model. Inputs are plain data. */
@@ -65,7 +68,12 @@ export interface DeterministicSteps {
   loadConfig(signal?: AbortSignal): Promise<AppConfig>;
   loadResumes(config: AppConfig, signal?: AbortSignal): Promise<ResumeSet>;
   fetchMail(config: AppConfig, signal?: AbortSignal): Promise<FetchPayload | AllAccountsFailed>;
-  validatePostings(postings: Posting[]): { valid: Posting[]; problems: string[] };
+  validatePostings(postings: Posting[]): {
+    valid: Posting[];
+    problems: string[];
+    /** Rows that failed a check, per job board. */
+    dropped: Partial<Record<Source, number>>;
+  };
   dedupe(postings: Posting[]): Promise<{ fresh: Posting[]; repeats: number }>;
   hardGates(postings: Posting[], config: AppConfig): { kept: Posting[]; filtered: Filtered[] };
   verifyJudgements(judged: Judgement[], resumes: ResumeSet): string[];
@@ -92,6 +100,8 @@ export interface ReportInput {
   mail: FetchPayload | AllAccountsFailed | null;
   repeats: number;
   filtered: Filtered[];
+  /** Rows dropped as misaligned after the last repair, per job board. */
+  dropped: Partial<Record<Source, number>>;
   top: Ranked[];
   explanations: Explanation[];
   coverage: Coverage[];

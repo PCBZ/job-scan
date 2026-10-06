@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildWorkflow } from "../../src/lib/workflow/graph.js";
 import type { NodeEvent } from "../../src/lib/workflow/types.js";
+import { posting } from "../postings/helpers.js";
 import { fakes } from "./fakes.js";
 
 function run(f: ReturnType<typeof fakes>, options = {}, signal?: AbortSignal) {
@@ -33,7 +34,7 @@ describe("workflow graph", () => {
       expect(ranBefore(f.log, a as string, b as string), `${a} before ${b}`).toBe(true);
     }
     expect(f.log.at(-1)).toBe("mark_seen");
-    expect(out.report).toEqual({ outcome: "report", warnings: [], top: 1 });
+    expect(out.report).toEqual({ outcome: "report", warnings: [], top: 1, dropped: {} });
   });
 
   it("loads mail and resumes in parallel and joins them at judge", async () => {
@@ -58,10 +59,18 @@ describe("workflow graph", () => {
       .map((c) => c.args[1]);
     expect(repairsSeen).toEqual([
       [],
-      [{ previous: [{ title: "attempt 1" }], problems: ["row 2: company looks like a date"] }],
       [
-        { previous: [{ title: "attempt 1" }], problems: ["row 2: company looks like a date"] },
-        { previous: [{ title: "attempt 2" }], problems: ["row 1: empty title"] },
+        {
+          previous: [posting({ title: "attempt 1" })],
+          problems: ["row 2: company looks like a date"],
+        },
+      ],
+      [
+        {
+          previous: [posting({ title: "attempt 1" })],
+          problems: ["row 2: company looks like a date"],
+        },
+        { previous: [posting({ title: "attempt 2" })], problems: ["row 1: empty title"] },
       ],
     ]);
     expect(out.warnings).toEqual([]);
@@ -73,12 +82,29 @@ describe("workflow graph", () => {
     const out = await run(f, { maxRepairs: 2 });
     expect(f.counters).toEqual({ extract: 3, judge: 3, explain: 3 });
     expect((out.report as { warnings: string[] }).warnings).toHaveLength(3);
+    // The last pass still failed, so its rows count as dropped.
+    expect((out.report as { dropped: object }).dropped).toEqual({ indeed: 1 });
     expect(out.warnings).toEqual([
       "validate: unresolved after 2 repair(s): still wrong",
       "verify_judgements: unresolved after 2 repair(s): still wrong",
       "verify_explanations: unresolved after 2 repair(s): still wrong",
     ]);
     expect(f.log.slice(-2)).toEqual(["deliver", "mark_seen"]);
+  });
+
+  it("carries extraction warnings and the final dropped counts into the report", async () => {
+    const f = fakes({
+      extractProblems: [["x"], []],
+      extractWarnings: ["extract_postings: message <m1@x>: refused"],
+    });
+    const out = await run(f);
+    const report = out.report as { warnings: string[]; dropped: object };
+    // The repair fixed the rows, so the last pass dropped nothing.
+    expect(report.dropped).toEqual({});
+    expect(report.warnings).toEqual([
+      "extract_postings: message <m1@x>: refused",
+      "extract_postings: message <m1@x>: refused",
+    ]);
   });
 
   it("with no new mail, skips extraction and judging and sends a short report", async () => {

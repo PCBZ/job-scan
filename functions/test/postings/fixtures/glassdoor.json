@@ -1,0 +1,67 @@
+{
+  "_note": "Synthetic. Company first, rating suffix, Easy Apply and age badges, saved-search name first.",
+  "message": {
+    "account": "personal",
+    "message_id": "<gd-20261005@mail.glassdoor.example>",
+    "from": "Glassdoor Jobs <noreply@glassdoor.com>",
+    "subject": "Software Engineer in Vancouver, BC: Harbourline Credit Union and 2 more jobs",
+    "date": "2026-10-05T14:02:11Z",
+    "body": "Your job listings for October 5, 2026\nSoftware Engineer in Vancouver, BC\nHarbourline Credit Union 3.9 ★\nSenior Full Stack Developer\nBritish Columbia\n$105K - $125K (Employer Est.)\nEasy Apply\n4d\nCedar & Finch Software 4.2 ★\nBackend Engineer, Payments\nVancouver, BC\n23h\nTidewater Analytics\nData Platform Engineer\nBurnaby, BC\n$95K - $115K (Employer Est.)\nEasy Apply\nJust posted\nSee all jobs\nManage your job alerts\nGlassdoor, Inc. 100 Shoreline Hwy, Mill Valley, CA 94941\nUnsubscribe",
+    "body_source": "html",
+    "links": [
+      {
+        "text": "Software Engineer in Vancouver, BC",
+        "url": "https://www.glassdoor.com/Job/jobs.htm?sc.keyword=software-engineer"
+      },
+      {
+        "text": "Senior Full Stack Developer",
+        "url": "https://www.glassdoor.com/partner/jobListing.htm?jobListingId=1000000001"
+      },
+      {
+        "text": "Backend Engineer, Payments",
+        "url": "https://www.glassdoor.com/partner/jobListing.htm?jobListingId=1000000002"
+      },
+      {
+        "text": "Data Platform Engineer",
+        "url": "https://www.glassdoor.com/partner/jobListing.htm?jobListingId=1000000003"
+      },
+      {
+        "text": "See all jobs",
+        "url": "https://www.glassdoor.com/Job/index.htm"
+      },
+      {
+        "text": "Unsubscribe",
+        "url": "https://www.glassdoor.com/unsubscribe"
+      }
+    ]
+  },
+  "expected": [
+    {
+      "title": "Senior Full Stack Developer",
+      "company": "Harbourline Credit Union",
+      "location": "British Columbia",
+      "salary": "$105K - $125K (Employer Est.)",
+      "workplace": "unknown",
+      "posted": "4d",
+      "link": 1
+    },
+    {
+      "title": "Backend Engineer, Payments",
+      "company": "Cedar & Finch Software",
+      "location": "Vancouver, BC",
+      "salary": "",
+      "workplace": "unknown",
+      "posted": "23h",
+      "link": 2
+    },
+    {
+      "title": "Data Platform Engineer",
+      "company": "Tidewater Analytics",
+      "location": "Burnaby, BC",
+      "salary": "$95K - $115K (Employer Est.)",
+      "workplace": "unknown",
+      "posted": "Just posted",
+      "link": 3
+    }
+  ]
+}
