@@ -1,4 +1,5 @@
 import type { TokenCredential } from "@azure/identity";
+import { APIUserAbortError } from "openai";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { ModelConfigError, modelClientFromEnv } from "../../src/lib/model/config.js";
@@ -131,5 +132,31 @@ describe("modelClientFromEnv", () => {
       }),
     ).rejects.toMatchObject({ name: "ModelProviderError", status: 503 });
     expect(n).toBe(2);
+  });
+
+  it("stops an aborted call through the real SDK without retrying it", async () => {
+    let n = 0;
+    const neverCalled = (async () => {
+      n++;
+      return new Response(okBody({ title: "x" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    const controller = new AbortController();
+    controller.abort();
+    const model = modelClientFromEnv({ ...AZURE, MODEL_MAX_RETRIES: "3" }, credential, {
+      fetch: neverCalled,
+    });
+    await expect(
+      model.structured({
+        name: "posting",
+        system: "s",
+        user: "u",
+        schema: z.object({ title: z.string() }),
+        signal: controller.signal,
+      }),
+    ).rejects.toBeInstanceOf(APIUserAbortError);
+    expect(n).toBe(0);
   });
 });

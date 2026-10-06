@@ -53,4 +53,16 @@ describe("FallbackClient", () => {
     ).rejects.toBeInstanceOf(ModelOutputError);
     expect(calls).toEqual(["primary"]);
   });
+
+  it("does not fall back when the call was aborted", async () => {
+    const calls: string[] = [];
+    const abort = Object.assign(new Error("Request was aborted."), { name: "APIUserAbortError" });
+    await expect(
+      new FallbackClient(
+        client("primary", abort, calls),
+        client("fallback", null, calls),
+      ).structured(REQ),
+    ).rejects.toThrow("Request was aborted.");
+    expect(calls).toEqual(["primary"]);
+  });
 });
