@@ -68,6 +68,8 @@ senders = ["linkedin.com", "joinhandshake.com", "careers"]
 # ---------------------------------------------------------------------------
 [resume]
 lib = "~/Developer/my-resume"      # TODO — path to your resume repo
+repo = "you/my-resume"             # TODO — the same repo on GitHub, read by the cloud run
+ref = "main"                       # branch, tag or commit the cloud run reads
 # A relative value resolves against this workspace directory, not the
 # current working directory, so a scheduled run finds the same library.
 variants = ["*.tex", "src/*.tex"]  # globs, relative to lib

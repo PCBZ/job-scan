@@ -9,7 +9,12 @@ import {
 
 const EXAMPLE = readFileSync(new URL("../../../config.example.toml", import.meta.url), "utf8");
 
-const MIN = `
+const RESUME = `
+[resume]
+repo = "PCBZ/Resume"
+`;
+
+const MIN = `${RESUME}
 [mail]
 senders = ["linkedin.com"]
 
@@ -55,6 +60,16 @@ describe("parseConfig on config.example.toml", () => {
     expect(main?.maxMessages).toBe(60);
   });
 
+  it("reads the resume repository and variant globs", () => {
+    expect(cfg.resume).toEqual({
+      owner: "you",
+      repo: "my-resume",
+      ref: "main",
+      variants: ["*.tex", "src/*.tex"],
+      default: "resume",
+    });
+  });
+
   it("reads the run-level mail settings, profile and report", () => {
     expect(cfg.mail.days).toBe(7);
     expect(cfg.mail.maxTotalMessages).toBe(150);
@@ -76,9 +91,19 @@ describe("parseConfig defaults", () => {
     });
   });
 
+  it("defaults the resume ref and variant globs", () => {
+    expect(parseConfig(MIN, "c").resume).toEqual({
+      owner: "PCBZ",
+      repo: "Resume",
+      ref: "main",
+      variants: ["*.tex", "*.pdf", "*.md", "*.txt"],
+      default: null,
+    });
+  });
+
   it("names unnamed accounts by position", () => {
     const cfg = parseConfig(
-      `[mail]\nsenders = ["x"]\n[[account]]\nhost = "imap.example.com"\n`,
+      `${RESUME}[mail]\nsenders = ["x"]\n[[account]]\nhost = "imap.example.com"\n`,
       "c",
     );
     expect(cfg.mail.accounts[0]).toMatchObject({
@@ -136,6 +161,16 @@ describe("parseConfig rejects", () => {
       "both resolve to GMAIL_MAIN_USER / GMAIL_MAIN_PASSWORD",
     ],
     ["invalid TOML", "[mail\nsenders = 1", "is not valid TOML"],
+    [
+      "a config without [resume] repo",
+      MIN.replace('repo = "PCBZ/Resume"', ""),
+      "[resume] repo is not set",
+    ],
+    [
+      "a malformed resume repo",
+      MIN.replace('"PCBZ/Resume"', '"PCBZ"'),
+      'resume.repo: expected "owner/name"',
+    ],
   ])("%s", (_name, text, expected) => {
     expect(errorOf(text)).toContain(expected);
   });
