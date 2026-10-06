@@ -94,6 +94,40 @@ describe("loadResumes", () => {
     ]);
   });
 
+  it("keeps .tex and .md apart when their bytes are identical", async () => {
+    const same = "\\textbf{Go} and Python";
+    const { source } = repo({ "General/Resume.md": same, "General/Resume.tex": same });
+    const set = await loadResumes(CFG, source, new MemoryTextStore(), NOW);
+    expect(set.variants.map((v) => [v.path, v.text])).toEqual([
+      ["General/Resume.md", "\\textbf{Go} and Python"],
+      ["General/Resume.tex", "Go and Python"],
+    ]);
+  });
+
+  it("surfaces an extraction failure instead of falling back", async () => {
+    const { state, source } = repo({ ...FILES });
+    const store = new MemoryTextStore();
+    await loadResumes(CFG, source, store, NOW, counting().extract);
+    state.files["General/Backend.tex"] = "B2";
+    const broken: Extract = () => {
+      throw new Error("extractor bug");
+    };
+    await expect(loadResumes(CFG, source, store, NOW, broken)).rejects.toThrow("extractor bug");
+  });
+
+  it("surfaces a storage failure instead of falling back", async () => {
+    const { state, source } = repo({ ...FILES });
+    const store = new MemoryTextStore();
+    await loadResumes(CFG, source, store, NOW, counting().extract);
+    state.files["General/Backend.tex"] = "B2";
+    store.put = async () => {
+      throw new Error("blob write failed");
+    };
+    await expect(loadResumes(CFG, source, store, NOW, counting().extract)).rejects.toThrow(
+      "blob write failed",
+    );
+  });
+
   it("rethrows the GitHub failure when there is nothing to fall back to", async () => {
     const { state, source } = repo({ ...FILES });
     state.offline = true;

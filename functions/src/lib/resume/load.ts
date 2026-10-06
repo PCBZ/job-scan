@@ -41,12 +41,19 @@ interface IndexFile {
 
 export type Extract = (path: string, source: string) => string;
 
+/** LaTeX is converted; Markdown and text are only normalised. */
+function modeOf(path: string): "tex" | "plain" {
+  return path.toLowerCase().endsWith(".tex") ? "tex" : "plain";
+}
+
 /** resume_text.extract for the formats the cloud reads: LaTeX, Markdown, text. */
 export const extractText: Extract = (path, source) =>
-  normalizeResumeText(path.toLowerCase().endsWith(".tex") ? latexToText(source) : source);
+  normalizeResumeText(modeOf(path) === "tex" ? latexToText(source) : source);
 
-function textKey(source: string): string {
-  return `text/${EXTRACTOR_VERSION}/${createHash("sha256").update(source).digest("hex")}.txt`;
+/** By source hash and mode: identical bytes in a .md and a .tex extract differently. */
+function textKey(path: string, source: string): string {
+  const hash = createHash("sha256").update(source).digest("hex");
+  return `text/${EXTRACTOR_VERSION}/${modeOf(path)}/${hash}.txt`;
 }
 
 function indexKey(cfg: ResumeConfig): string {
@@ -69,31 +76,36 @@ export async function loadResumes(
   extract: Extract = extractText,
 ): Promise<ResumeSet> {
   const warnings: string[] = [];
-  let fresh: { variant: ResumeVariant; key: string }[];
-  let extracted = 0;
+
+  // Only reading GitHub falls back. An extraction bug or a storage failure
+  // below must surface as itself, not as a stale set blamed on GitHub.
+  const sources: { path: string; raw: string }[] = [];
   try {
-    const paths = await discoverVariants(source, cfg.variants);
-    fresh = [];
-    for (const path of paths) {
+    for (const path of await discoverVariants(source, cfg.variants)) {
       if (path.toLowerCase().endsWith(".pdf")) {
         warnings.push(
           `Skipped ${path}: PDF resumes aren't read in the cloud; keep a .tex or .md variant.`,
         );
         continue;
       }
-      const raw = await source.readFile(path);
-      const key = textKey(raw);
-      let text = await store.get(key);
-      if (text === null) {
-        text = extract(path, raw);
-        await store.put(key, text);
-        extracted++;
-      }
-      fresh.push({ variant: { path, name: variantName(path), text }, key });
+      sources.push({ path, raw: await source.readFile(path) });
     }
-    if (fresh.length === 0) throw new Error("every resume variant was skipped");
   } catch (err) {
     return fallback(cfg, store, err);
+  }
+  if (sources.length === 0) throw new Error("every resume variant was skipped");
+
+  const fresh: { variant: ResumeVariant; key: string }[] = [];
+  let extracted = 0;
+  for (const { path, raw } of sources) {
+    const key = textKey(path, raw);
+    let text = await store.get(key);
+    if (text === null) {
+      text = extract(path, raw);
+      await store.put(key, text);
+      extracted++;
+    }
+    fresh.push({ variant: { path, name: variantName(path), text }, key });
   }
 
   const index: IndexFile = {
