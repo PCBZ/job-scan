@@ -113,6 +113,11 @@ describe("latexToText", () => {
     ],
     ["starred headings", String.raw`\section*{Projects}\subsection*{Side}`, "## Projects\n## Side"],
     [
+      "the preamble never reaches the text",
+      String.raw`\documentclass{article}\usepackage{hyperref}\hypersetup{pdftitle={Private Title}}\geometry{margin=1in}\begin{document}Body\end{document}`,
+      "Body",
+    ],
+    [
       "layout commands drop with their arguments",
       String.raw`\vspace{-4pt}\setlength{\tabcolsep}{0in}\includegraphics[width=1in]{me.png}Kept`,
       "Kept",

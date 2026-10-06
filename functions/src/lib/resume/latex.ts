@@ -14,10 +14,14 @@ import { listNewcommands } from "@unified-latex/unified-latex-util-macros";
 import { parse } from "@unified-latex/unified-latex-util-parse";
 import { stripWhitespace, WHITESPACE } from "../unicode.js";
 
-/** Layout and preamble commands: drop the command and everything it wraps. */
+/**
+ * Layout commands: drop the command and everything it wraps. The parser knows
+ * `\vspace{-4pt}` has one argument, not that the argument is a length rather
+ * than resume text; unified-latex's own renderers leak several of these
+ * (\raisebox, \setlength). Only body content is rendered, so commands that
+ * LaTeX allows in the preamble alone aren't listed.
+ */
 const DROP_WITH_ARGS = new Set([
-  "documentclass",
-  "usepackage",
   "newcommand",
   "renewcommand",
   "providecommand",
@@ -35,49 +39,19 @@ const DROP_WITH_ARGS = new Set([
   "hspace",
   "includegraphics",
   "hypersetup",
-  "geometry",
   "input",
   "include",
   "label",
   "ref",
   "pagenumbering",
   "urlstyle",
-  "raggedbottom",
-  "raggedright",
   "newlength",
   "setcounter",
-  "AtBeginDocument",
   "phantom",
   "vphantom",
   "hphantom",
   "rule",
   "raisebox",
-]);
-
-/** Spacing and font switches: a word break at most. */
-const DROP_BARE = new Set([
-  "scshape",
-  "bfseries",
-  "itshape",
-  "rmfamily",
-  "sffamily",
-  "ttfamily",
-  "centering",
-  "hfill",
-  "vfill",
-  "noindent",
-  "clearpage",
-  "newpage",
-  "quad",
-  "qquad",
-  "ldots",
-  "dots",
-  "smallskip",
-  "medskip",
-  "bigskip",
-  "par",
-  "leavevmode",
-  "strut",
 ]);
 
 const LINE_BREAKS = new Set(["\\", "newline", "linebreak"]);
@@ -145,7 +119,7 @@ function renderAll(nodes: Ast.Node[]): string {
 }
 
 function takesLooseGroups(name: string): boolean {
-  return !ESCAPED.has(name) && !LINE_BREAKS.has(name) && !DROP_BARE.has(name);
+  return !ESCAPED.has(name) && !LINE_BREAKS.has(name);
 }
 
 /** A starred command's star: an argument with no delimiters holding just "*". */
@@ -176,7 +150,7 @@ function renderMacro(macro: Ast.Macro): string {
   const name = macro.content;
   if (ESCAPED.has(name)) return name;
   if (LINE_BREAKS.has(name)) return "\n";
-  if (DROP_WITH_ARGS.has(name) || DROP_BARE.has(name)) return " ";
+  if (DROP_WITH_ARGS.has(name)) return " ";
 
   const lower = name.toLowerCase();
   const args = contentArgs(macro);
