@@ -4,9 +4,9 @@
 // classes with the `u` flag, plus `i` for case-insensitive matching.
 
 /** Whitespace: exactly the characters Python's str.isspace() accepts. */
-export const WHITESPACE = String.raw`[\t\n\v\f\r \x1c-\x1f\x85\xa0  -     　]`;
+export const WHITESPACE = String.raw`[\t\n\v\f\r \x1c-\x1f\x85\xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]`;
 /** Anything but WHITESPACE. */
-export const NON_WHITESPACE = String.raw`[^\t\n\v\f\r \x1c-\x1f\x85\xa0  -     　]`;
+export const NON_WHITESPACE = String.raw`[^\t\n\v\f\r \x1c-\x1f\x85\xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]`;
 /** A letter, number or underscore in any script. */
 export const WORD_CHAR = String.raw`[\p{L}\p{N}_]`;
 /** A word boundary over WORD_CHAR, written as lookarounds. */

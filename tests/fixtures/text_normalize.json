@@ -1,0 +1,30 @@
+{
+  "_note": "Generated from resume_text.text_for's normalisation (Python), which the TS port must match.",
+  "normalize": [
+    {
+      "name": "trailing spaces and triple newlines",
+      "text": "a  \n\n\n\nb\t\nc",
+      "expected": "a\n\nb\nc"
+    },
+    {
+      "name": "python splitlines boundaries",
+      "text": "a\rb\r\nc\u000bd\fe\u001cfg h i",
+      "expected": "a\nb\nc\nd\ne\nf\ng\nh\ni"
+    },
+    {
+      "name": "trailing newline dropped like splitlines",
+      "text": "a\nb\n",
+      "expected": "a\nb"
+    },
+    {
+      "name": "unicode trailing whitespace",
+      "text": "x　 \ny",
+      "expected": "x\ny"
+    },
+    {
+      "name": "empty",
+      "text": "",
+      "expected": ""
+    }
+  ]
+}
