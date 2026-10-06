@@ -107,10 +107,13 @@ describe("workflow graph", () => {
     expect(f.log.slice(-2)).toEqual(["deliver", "mark_seen"]);
   });
 
-  it("never marks mail seen when delivery fails", async () => {
+  it("never marks mail seen when delivery fails, and reports the failed node", async () => {
+    const events: NodeEvent[] = [];
     const f = fakes({ deliverFails: true });
-    await expect(run(f)).rejects.toThrow("smtp down");
+    await expect(run(f, { onNode: (e: NodeEvent) => events.push(e) })).rejects.toThrow("smtp down");
     expect(f.log).not.toContain("mark_seen");
+    expect(events.find((e) => e.node === "deliver")?.ok).toBe(false);
+    expect(events.find((e) => e.node === "render_report")?.ok).toBe(true);
   });
 
   it("gives LLM nodes data only: no functions anywhere in their input", async () => {

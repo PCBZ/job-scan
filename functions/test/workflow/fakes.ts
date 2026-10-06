@@ -1,7 +1,7 @@
 import type { AppConfig } from "../../src/lib/config/load.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
 import type { ResumeSet } from "../../src/lib/resume/load.js";
-import type { CodeNodes, Effects, LlmNodes } from "../../src/lib/workflow/types.js";
+import type { DeterministicSteps, Effects, ModelSteps } from "../../src/lib/workflow/types.js";
 
 export const CONFIG = { mail: {}, resume: {}, profile: {}, report: {} } as unknown as AppConfig;
 
@@ -44,7 +44,7 @@ export function fakes(o: FakeOptions = {}) {
     llmInputs.push({ node, args });
   };
 
-  const code: CodeNodes = {
+  const code: DeterministicSteps = {
     async loadConfig() {
       log.push("load_config");
       return CONFIG;
@@ -94,7 +94,7 @@ export function fakes(o: FakeOptions = {}) {
     },
   };
 
-  const llm: LlmNodes = {
+  const llm: ModelSteps = {
     async extractPostings(...args) {
       counters.extract++;
       llmCall("extract_postings", args);

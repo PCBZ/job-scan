@@ -1,9 +1,9 @@
 // The contract between the workflow graph and its nodes.
 //
-// Code nodes do everything that can be computed exactly. LLM nodes do what
-// needs judgement and receive data only: no tools, no clients, no callbacks.
-// Side effects (delivery, marking mail seen) live in Effects, which only code
-// nodes reached by graph edges ever call.
+// Deterministic steps do everything that can be computed exactly. Model steps
+// do what needs judgement and receive data only: no tools, no clients, no
+// callbacks. Side effects (delivery, marking mail seen) live in Effects, which
+// only deterministic nodes reached by graph edges ever call.
 
 import type { AppConfig } from "../config/load.js";
 import type { AllAccountsFailed, FetchedMessage, FetchPayload } from "../mail/types.js";
@@ -33,8 +33,8 @@ export interface LlmResult<T> {
   usage: TokenUsage;
 }
 
-/** Nodes that call the model. Inputs are plain data. */
-export interface LlmNodes {
+/** Steps that call the model. Inputs are plain data. */
+export interface ModelSteps {
   extractPostings(
     input: { messages: FetchedMessage[] },
     repairs: RepairTurn[],
@@ -60,8 +60,8 @@ export interface LlmNodes {
   ): Promise<LlmResult<SkillSets>>;
 }
 
-/** Nodes computed in code. A check returns its problems; empty means it passed. */
-export interface CodeNodes {
+/** Steps computed exactly in code. A check returns its problems; empty means it passed. */
+export interface DeterministicSteps {
   loadConfig(signal?: AbortSignal): Promise<AppConfig>;
   loadResumes(config: AppConfig, signal?: AbortSignal): Promise<ResumeSet>;
   fetchMail(config: AppConfig, signal?: AbortSignal): Promise<FetchPayload | AllAccountsFailed>;
