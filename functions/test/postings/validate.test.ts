@@ -64,7 +64,7 @@ describe("validatePostings", () => {
     const out = validatePostings([good, shifted]);
     expect(out.valid).toEqual([good]);
     expect(out.problems).toEqual([
-      'message <g@x> row 3: company "4d" is a badge or an age, not a company',
+      'message "<g@x>" row 3: company "4d" is a badge or an age, not a company',
     ]);
   });
 
@@ -88,8 +88,17 @@ describe("problemsFor", () => {
       problemFor("<a@x>", 2, "four"),
     ];
     expect(problemsFor(problems, "<a@x>")).toEqual([
-      "message <a@x> row 0: one",
-      "message <a@x> row 2: four",
+      'message "<a@x>" row 0: one',
+      'message "<a@x>" row 2: four',
     ]);
+  });
+
+  it("keeps fallback ids apart when one subject extends another with ' row '", () => {
+    // Fallback ids are `no-id:<date>:<subject>`, so this pair is possible.
+    const short = "no-id:Mon, 5 Oct 2026:Jobs";
+    const long = "no-id:Mon, 5 Oct 2026:Jobs row 1";
+    const problems = [problemFor(long, 0, "theirs"), problemFor(short, 0, "mine")];
+    expect(problemsFor(problems, short)).toEqual([problemFor(short, 0, "mine")]);
+    expect(problemsFor(problems, long)).toEqual([problemFor(long, 0, "theirs")]);
   });
 });

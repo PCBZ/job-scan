@@ -1,25 +1,14 @@
-// A job posting as the pipeline carries it. Field names follow the local
-// skill's /tmp/jobs.json (SKILL.md step 3), so both runs can be compared.
+// A job posting as the pipeline carries it: what the model read, plus where it
+// came from. Field names follow the local skill's /tmp/jobs.json (SKILL.md
+// step 3), so both runs can be compared.
 
-export type Workplace = "onsite" | "hybrid" | "remote" | "unknown";
+import type { ExtractedPosting } from "./schema.js";
+
+export type Workplace = ExtractedPosting["workplace"];
 export type Source = "linkedin" | "indeed" | "glassdoor" | "other";
 
-export interface Posting {
-  // Read from the alert by the model; "" when the alert doesn't say.
-  title: string;
-  company: string;
-  location: string;
-  workplace: Workplace;
-  salary: string;
-  /** As the alert shows it, e.g. "4d" or "2 days ago". */
-  posted: string;
-  requirements: string[];
-  /** Canonical skill names for the requirements, e.g. K8s → Kubernetes. */
-  skills: string[];
-  /** Index into the message's links[] the model chose, or null. */
-  link: number | null;
-
-  // Filled in by code from the message, never by the model.
+/** Filled in by code from the message, never by the model. */
+export interface Provenance {
   url: string;
   source: Source;
   account: string;
@@ -28,3 +17,5 @@ export interface Posting {
   /** Position of this row in the model's answer for its message. */
   row: number;
 }
+
+export type Posting = ExtractedPosting & Provenance;

@@ -82,14 +82,18 @@ export function checkPosting(p: Posting): string[] {
 }
 
 // Problems name their message and row, so a repair goes back to the one
-// message that produced them.
+// message that produced them. The id is quoted as a JSON string: a quoted id
+// ends at its closing quote, so one id's prefix never matches another id that
+// merely starts with it (fallback ids carry raw subjects).
+const prefixOf = (messageId: string) => `message ${JSON.stringify(messageId)} row `;
+
 export function problemFor(messageId: string, row: number, problem: string): string {
-  return `message ${messageId} row ${row}: ${problem}`;
+  return `${prefixOf(messageId)}${row}: ${problem}`;
 }
 
 /** The problems that belong to one message. */
 export function problemsFor(problems: string[], messageId: string): string[] {
-  const prefix = `message ${messageId} row `;
+  const prefix = prefixOf(messageId);
   return problems.filter((p) => p.startsWith(prefix));
 }
 

@@ -12,7 +12,7 @@ import {
 import { mapWithLimit } from "../workflow/limit.js";
 import type { ModelSteps } from "../workflow/types.js";
 import { EXTRACT_SYSTEM, extractUser } from "./prompt.js";
-import { type ExtractedPosting, extractedPostings } from "./schema.js";
+import { type ExtractedPosting, extractedPosting, extractedPostings } from "./schema.js";
 import { sourceOf } from "./source.js";
 import type { Posting } from "./types.js";
 import { problemsFor } from "./validate.js";
@@ -65,19 +65,17 @@ function rowsOf(previous: unknown, messageId: string): Posting[] {
   return ((previous ?? []) as Posting[]).filter((p) => p.message_id === messageId);
 }
 
+/** A row as the model answered it: zod drops the fields code added. */
+const asAnswer = (p: Posting): ExtractedPosting => extractedPosting.parse(p);
+
 /** This message's own repair turns: its earlier answers and their problems. */
 function historyOf(repairs: RepairTurn[], messageId: string): RepairTurn[] {
   return repairs
     .map((t) => ({
-      previous: { postings: rowsOf(t.previous, messageId).map(asExtracted) },
+      previous: { postings: rowsOf(t.previous, messageId).map(asAnswer) },
       problems: problemsFor(t.problems, messageId),
     }))
     .filter((t) => t.problems.length > 0);
-}
-
-function asExtracted(p: Posting): ExtractedPosting {
-  const { title, company, location, workplace, salary, posted, requirements, skills, link } = p;
-  return { title, company, location, workplace, salary, posted, requirements, skills, link };
 }
 
 function toPosting(e: ExtractedPosting, m: FetchedMessage, row: number): Posting {
@@ -96,14 +94,10 @@ function toPosting(e: ExtractedPosting, m: FetchedMessage, row: number): Posting
   };
 }
 
+/** Trimmed, without blanks, and each skill once, ignoring case; first spelling wins. */
 function uniqueSkills(skills: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const s of skills.map((x) => x.trim())) {
-    if (s && !seen.has(s.toLowerCase())) {
-      seen.add(s.toLowerCase());
-      out.push(s);
-    }
-  }
-  return out;
+  const trimmed = skills.map((s) => s.trim()).filter(Boolean);
+  return trimmed.filter(
+    (s, i) => trimmed.findIndex((t) => t.toLowerCase() === s.toLowerCase()) === i,
+  );
 }
