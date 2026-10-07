@@ -16,6 +16,8 @@ export interface Provenance {
   message_subject: string;
   /** Position of this row in the model's answer for its message. */
   row: number;
+  /** Gate questions code couldn't settle, for Jev in judge (#17). */
+  gate_questions?: string[];
 }
 
 export type Posting = ExtractedPosting & Provenance;
