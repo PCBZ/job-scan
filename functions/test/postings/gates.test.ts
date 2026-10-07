@@ -42,15 +42,19 @@ describe("location gate", () => {
     expect(out.kept).toEqual([onsite(location)]);
   });
 
-  it.each(["Toronto, ON", "Burnaby, WA", "Seattle, Washington, US", "Calgary, Alberta, Canada"])(
-    "filters a placed city it wasn't given: %s",
-    async (location) => {
-      const out = await gate(onsite(location));
-      expect(out.filtered).toEqual([
-        { posting: onsite(location), gate: "location", reason: `outside locations: ${location}` },
-      ]);
-    },
-  );
+  it.each([
+    "Toronto, ON",
+    "Burnaby, WA",
+    "Seattle, Washington",
+    "Seattle, Washington, US",
+    "Calgary, Alberta, Canada",
+    "Halifax, Canada",
+  ])("filters a placed city it wasn't given: %s", async (location) => {
+    const out = await gate(onsite(location));
+    expect(out.filtered).toEqual([
+      { posting: onsite(location), gate: "location", reason: `outside locations: ${location}` },
+    ]);
+  });
 
   it.each([
     "Lower Mainland",

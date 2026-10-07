@@ -2,7 +2,7 @@
 // (or a model) that loses a row's alignment produces plausible nonsense, not
 // an error, and a schema can't see it: every field is still a string.
 
-import { PLACE_CODES, PLACE_NAMES } from "./places.js";
+import { isPlaceName, regionCode } from "./places.js";
 import type { Posting, Source } from "./types.js";
 
 /** Glassdoor badges and ages, LinkedIn's trailing lines: never a company or title. */
@@ -23,9 +23,9 @@ function looksLikePlace(value: string, location: string): boolean {
   return (
     v === norm(location) ||
     // Only real codes, so a title like "Developer, AI" is not a place.
-    PLACE_CODES.has(CITY_CODE.exec(value.trim())?.[1] ?? "") ||
+    regionCode(CITY_CODE.exec(value.trim())?.[1] ?? "") !== undefined ||
     v === "remote" ||
-    PLACE_NAMES.has(v)
+    isPlaceName(value)
   );
 }
 

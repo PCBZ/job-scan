@@ -1,45 +1,33 @@
-// Canadian provinces and US states, for reading a posting's location.
+// Countries a posting's location can name. Each country reads its own regions
+// and carries its currency; lookups ask every country in turn.
 
-const PROVINCES: Record<string, string> = {
-  alberta: "AB",
-  "british columbia": "BC",
-  manitoba: "MB",
-  "new brunswick": "NB",
-  "newfoundland and labrador": "NL",
-  "northwest territories": "NT",
-  "nova scotia": "NS",
-  nunavut: "NU",
-  ontario: "ON",
-  "prince edward island": "PE",
-  quebec: "QC",
-  saskatchewan: "SK",
-  yukon: "YT",
-};
-const CA_CODES = new Set(Object.values(PROVINCES));
-const US_CODES = new Set(
-  (
-    "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT " +
-    "NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY"
-  ).split(" "),
-);
+import { CANADA } from "./places/ca.js";
+import type { Country } from "./places/country.js";
+import { UNITED_STATES } from "./places/us.js";
 
-/** Every province and state code. */
-export const PLACE_CODES = new Set([...CA_CODES, ...US_CODES]);
-/** Province and country names, as a location (or a misread company) spells them. */
-export const PLACE_NAMES = new Set([...Object.keys(PROVINCES), "canada", "united states", "usa"]);
+export type { Country, Currency } from "./places/country.js";
 
-/** A region's code, from a code ("BC") or a province name ("British Columbia"). */
-export function regionCode(region: string): string | undefined {
-  const r = region.trim();
-  return PLACE_CODES.has(r) ? r : PROVINCES[r.toLowerCase()];
+export const COUNTRIES: readonly Country[] = [CANADA, UNITED_STATES];
+
+/** A region's code in any country. */
+export function regionCode(text: string): string | undefined {
+  for (const c of COUNTRIES) {
+    const code = c.regionCode(text);
+    if (code) return code;
+  }
+  return undefined;
 }
 
-/** The country a location names through a province, state or country, if any. */
-export function countryOf(location: string): "CA" | "US" | undefined {
+/** Whether the text is a region or a country, as a misread company or title can be. */
+export function isPlaceName(text: string): boolean {
+  return COUNTRIES.some((c) => c.isCountry(text) || c.regionCode(text) !== undefined);
+}
+
+/** The country a location names through a region or the country itself. */
+export function countryOf(location: string): Country | undefined {
   for (const part of location.replace(/\([^)]*\)/g, "").split(",")) {
-    const p = part.trim();
-    if (p.toLowerCase() === "canada" || CA_CODES.has(regionCode(p) ?? "")) return "CA";
-    if (/^(united states|usa|us)$/i.test(p) || US_CODES.has(p)) return "US";
+    const found = COUNTRIES.find((c) => c.isCountry(part) || c.regionCode(part) !== undefined);
+    if (found) return found;
   }
   return undefined;
 }
