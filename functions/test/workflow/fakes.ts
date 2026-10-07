@@ -69,7 +69,7 @@ export function fakes(o: FakeOptions = {}) {
     },
     async dedupe(postings) {
       log.push("dedupe");
-      return { fresh: postings, repeats: 1 };
+      return { fresh: postings, repeats: 1, duplicates: 2 };
     },
     hardGates(postings) {
       log.push("hard_gates");
@@ -100,6 +100,8 @@ export function fakes(o: FakeOptions = {}) {
         warnings: input.warnings,
         top: input.top.length,
         dropped: input.dropped,
+        repeats: input.repeats,
+        duplicates: input.duplicates,
       };
     },
   };

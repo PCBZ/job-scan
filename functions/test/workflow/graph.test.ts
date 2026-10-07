@@ -34,7 +34,14 @@ describe("workflow graph", () => {
       expect(ranBefore(f.log, a as string, b as string), `${a} before ${b}`).toBe(true);
     }
     expect(f.log.at(-1)).toBe("mark_seen");
-    expect(out.report).toEqual({ outcome: "report", warnings: [], top: 1, dropped: {} });
+    expect(out.report).toEqual({
+      outcome: "report",
+      warnings: [],
+      top: 1,
+      dropped: {},
+      repeats: 1,
+      duplicates: 2,
+    });
   });
 
   it("loads mail and resumes in parallel and joins them at judge", async () => {
