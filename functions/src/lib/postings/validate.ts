@@ -1,6 +1,6 @@
 // The validate node: SKILL.md step 3's misalignment checks, in code. A parser
 // (or a model) that loses a row's alignment produces plausible nonsense, not
-// an error, so each check looks for one specific way that shows.
+// an error, and a schema can't see it: every field is still a string.
 
 import type { Posting, Source } from "./types.js";
 
@@ -23,32 +23,14 @@ const PLACE_CODES = new Set(
     "NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY"
   ).split(" "),
 );
-const REGIONS = new Set([
-  "remote",
-  "canada",
-  "united states",
-  "usa",
-  "alberta",
-  "british columbia",
-  "manitoba",
-  "new brunswick",
-  "newfoundland and labrador",
-  "northwest territories",
-  "nova scotia",
-  "nunavut",
-  "ontario",
-  "prince edward island",
-  "quebec",
-  "saskatchewan",
-  "yukon",
-]);
-/** The job board itself, as its footer names it. */
-const SENDER = /^(linkedin|indeed|glassdoor),?(\s+(corporation|corp\.?|inc\.?|ltd\.?|llc))?$/i;
-const STREET =
-  /\b\d{2,6}\s+[\w .'-]+?\s(avenue|ave|street|st|road|rd|boulevard|blvd|drive|dr|way)\b/i;
-/** "Software Engineer jobs in Vancouver": a saved-search name. */
-const SAVED_SEARCH = /\bjobs\s+(in|near|for)\b|^\d+\s+new\s+jobs\b/i;
-
+/** Region names read as a company or title: provinces, countries, "Remote". */
+const REGIONS = new Set(
+  (
+    "remote|canada|united states|usa|alberta|british columbia|manitoba|new brunswick|" +
+    "newfoundland and labrador|northwest territories|nova scotia|nunavut|ontario|" +
+    "prince edward island|quebec|saskatchewan|yukon"
+  ).split("|"),
+);
 const norm = (s: string) => s.trim().toLowerCase();
 
 function looksLikePlace(value: string, location: string): boolean {
@@ -60,7 +42,10 @@ function looksLikePlace(value: string, location: string): boolean {
   );
 }
 
-/** What is wrong with one posting; empty means it passed. */
+/**
+ * What is wrong with one posting; empty means it passed. The six checks are
+ * SKILL.md's: each catches one way a row loses its alignment.
+ */
 export function checkPosting(p: Posting): string[] {
   const problems: string[] = [];
   const say = (ok: boolean, problem: string) => {
@@ -69,27 +54,30 @@ export function checkPosting(p: Posting): string[] {
   const company = p.company.trim();
   const title = p.title.trim();
 
+  // 1. A posting needs a title and a company.
   say(title !== "", "title is empty");
   say(company !== "", "company is empty");
   if (company) {
+    // 2. A badge or an age read as the company shifts every row after it.
     say(!isBadge(company), `company "${company}" is a badge or an age, not a company`);
+    // 3. Glassdoor's rating suffix stayed on the company.
     say(!RATING.test(company), `company "${company}" still carries a rating; drop it`);
+    // 4. A place in the company or title field.
     say(!looksLikePlace(company, p.location), `company "${company}" looks like a location`);
-    say(!MONEY.test(company), `company "${company}" looks like a salary`);
-    say(!SENDER.test(company), `company "${company}" is the job board itself, from its footer`);
-    say(!STREET.test(company), `company "${company}" looks like a street address`);
   }
   if (title) {
-    say(!isBadge(title), `title "${title}" is a badge or an age, not a title`);
-    say(!RATING.test(title), `title "${title}" carries a rating, so it is likely the company`);
     say(!looksLikePlace(title, p.location), `title "${title}" looks like a location`);
-    say(!MONEY.test(title), `title "${title}" looks like a salary`);
+    // 6. Title and company read from the same line.
     say(norm(title) !== norm(company), `title and company are both "${title}"`);
-    say(!SAVED_SEARCH.test(title), `title "${title}" is a saved-search name, not a posting`);
   }
-  say(!MONEY.test(p.location), `location "${p.location}" looks like a salary`);
-  say(!STREET.test(p.location), `location "${p.location}" looks like a street address`);
-  say(p.salary === "" || /\d/.test(p.salary), `salary "${p.salary}" has no amount`);
+  // 5. The salary landed in another field.
+  for (const [field, value] of [
+    ["company", company],
+    ["title", title],
+    ["location", p.location],
+  ] as const) {
+    say(!MONEY.test(value), `${field} "${value}" looks like a salary`);
+  }
   return problems;
 }
 

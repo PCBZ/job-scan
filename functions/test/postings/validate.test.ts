@@ -44,18 +44,10 @@ describe("checkPosting", () => {
     [{ company: "British Columbia" }, "looks like a location"],
     [{ company: "Pinegrove", location: "Pinegrove" }, "looks like a location"],
     [{ company: "$105K - $125K (Employer Est.)" }, "looks like a salary"],
-    [{ company: "LinkedIn Corporation" }, "is the job board itself"],
-    [{ company: "Glassdoor, Inc." }, "is the job board itself"],
-    [{ company: "1000 West Maude Avenue" }, "looks like a street address"],
-    [{ title: "Easy Apply" }, "is a badge or an age"],
-    [{ title: "Cedar & Finch Software 4.2 ★" }, "carries a rating"],
     [{ title: "Vancouver, BC" }, "looks like a location"],
     [{ title: "$140,000 a year" }, "looks like a salary"],
     [{ title: "Northwind Labs" }, "title and company are both"],
-    [{ title: "Full Stack Developer jobs in Vancouver, BC" }, "saved-search name"],
     [{ location: "$100,000–$120,000 a year" }, "looks like a salary"],
-    [{ location: "1000 West Maude Avenue, Sunnyvale, CA 94085" }, "looks like a street address"],
-    [{ salary: "Vancouver, BC" }, "has no amount"],
   ])("flags %j", (over, problem) => {
     const found = checkPosting(posting(over));
     expect(
@@ -80,7 +72,7 @@ describe("validatePostings", () => {
     const out = validatePostings([
       posting({ title: "", company: "", source: "glassdoor" }),
       posting({ company: "Easy Apply", source: "glassdoor" }),
-      posting({ salary: "n/a", source: "linkedin" }),
+      posting({ location: "$90K a year", source: "linkedin" }),
       posting({ source: "indeed" }),
     ]);
     expect(out.dropped).toEqual({ glassdoor: 2, linkedin: 1 });
