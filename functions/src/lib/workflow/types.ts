@@ -74,7 +74,11 @@ export interface DeterministicSteps {
     /** Rows that failed a check, per job board. */
     dropped: Partial<Record<Source, number>>;
   };
-  dedupe(postings: Posting[]): Promise<{ fresh: Posting[]; repeats: number }>;
+  /** Repeats (recommended recently) and duplicates (twice in this batch) are only counted. */
+  dedupe(
+    postings: Posting[],
+    config: AppConfig,
+  ): Promise<{ fresh: Posting[]; repeats: number; duplicates: number }>;
   hardGates(postings: Posting[], config: AppConfig): { kept: Posting[]; filtered: Filtered[] };
   verifyJudgements(judged: Judgement[], resumes: ResumeSet): string[];
   rank(judged: Judgement[], config: AppConfig): Ranked[];
@@ -99,6 +103,7 @@ export interface ReportInput {
   resumes: ResumeSet | null;
   mail: FetchPayload | AllAccountsFailed | null;
   repeats: number;
+  duplicates: number;
   filtered: Filtered[];
   /** Rows dropped as misaligned after the last repair, per job board. */
   dropped: Partial<Record<Source, number>>;

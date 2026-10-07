@@ -81,8 +81,8 @@ export function buildWorkflow(
         },
       })
       .node("dedupe", async (s) => {
-        const { fresh, repeats } = await steps.dedupe(s.postings);
-        return { postings: fresh, repeats };
+        const { fresh, repeats, duplicates } = await steps.dedupe(s.postings, config(s));
+        return { postings: fresh, repeats, duplicates };
       })
       .edge("dedupe", "hard_gates")
       .node("hard_gates", (s) => {
@@ -153,6 +153,7 @@ export function buildWorkflow(
           resumes: s.resumes,
           mail: s.mail,
           repeats: s.repeats,
+          duplicates: s.duplicates,
           filtered: s.filtered,
           dropped: s.dropped,
           top: s.top,

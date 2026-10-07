@@ -50,6 +50,7 @@ export const WorkflowState = Annotation.Root({
   extracted: last<Posting[]>([]),
   postings: last<Posting[]>([]),
   repeats: last<number>(0),
+  duplicates: last<number>(0),
   filtered: last<Filtered[]>([]),
   dropped: last<Partial<Record<Source, number>>>({}),
   judged: last<Judgement[]>([]),
