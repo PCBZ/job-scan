@@ -4,6 +4,7 @@ import { Annotation } from "@langchain/langgraph";
 import type { AppConfig } from "../config/load.js";
 import type { AllAccountsFailed, FetchPayload } from "../mail/types.js";
 import type { RepairTurn, TokenUsage } from "../model/types.js";
+import type { Source } from "../postings/types.js";
 import type { ResumeSet } from "../resume/load.js";
 import type {
   Coverage,
@@ -50,6 +51,7 @@ export const WorkflowState = Annotation.Root({
   postings: last<Posting[]>([]),
   repeats: last<number>(0),
   filtered: last<Filtered[]>([]),
+  dropped: last<Partial<Record<Source, number>>>({}),
   judged: last<Judgement[]>([]),
   top: last<Ranked[]>([]),
   explanations: last<Explanation[]>([]),

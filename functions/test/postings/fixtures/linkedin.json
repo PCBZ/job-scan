@@ -1,0 +1,67 @@
+{
+  "_note": "Synthetic. Title, company, location, then alumni / View job; the footer carries LinkedIn's corporate address.",
+  "message": {
+    "account": "school",
+    "message_id": "<li-20261005@mail.linkedin.example>",
+    "from": "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>",
+    "subject": "“software engineer”: Lumen Ridge - Backend Engineer and more",
+    "date": "2026-10-05T14:02:11Z",
+    "body": "Your job alert for software engineer in Greater Vancouver\n3 new jobs match your preferences.\nBackend Engineer\nLumen Ridge\nVancouver, British Columbia, Canada (Hybrid)\n2 alumni\nView job\nPlatform Engineer, Kubernetes\nSaltmarsh Robotics\nBurnaby, British Columbia, Canada (On-site)\nView job\nSoftware Developer II\nQuillfeather\nCanada (Remote)\n$110K/yr - $130K/yr\nView job\nSee all jobs\nUnsubscribe\nHelp\n© 2026 LinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085",
+    "body_source": "html",
+    "links": [
+      {
+        "text": "Backend Engineer",
+        "url": "https://www.linkedin.com/comm/jobs/view/4000000001"
+      },
+      {
+        "text": "Platform Engineer, Kubernetes",
+        "url": "https://www.linkedin.com/comm/jobs/view/4000000002"
+      },
+      {
+        "text": "Software Developer II",
+        "url": "https://www.linkedin.com/comm/jobs/view/4000000003"
+      },
+      {
+        "text": "See all jobs",
+        "url": "https://www.linkedin.com/comm/jobs/search"
+      },
+      {
+        "text": "Unsubscribe",
+        "url": "https://www.linkedin.com/comm/psettings/email-unsubscribe"
+      },
+      {
+        "text": "Help",
+        "url": "https://www.linkedin.com/help"
+      }
+    ]
+  },
+  "expected": [
+    {
+      "title": "Backend Engineer",
+      "company": "Lumen Ridge",
+      "location": "Vancouver, British Columbia, Canada",
+      "salary": "",
+      "workplace": "hybrid",
+      "posted": "",
+      "link": 0
+    },
+    {
+      "title": "Platform Engineer, Kubernetes",
+      "company": "Saltmarsh Robotics",
+      "location": "Burnaby, British Columbia, Canada",
+      "salary": "",
+      "workplace": "onsite",
+      "posted": "",
+      "link": 1
+    },
+    {
+      "title": "Software Developer II",
+      "company": "Quillfeather",
+      "location": "Canada",
+      "salary": "$110K/yr - $130K/yr",
+      "workplace": "remote",
+      "posted": "",
+      "link": 2
+    }
+  ]
+}

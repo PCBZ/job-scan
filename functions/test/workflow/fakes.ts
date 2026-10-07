@@ -2,6 +2,7 @@ import type { AppConfig } from "../../src/lib/config/load.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
 import type { ResumeSet } from "../../src/lib/resume/load.js";
 import type { DeterministicSteps, Effects, ModelSteps } from "../../src/lib/workflow/types.js";
+import { posting } from "../postings/helpers.js";
 
 export const CONFIG = { mail: {}, resume: {}, profile: {}, report: {} } as unknown as AppConfig;
 
@@ -31,6 +32,7 @@ export interface FakeOptions {
   explainProblems?: string[][];
   resumeDelayMs?: number;
   deliverFails?: boolean;
+  extractWarnings?: string[];
 }
 
 /** Nodes that record every call, in order, with their arguments. */
@@ -62,7 +64,8 @@ export function fakes(o: FakeOptions = {}) {
     },
     validatePostings(postings) {
       log.push("validate");
-      return { valid: postings, problems: take(o.extractProblems, counters.extract - 1) };
+      const problems = take(o.extractProblems, counters.extract - 1);
+      return { valid: postings, problems, dropped: problems.length ? { indeed: 1 } : {} };
     },
     async dedupe(postings) {
       log.push("dedupe");
@@ -70,7 +73,9 @@ export function fakes(o: FakeOptions = {}) {
     },
     hardGates(postings) {
       log.push("hard_gates");
-      return o.keepNone ? { kept: [], filtered: postings } : { kept: postings, filtered: [] };
+      return o.keepNone
+        ? { kept: [], filtered: postings.map((p) => ({ ...p })) }
+        : { kept: postings, filtered: [] };
     },
     verifyJudgements() {
       log.push("verify_judgements");
@@ -90,7 +95,12 @@ export function fakes(o: FakeOptions = {}) {
     },
     renderReport(input) {
       log.push("render_report");
-      return { outcome: input.outcome, warnings: input.warnings, top: input.top.length };
+      return {
+        outcome: input.outcome,
+        warnings: input.warnings,
+        top: input.top.length,
+        dropped: input.dropped,
+      };
     },
   };
 
@@ -98,7 +108,11 @@ export function fakes(o: FakeOptions = {}) {
     async extractPostings(...args) {
       counters.extract++;
       llmCall("extract_postings", args);
-      return { value: [{ title: `attempt ${counters.extract}` }], usage: USAGE };
+      return {
+        value: [posting({ title: `attempt ${counters.extract}` })],
+        usage: USAGE,
+        ...(o.extractWarnings ? { warnings: o.extractWarnings } : {}),
+      };
     },
     async canonicalizeResumeSkills(...args) {
       llmCall("canonicalize_resume_skills", args);
