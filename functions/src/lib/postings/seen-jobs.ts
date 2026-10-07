@@ -6,42 +6,15 @@ import { odata, RestError, TableClient } from "@azure/data-tables";
 import type { TokenCredential } from "@azure/identity";
 import { fingerprint, type JobIdentity } from "../fingerprint.js";
 
-export interface SeenJobsStore {
-  /** Fingerprints recommended on or after `since` (YYYY-MM-DD). */
-  recommendedSince(since: string): Promise<Set<string>>;
-  /** Record postings as recommended on `day`, keeping each one's first day. */
-  recordRecommended(jobs: JobIdentity[], day: string): Promise<void>;
-}
-
-interface SeenJob {
+// A type alias, not an interface: the Tables SDK needs Record<string, unknown>.
+type SeenJobEntity = {
+  partitionKey: string;
+  rowKey: string;
   firstSeen: string;
   lastSeen: string;
   title: string;
   company: string;
-}
-
-export class MemorySeenJobsStore implements SeenJobsStore {
-  readonly rows = new Map<string, SeenJob>();
-
-  async recommendedSince(since: string): Promise<Set<string>> {
-    return new Set([...this.rows].filter(([, r]) => r.lastSeen >= since).map(([fp]) => fp));
-  }
-
-  async recordRecommended(jobs: JobIdentity[], day: string): Promise<void> {
-    for (const job of jobs) {
-      const fp = fingerprint(job);
-      this.rows.set(fp, {
-        firstSeen: this.rows.get(fp)?.firstSeen ?? day,
-        lastSeen: day,
-        title: job.title ?? "",
-        company: job.company ?? "",
-      });
-    }
-  }
-}
-
-// A type alias, not an interface: the Tables SDK needs Record<string, unknown>.
-type SeenJobEntity = { partitionKey: string; rowKey: string } & SeenJob;
+};
 
 const PARTITION = "job";
 
@@ -50,7 +23,7 @@ const PARTITION = "job";
  * only [a-z0-9 ] and "|", all legal in a RowKey, so it is stored as is and
  * reads plainly in the portal.
  */
-export class TableSeenJobsStore implements SeenJobsStore {
+export class TableSeenJobsStore {
   constructor(
     private readonly client: Pick<TableClient, "listEntities" | "createEntity" | "updateEntity">,
   ) {}
@@ -59,6 +32,7 @@ export class TableSeenJobsStore implements SeenJobsStore {
     return new TableSeenJobsStore(new TableClient(tableEndpoint, tableName, credential));
   }
 
+  /** Fingerprints recommended on or after `since` (YYYY-MM-DD). */
   async recommendedSince(since: string): Promise<Set<string>> {
     const fps = new Set<string>();
     const entities = this.client.listEntities<SeenJobEntity>({
@@ -71,6 +45,7 @@ export class TableSeenJobsStore implements SeenJobsStore {
     return fps;
   }
 
+  /** Record postings as recommended on `day`, keeping each one's first day. */
   async recordRecommended(jobs: JobIdentity[], day: string): Promise<void> {
     // A handful of top picks a day: one write each is simpler than a batch.
     // Once per fingerprint: two picks can share one.

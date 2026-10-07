@@ -5,10 +5,10 @@
 import { addDays, runDay } from "../day.js";
 import { fingerprint } from "../fingerprint.js";
 import type { DeterministicSteps } from "../workflow/types.js";
-import type { SeenJobsStore } from "./seen-jobs.js";
+import type { TableSeenJobsStore } from "./seen-jobs.js";
 
 export function dedupeStep(
-  store: SeenJobsStore,
+  store: Pick<TableSeenJobsStore, "recommendedSince">,
   now = () => new Date(),
 ): DeterministicSteps["dedupe"] {
   return async (postings, config) => {
