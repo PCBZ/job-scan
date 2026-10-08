@@ -25,7 +25,9 @@ export function isPlaceName(text: string): boolean {
 
 /** The country a location names through a region or the country itself. */
 export function countryOf(location: string): Country | undefined {
-  for (const part of location.replace(/\([^)]*\)/g, "").split(",")) {
+  // Commas, dashes and brackets all separate parts: "Remote - USA",
+  // "Vancouver, BC", "Remote (US)"; a note like "(Hybrid)" matches nothing.
+  for (const part of location.split(/[,()\-–—/|]/)) {
     const found = COUNTRIES.find((c) => c.isCountry(part) || c.regionCode(part) !== undefined);
     if (found) return found;
   }

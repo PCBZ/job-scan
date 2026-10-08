@@ -34,6 +34,9 @@ describe("lookups across countries", () => {
     ["Seattle, Washington", "US"],
     ["Los Angeles, CA", "US"],
     ["Austin, TX, USA", "US"],
+    ["Remote - USA", "US"],
+    ["Winston-Salem, NC", "US"],
+    ["Remote - Australia", undefined],
     ["Lower Mainland", undefined],
     ["Remote", undefined],
   ])("countryOf(%s) is %s", (location, code) => {

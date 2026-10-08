@@ -104,6 +104,54 @@ describe("location gate", () => {
     ).toEqual(["Is this remote role open to someone working from Canada?"]);
   });
 
+  it("passes a remote role in a country scope, by any name of the country", async () => {
+    const profile = { locations: ["Vancouver", "Remote (US)"] };
+    for (const location of [
+      "United States (Remote)",
+      "Remote - USA",
+      "Seattle, WA",
+      "Remote (US)",
+    ]) {
+      const out = await gate(onsite(location, { workplace: "remote" }), profile);
+      expect(out.kept[0]?.gate_questions, location).toBeUndefined();
+    }
+  });
+
+  it("asks about a remote role whose place isn't the scope, even when the letters are", async () => {
+    const profile = { locations: ["Vancouver", "Remote (US)"] };
+    for (const location of ["Remote - Australia", "Remote, Belarus", "Remote", "Canada (Remote)"]) {
+      const out = await gate(onsite(location, { workplace: "remote" }), profile);
+      expect(out.kept[0]?.gate_questions, location).toEqual([
+        "Is this remote role open to someone working from US?",
+      ]);
+    }
+  });
+
+  it("matches a scope that isn't a country as whole words, ignoring punctuation", async () => {
+    const emea = { locations: ["Remote (EMEA)"] };
+    for (const location of ["Remote - EMEA", "Remote (EMEA)"]) {
+      const out = await gate(onsite(location, { workplace: "remote" }), emea);
+      expect(out.kept[0]?.gate_questions, location).toBeUndefined();
+    }
+    const americas = await gate(onsite("Remote - Americas", { workplace: "remote" }), emea);
+    expect(americas.kept[0]?.gate_questions).toEqual([
+      "Is this remote role open to someone working from EMEA?",
+    ]);
+    // "UK" is inside "Ukraine", but not a word of it.
+    const ukraine = await gate(onsite("Remote - Ukraine", { workplace: "remote" }), {
+      locations: ["Remote (UK)"],
+    });
+    expect(ukraine.kept[0]?.gate_questions).toEqual([
+      "Is this remote role open to someone working from UK?",
+    ]);
+  });
+
+  it("passes Canada's remote scope by country too", async () => {
+    const profile = { locations: ["Vancouver", "Remote (Canada)"] };
+    const out = await gate(onsite("Toronto, ON", { workplace: "remote" }), profile);
+    expect(out.kept[0]?.gate_questions).toBeUndefined();
+  });
+
   it("with no locations listed, filters everything that isn't remote", async () => {
     const out = await gate(onsite("Vancouver, BC"), { locations: [] });
     expect(out.filtered[0]?.reason).toBe("not remote, and no locations are listed");

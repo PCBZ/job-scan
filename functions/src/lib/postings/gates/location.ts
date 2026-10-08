@@ -30,6 +30,19 @@ interface LocationFacts {
   near: boolean;
 }
 
+const words = (s: string) => s.replace(/[^\p{L}\p{N}]+/gu, " ");
+
+/**
+ * A remote posting is within a scope like "Remote (US)" when both name the
+ * same country ("United States (Remote)", "Seattle, WA"); a scope that isn't a
+ * country ("EMEA") must appear as whole words, so "Australia" isn't "US".
+ */
+function inScope(location: string, scope: string): boolean {
+  const country = countryOf(scope);
+  if (country) return countryOf(location) === country;
+  return wordIn(words(location), words(scope));
+}
+
 export function locationFacts(p: Posting, profile: ProfileConfig): LocationFacts {
   const entries = profile.locations ?? [];
   const scopes = entries.flatMap((e) => /remote\s*\(([^)]+)\)/i.exec(e)?.[1]?.trim() ?? []);
@@ -51,7 +64,7 @@ export function locationFacts(p: Posting, profile: ProfileConfig): LocationFacts
     remote: p.workplace === "remote" || /\bremote\b/i.test(p.location),
     openToRemote: profile.open_to_remote !== false,
     scopes,
-    inScope: scopes.length === 0 || scopes.some((s) => norm(p.location).includes(norm(s))),
+    inScope: scopes.length === 0 || scopes.some((s) => inScope(p.location, s)),
     places,
     listed: cities.some((c) => norm(c) === norm(city)),
     placed: code !== undefined || countryOf(rest.join(",")) !== undefined,
