@@ -18,7 +18,7 @@ import { fixture, VENDORS } from "../postings/fixtures.js";
 
 const MAX_REPAIRS = 2;
 
-describe.skipIf(!process.env.EVAL_LIVE)("extraction, live", () => {
+describe.skipIf(process.env.EVAL_LIVE !== "1")("extraction, live", () => {
   // Built on first use: a skipped suite still runs this body to collect tests.
   let step: ReturnType<typeof extractStep> | undefined;
   const extract = () => {

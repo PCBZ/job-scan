@@ -21,5 +21,11 @@ module "function_app" {
     "MODEL_NAME"       = module.openai.deployment_name
     "CONFIG_BLOB_URL"  = module.config_blob.url
     "RESUME_CACHE_URL" = module.storage.container_endpoints["resume-cache"]
+    # Jev, read by functions/src/lib/decision/config.ts. The model is pinned:
+    # confidence thresholds are tuned against one version.
+    "JEV_MODEL" = "jev-1.13.0"
+    # A Key Vault reference, resolved by the app's identity. The secret's value
+    # is added by hand, so it never passes through Terraform state.
+    "TYPESAFE_API_KEY" = "@Microsoft.KeyVault(SecretUri=${module.key_vault.uri}secrets/typesafe-api-key/)"
   }
 }
