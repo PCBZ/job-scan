@@ -15,17 +15,16 @@ import type { AllAccountsFailed, FetchedMessage, FetchPayload } from "../mail/ty
 import type { RepairTurn, TokenUsage } from "../model/types.js";
 import type { Filtered } from "../postings/gates.js";
 import type { Posting, Source } from "../postings/types.js";
+import type { Report } from "../report/types.js";
 import type { ResumeSet, ResumeVariant } from "../resume/load.js";
 
-export type { Explanation, Filtered, Judgement, Posting, Ranked };
+export type { Explanation, Filtered, Judgement, Posting, Ranked, Report };
 
 // Shapes the node issues define; the graph only moves them between nodes.
 /** Canonical skills per resume variant or per posting. Shape: #28. */
 export type SkillSets = Record<string, string[]>;
 /** Coverage of a top pick's requirements by its variant. Shape: #28. */
 export type Coverage = Record<string, unknown>;
-/** The report every channel renders from. Shape: #19. */
-export type Report = Record<string, unknown>;
 
 export interface LlmResult<T> {
   value: T;

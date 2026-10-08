@@ -34,7 +34,18 @@ describe("workflow graph", () => {
       expect(ranBefore(f.log, a as string, b as string), `${a} before ${b}`).toBe(true);
     }
     expect(f.log.at(-1)).toBe("mark_seen");
-    expect(out.report).toEqual({
+    expect(out.report?.outcome).toBe("report");
+    const input = f.reported.at(-1);
+    expect({
+      outcome: input?.outcome,
+      warnings: input?.warnings,
+      top: input?.top.length,
+      dropped: input?.dropped,
+      repeats: input?.repeats,
+      duplicates: input?.duplicates,
+      notes: input?.notes,
+      filtered: input?.filtered.map((x) => `${x.gate}: ${x.posting.title}`),
+    }).toEqual({
       outcome: "report",
       warnings: [],
       top: 1,
@@ -94,9 +105,9 @@ describe("workflow graph", () => {
     const f = fakes({ extractProblems: always, judgeProblems: always, explainProblems: always });
     const out = await run(f, { maxRepairs: 2 });
     expect(f.counters).toEqual({ extract: 3, judge: 3, explain: 3 });
-    expect((out.report as { warnings: string[] }).warnings).toHaveLength(3);
+    expect(f.reported.at(-1)?.warnings).toHaveLength(3);
     // The last pass still failed, so its rows count as dropped.
-    expect((out.report as { dropped: object }).dropped).toEqual({ indeed: 1 });
+    expect(f.reported.at(-1)?.dropped).toEqual({ indeed: 1 });
     expect(out.warnings).toEqual([
       "validate: unresolved after 2 repair(s): still wrong",
       "verify_judgements: unresolved after 2 repair(s): still wrong",
@@ -110,11 +121,11 @@ describe("workflow graph", () => {
       extractProblems: [["x"], []],
       extractWarnings: ["extract_postings: message <m1@x>: refused"],
     });
-    const out = await run(f);
-    const report = out.report as { warnings: string[]; dropped: object };
+    await run(f);
+    const report = f.reported.at(-1);
     // The repair fixed the rows, so the last pass dropped nothing.
-    expect(report.dropped).toEqual({});
-    expect(report.warnings).toEqual([
+    expect(report?.dropped).toEqual({});
+    expect(report?.warnings).toEqual([
       "extract_postings: message <m1@x>: refused",
       "extract_postings: message <m1@x>: refused",
     ]);

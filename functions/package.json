@@ -36,6 +36,7 @@
     "@unified-latex/unified-latex-util-parse": "1.8.4",
     "entities": "8.1.0",
     "imapflow": "2.2.5",
+    "mjml": "5.4.1",
     "openai": "7.28.0",
     "postal-mime": "4.0.4",
     "smol-toml": "1.9.0",
@@ -43,6 +44,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
+    "@types/mjml": "5.0.0",
     "@types/node": "24.19.1",
     "azurite": "3.37.0",
     "typescript": "7.0.2",

@@ -21,6 +21,8 @@ module "function_app" {
     "MODEL_NAME"       = module.openai.deployment_name
     "CONFIG_BLOB_URL"  = module.config_blob.url
     "RESUME_CACHE_URL" = module.storage.container_endpoints["resume-cache"]
+    # Private; reports are read through user delegation SAS links (#19).
+    "REPORTS_URL" = module.storage.container_endpoints["reports"]
     # Jev, read by functions/src/lib/decision/config.ts. The model is pinned:
     # confidence thresholds are tuned against one version.
     "JEV_MODEL" = "jev-1.13.0"

@@ -1,7 +1,12 @@
 import type { AppConfig } from "../../src/lib/config/load.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
 import type { ResumeSet } from "../../src/lib/resume/load.js";
-import type { DeterministicSteps, Effects, ModelSteps } from "../../src/lib/workflow/types.js";
+import type {
+  DeterministicSteps,
+  Effects,
+  ModelSteps,
+  ReportInput,
+} from "../../src/lib/workflow/types.js";
 import { judgement, rankedOf } from "../judge/helpers.js";
 import { posting } from "../postings/helpers.js";
 
@@ -41,6 +46,8 @@ export function fakes(o: FakeOptions = {}) {
   const log: string[] = [];
   const llmInputs: { node: string; args: unknown[] }[] = [];
   const counters = { extract: 0, judge: 0, explain: 0 };
+  /** What render_report was given: everything the run carried to the report. */
+  const reported: ReportInput[] = [];
   const take = (lists: string[][] | undefined, n: number) => lists?.[n] ?? [];
   const llmCall = (node: string, args: unknown[]) => {
     log.push(node);
@@ -111,15 +118,19 @@ export function fakes(o: FakeOptions = {}) {
     },
     renderReport(input) {
       log.push("render_report");
+      reported.push(input);
       return {
+        day: "2026-10-08",
         outcome: input.outcome,
-        warnings: input.warnings,
-        top: input.top.length,
-        dropped: input.dropped,
-        repeats: input.repeats,
-        duplicates: input.duplicates,
-        notes: input.notes,
-        filtered: input.filtered.map((f) => `${f.gate}: ${f.posting.title}`),
+        alerts: [],
+        funnel: "",
+        counts: "",
+        notes: [],
+        top: [],
+        others: [],
+        filtered: [],
+        suspicious: "not checked",
+        housekeeping: [],
       };
     },
   };
@@ -177,5 +188,5 @@ export function fakes(o: FakeOptions = {}) {
     },
   };
 
-  return { code, llm, effects, log, llmInputs, counters };
+  return { code, llm, effects, log, llmInputs, counters, reported };
 }
