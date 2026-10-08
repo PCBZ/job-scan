@@ -116,6 +116,33 @@ describe("verifyJudgements", () => {
       'its quote "no visas" is not in the posting',
     );
   });
+
+  it("accepts a gate quote from any field the model was shown, workplace and age included", () => {
+    const asked = [{ gate: "location" as const, mode: "filter" as const, rule: "x" }];
+    const onsite = {
+      gate: "location" as const,
+      fails: true,
+      reason: "Fully on-site",
+      quote: "onsite",
+    };
+    const p = { workplace: "onsite" as const, location: "Lower Mainland" };
+    expect(
+      verifyJudgements([judgement({ posting: p, asked, answer: { gates: [onsite] } })], RESUMES),
+    ).toEqual([]);
+    const aged = { ...onsite, quote: "30+ days ago" };
+    expect(
+      verifyJudgements(
+        [
+          judgement({
+            posting: { ...p, posted: "30+ days ago" },
+            asked,
+            answer: { gates: [aged] },
+          }),
+        ],
+        RESUMES,
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe("problemsAbout", () => {

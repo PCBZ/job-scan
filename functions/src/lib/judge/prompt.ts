@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import type { ProfileConfig } from "../config/schema.js";
 import type { Posting } from "../postings/types.js";
 import type { ResumeVariant } from "../resume/load.js";
+import { postingFields } from "./fields.js";
 import type { AskedGate } from "./gates.js";
 
 /** The system prompt, kept as prose in prompts/judge.md. */
@@ -20,12 +21,11 @@ export function judgeUser(
   gates: AskedGate[],
   resumes: ResumeVariant[],
 ): string {
-  const { title, company, location, workplace, salary, posted, requirements } = p;
   const { target_titles, seniority, years_experience, locations, open_to_remote, core_skills } =
     profile;
   return JSON.stringify(
     {
-      posting: { title, company, location, workplace, salary, posted, requirements },
+      posting: postingFields(p),
       candidate: {
         target_titles,
         seniority,

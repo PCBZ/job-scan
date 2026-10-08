@@ -5,6 +5,7 @@
 
 import type { Posting } from "../postings/types.js";
 import type { ResumeSet } from "../resume/load.js";
+import { postingFields } from "./fields.js";
 import type { AskedGate } from "./gates.js";
 import type { JudgeAnswer } from "./schema.js";
 
@@ -32,8 +33,8 @@ const flat = (s: string) =>
 const quotes = (text: string, quote: string) =>
   flat(quote) !== "" && flat(text).includes(flat(quote));
 
-const postingText = (p: Posting) =>
-  [p.title, p.company, p.location, p.salary, ...p.requirements].join("\n");
+/** Everything the model was shown about the posting, which a gate may quote. */
+const postingText = (p: Posting) => Object.values(postingFields(p)).flat().join("\n");
 
 export function verifyJudgements(judged: Judgement[], resumes: ResumeSet): string[] {
   const texts = new Map(resumes.variants.map((v) => [v.name, v.text]));
