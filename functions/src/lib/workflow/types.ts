@@ -6,6 +6,8 @@
 // only deterministic nodes reached by graph edges ever call.
 
 import type { AppConfig } from "../config/load.js";
+import type { ExplainInput } from "../explain/explain.js";
+import type { Explanation } from "../explain/schema.js";
 import type { JudgeInput } from "../judge/judge.js";
 import type { Ranked, RankResult } from "../judge/rank.js";
 import type { Judgement } from "../judge/verify.js";
@@ -15,11 +17,9 @@ import type { Filtered } from "../postings/gates.js";
 import type { Posting, Source } from "../postings/types.js";
 import type { ResumeSet, ResumeVariant } from "../resume/load.js";
 
-export type { Filtered, Judgement, Posting, Ranked };
+export type { Explanation, Filtered, Judgement, Posting, Ranked };
 
 // Shapes the node issues define; the graph only moves them between nodes.
-/** Fit / Gap prose for a top pick. Shape: #18. */
-export type Explanation = Record<string, unknown>;
 /** Canonical skills per resume variant or per posting. Shape: #28. */
 export type SkillSets = Record<string, string[]>;
 /** Coverage of a top pick's requirements by its variant. Shape: #28. */
@@ -51,7 +51,7 @@ export interface ModelSteps {
     signal?: AbortSignal,
   ): Promise<LlmResult<Judgement[]>>;
   explain(
-    input: { top: Ranked[]; resumes: ResumeVariant[] },
+    input: ExplainInput,
     repairs: RepairTurn[],
     signal?: AbortSignal,
   ): Promise<LlmResult<Explanation[]>>;
@@ -85,7 +85,7 @@ export interface DeterministicSteps {
   verifyJudgements(judged: Judgement[], resumes: ResumeSet): string[];
   /** Top N past the floor, the rest, model-gate failures and notes. */
   rank(judged: Judgement[], config: AppConfig): RankResult;
-  verifyExplanations(explained: Explanation[], resumes: ResumeSet): string[];
+  verifyExplanations(explained: Explanation[], top: Ranked[], resumes: ResumeSet): string[];
   keywordCoverage(top: Ranked[], postingSkills: SkillSets, resumeSkills: SkillSets): Coverage[];
   renderReport(input: ReportInput): Report;
 }

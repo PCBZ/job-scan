@@ -1,4 +1,5 @@
-// Live judging against the deployed model, on synthetic postings and resumes.
+// Live judging and explaining against the deployed model, on synthetic
+// postings and resumes.
 // Skipped unless EVAL_LIVE is exactly 1. Signs in with DefaultAzureCredential,
 // like the extraction eval; set MODEL_PROVIDER, MODEL_ENDPOINT and MODEL_NAME
 // the same way (see extract.live.test.ts), then: npm run eval:judge
@@ -6,6 +7,9 @@
 import { DefaultAzureCredential } from "@azure/identity";
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../../src/lib/config/load.js";
+import { explainStep } from "../../src/lib/explain/explain.js";
+import type { Explanation } from "../../src/lib/explain/schema.js";
+import { verifyExplanations } from "../../src/lib/explain/verify.js";
 import { judgeStep } from "../../src/lib/judge/judge.js";
 import { rank } from "../../src/lib/judge/rank.js";
 import { type Judgement, verifyJudgements } from "../../src/lib/judge/verify.js";
@@ -80,9 +84,10 @@ const DATA = posting({
   requirements: ["Spark", "Airflow", "SQL", "Snowflake"],
 });
 
-describe.skipIf(process.env.EVAL_LIVE !== "1")("judging, live", () => {
-  it("judges, verifies and ranks three postings", { timeout: 300_000 }, async () => {
-    const judge = judgeStep(modelClientFromEnv(process.env, new DefaultAzureCredential()));
+describe.skipIf(process.env.EVAL_LIVE !== "1")("judging and explaining, live", () => {
+  it("judges, ranks and explains three postings", { timeout: 300_000 }, async () => {
+    const client = modelClientFromEnv(process.env, new DefaultAzureCredential());
+    const judge = judgeStep(client);
     const input = {
       postings: [BACKEND, CITIZENS, DATA],
       resumes: RESUMES.variants,
@@ -115,7 +120,30 @@ describe.skipIf(process.env.EVAL_LIVE !== "1")("judging, live", () => {
     for (const f of ranked.filtered)
       console.log(`filtered ${f.posting.title}: ${f.gate}: ${f.reason}`);
 
+    // explain ⇄ verify_explanations, as in the graph.
+    const explain = explainStep(client);
+    const explainRepairs: RepairTurn[] = [];
+    let explained: Explanation[] = [];
+    let explainProblems: string[] = [];
+    for (let attempt = 0; attempt <= MAX_REPAIRS; attempt++) {
+      explained = (await explain({ top: ranked.top, resumes: RESUMES.variants }, explainRepairs))
+        .value;
+      explainProblems = verifyExplanations(explained, ranked.top, RESUMES);
+      console.log(`explain attempt ${attempt + 1}: ${explainProblems.length} problems`);
+      for (const p of explainProblems) console.log(`  ${p}`);
+      if (explainProblems.length === 0) break;
+      explainRepairs.push({ previous: explained, problems: explainProblems });
+    }
+    for (const e of explained) {
+      console.log(`${e.id}\n  Fit: ${e.fit.sentence} [${e.fit.quote}]`);
+      console.log(
+        `  Gap: ${e.gap.requirement || "(none)"}: ${e.gap.advice}\n  Unknown: ${e.unknown}`,
+      );
+    }
+
     expect(problems).toEqual([]);
+    expect(explainProblems).toEqual([]);
+    expect(explained).toHaveLength(ranked.top.length);
     expect(ranked.filtered.map((f) => [f.posting.title, f.gate])).toEqual([
       ["Software Engineer", "sponsorship"],
     ]);

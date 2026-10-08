@@ -36,8 +36,7 @@ Return one entry per resume in "resumes", in the same order, with "variant" set 
 
 For each dimension:
 - "evidence" is one line copied verbatim from this resume's text that earns the level. Copy it exactly: no paraphrase, no joining of separate lines. Use "" only when the level is none.
-- "gap" is a requirement in the posting this resume doesn't meet, in a few words. Use "" when there is none.
-- Every variant must name at least one gap across its three dimensions. A fit with no stated gap is not credible: find the gap, or lower the levels.
+- "gap" is a requirement the posting states that this resume doesn't meet, copied verbatim from the posting. It is never something the alert leaves out (those go in "unknowns"), and never a requirement the resume already meets. Use "" when the resume meets every requirement the posting states. An empty gap is a fact: don't invent one to fill the field.
 
 ## Location and signal
 

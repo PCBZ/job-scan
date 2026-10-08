@@ -149,7 +149,17 @@ export function fakes(o: FakeOptions = {}) {
     async explain(...args) {
       counters.explain++;
       llmCall("explain", args);
-      return { value: [{ fit: "Go", attempt: counters.explain }], usage: USAGE };
+      return {
+        value: [
+          {
+            id: `pick ${counters.explain}`,
+            fit: { sentence: "Built it", quote: "Go" },
+            gap: { requirement: "", advice: "Check the years" },
+            unknown: "",
+          },
+        ],
+        usage: USAGE,
+      };
     },
     async canonicalizePostingSkills(...args) {
       llmCall("canonicalize_posting_skills", args);
