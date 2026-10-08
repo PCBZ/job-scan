@@ -41,7 +41,12 @@ describe("workflow graph", () => {
       dropped: {},
       repeats: 1,
       duplicates: 2,
-      notes: ["salary not compared for 1 posting(s): currency unknown"],
+      // Code gates' and model gates' results both reach the report.
+      notes: [
+        "salary not compared for 1 posting(s): currency unknown",
+        "needs_sponsorship wasn't applied",
+      ],
+      filtered: ["location: far away", "sponsorship: citizens only"],
     });
   });
 

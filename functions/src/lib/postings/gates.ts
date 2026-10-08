@@ -4,6 +4,7 @@
 
 import type { AppConfig } from "../config/load.js";
 import type { ProfileConfig } from "../config/schema.js";
+import type { ModelGate } from "../judge/schema.js";
 import type { DeterministicSteps } from "../workflow/types.js";
 import { KEYWORD, keywordFacts } from "./gates/keyword.js";
 import { LOCATION, locationFacts } from "./gates/location.js";
@@ -31,7 +32,8 @@ export type Gate = keyof typeof GATES;
 
 export interface Filtered {
   posting: Posting;
-  gate: Gate;
+  /** A code gate here, or a model gate from judge (#17). */
+  gate: Gate | ModelGate;
   reason: string;
 }
 

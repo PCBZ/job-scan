@@ -6,19 +6,18 @@
 // only deterministic nodes reached by graph edges ever call.
 
 import type { AppConfig } from "../config/load.js";
+import type { JudgeInput } from "../judge/judge.js";
+import type { Ranked, RankResult } from "../judge/rank.js";
+import type { Judgement } from "../judge/verify.js";
 import type { AllAccountsFailed, FetchedMessage, FetchPayload } from "../mail/types.js";
 import type { RepairTurn, TokenUsage } from "../model/types.js";
 import type { Filtered } from "../postings/gates.js";
 import type { Posting, Source } from "../postings/types.js";
 import type { ResumeSet, ResumeVariant } from "../resume/load.js";
 
-export type { Filtered, Posting };
+export type { Filtered, Judgement, Posting, Ranked };
 
 // Shapes the node issues define; the graph only moves them between nodes.
-/** A posting with gates, rubric score, variant and evidence. Shape: #17. */
-export type Judgement = Record<string, unknown>;
-/** A judged posting after weighting and the floor. Shape: #17. */
-export type Ranked = Record<string, unknown>;
 /** Fit / Gap prose for a top pick. Shape: #18. */
 export type Explanation = Record<string, unknown>;
 /** Canonical skills per resume variant or per posting. Shape: #28. */
@@ -47,7 +46,7 @@ export interface ModelSteps {
     signal?: AbortSignal,
   ): Promise<LlmResult<SkillSets>>;
   judge(
-    input: { postings: Posting[]; resumes: ResumeVariant[] },
+    input: JudgeInput,
     repairs: RepairTurn[],
     signal?: AbortSignal,
   ): Promise<LlmResult<Judgement[]>>;
@@ -84,7 +83,8 @@ export interface DeterministicSteps {
     config: AppConfig,
   ): Promise<{ kept: Posting[]; filtered: Filtered[]; notes: string[] }>;
   verifyJudgements(judged: Judgement[], resumes: ResumeSet): string[];
-  rank(judged: Judgement[], config: AppConfig): Ranked[];
+  /** Top N past the floor, the rest, model-gate failures and notes. */
+  rank(judged: Judgement[], config: AppConfig): RankResult;
   verifyExplanations(explained: Explanation[], resumes: ResumeSet): string[];
   keywordCoverage(top: Ranked[], postingSkills: SkillSets, resumeSkills: SkillSets): Coverage[];
   renderReport(input: ReportInput): Report;
@@ -111,6 +111,8 @@ export interface ReportInput {
   /** Rows dropped as misaligned after the last repair, per job board. */
   dropped: Partial<Record<Source, number>>;
   top: Ranked[];
+  /** Scored postings outside the top, best first. */
+  rest: Ranked[];
   explanations: Explanation[];
   coverage: Coverage[];
   warnings: string[];
