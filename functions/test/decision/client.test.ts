@@ -171,6 +171,63 @@ describe("DecisionClient", () => {
   });
 });
 
+describe("DecisionClient response checks", () => {
+  const good = {
+    model: "jev-1.13.0",
+    answers: ANSWERS,
+    usage: { input_tokens: 120, output_tokens: 0 },
+  };
+  const answer = <K extends keyof typeof ANSWERS>(name: K, over: Record<string, unknown>) => ({
+    ...good,
+    answers: { ...ANSWERS, [name]: { ...ANSWERS[name], ...over } },
+  });
+  const { remote: _remote, ...withoutRemote } = ANSWERS;
+
+  it.each([
+    ["no usage", { ...good, usage: undefined }, "usage"],
+    [
+      "a token count that isn't a number",
+      { ...good, usage: { input_tokens: "120", output_tokens: 0 } },
+      "usage.input_tokens",
+    ],
+    ["no model", { ...good, model: "" }, "model"],
+    ["a missing answer", { ...good, answers: withoutRemote }, "answers.remote"],
+    ["a noul that isn't a number", answer("remote", { noul: "yes" }), "answers.remote.noul"],
+    ["a noul above 1", answer("remote", { noul: 1.2 }), "answers.remote.noul"],
+    ["an answer of the wrong type", answer("remote", { type: "score" }), "answers.remote.type"],
+    ["a score past the top level", answer("seniority", { score: 2.5 }), "answers.seniority.score"],
+    [
+      "a score without confidence",
+      answer("seniority", { confidence: undefined }),
+      "answers.seniority.confidence",
+    ],
+    [
+      "a choice that isn't an option",
+      answer("variant", { choice: "devops" }),
+      "answers.variant.choice",
+    ],
+    [
+      "a probability out of range",
+      answer("variant", { probabilities: { backend: 1.5 } }),
+      "answers.variant.probabilities.backend",
+    ],
+  ])("rejects %s as a provider failure", async (_, body, where) => {
+    const { fetchFn } = fakeFetch(ok(body));
+    const err = await decisionClientFromEnv(ENV, { fetch: fetchFn })
+      .ask({ state: "x", questions: QUESTIONS })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DecisionProviderError);
+    expect((err as Error).message).toContain(`malformed response at ${where}:`);
+  });
+
+  it("rejects a body that isn't JSON", async () => {
+    const { fetchFn } = fakeFetch(new Response("upstream hiccup", { status: 200 }));
+    await expect(
+      decisionClientFromEnv(ENV, { fetch: fetchFn }).ask({ state: "x", questions: QUESTIONS }),
+    ).rejects.toThrow("malformed response at body:");
+  });
+});
+
 describe("decisionClientFromEnv", () => {
   it("needs the API key", () => {
     expect(() => decisionClientFromEnv({})).toThrow(DecisionConfigError);

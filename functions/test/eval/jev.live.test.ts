@@ -1,6 +1,6 @@
 // One live call to Jev with a Noul, a Score and a Choice whose answers are
 // obvious, to check the key, the pinned model and the answer shapes. Skipped
-// unless EVAL_LIVE=1:
+// unless EVAL_LIVE is exactly 1:
 //
 //   export TYPESAFE_API_KEY=...   # the same key that goes in Key Vault
 //   npm run eval:jev
@@ -17,7 +17,7 @@ const POSTING = {
     "you will lead the payments team.",
 };
 
-describe.skipIf(!process.env.EVAL_LIVE)("Jev, live", () => {
+describe.skipIf(process.env.EVAL_LIVE !== "1")("Jev, live", () => {
   it("answers a Noul, a Score and a Choice in one call", { timeout: 60_000 }, async () => {
     const r = await decisionClientFromEnv(process.env).ask({
       state: POSTING,
