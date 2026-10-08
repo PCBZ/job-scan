@@ -32,6 +32,12 @@ const flat = (s: string) =>
     .replace(/^[\s\p{P}]+|[\s\p{P}]+$/gu, "");
 export const quotes = (text: string, quote: string) =>
   flat(quote) !== "" && flat(text).includes(flat(quote));
+/** The quote within one line of the text: the prompts forbid joining lines. */
+export const quotesLine = (text: string, quote: string) =>
+  text.split("\n").some((line) => quotes(line, quote));
+/** The same phrase, give or take a few words at either end. */
+export const samePhrase = (a: string, b: string) =>
+  flat(a) !== "" && flat(b) !== "" && (flat(a).includes(flat(b)) || flat(b).includes(flat(a)));
 
 /** Everything the model was shown about the posting, which a gate may quote. */
 export const postingText = (p: Posting) => Object.values(postingFields(p)).flat().join("\n");
@@ -60,13 +66,14 @@ export function verifyJudgements(judged: Judgement[], resumes: ResumeSet): strin
       const text = texts.get(v.variant) ?? "";
       for (const dim of ["skills", "domain", "seniority"] as const) {
         const { level, evidence } = v[dim];
-        if (level !== "none" && !quotes(text, evidence)) {
+        if (level !== "none" && !quotesLine(text, evidence)) {
           say(`${v.variant} ${dim}: evidence "${evidence}" is not a line of that resume`);
         }
       }
       for (const dim of ["skills", "domain", "seniority"] as const) {
         const { gap } = v[dim];
-        if (gap && !quotes(postingText(posting), gap)) {
+        // A gap is one of the posting's requirements, not its title or place.
+        if (gap && !quotesLine(posting.requirements.join("\n"), gap)) {
           say(
             `${v.variant} ${dim}: gap "${gap}" is not a requirement the posting states; copy it verbatim, or leave it empty`,
           );

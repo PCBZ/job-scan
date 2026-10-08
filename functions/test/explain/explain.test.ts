@@ -53,6 +53,7 @@ const none = (over: Partial<Explanation> = {}): Explanation => ({
     requirement: "",
     advice: "The listed requirements are all met; check the years required.",
   },
+  unknown: "years required",
   ...over,
 });
 
@@ -75,7 +76,12 @@ describe("verifyExplanations", () => {
     [{ fit: { sentence: " ", quote: "Built payment services in Go" } }, "fit needs a sentence"],
     [
       { gap: { requirement: "product area not stated", advice: "x" } },
-      'gap "product area not stated" is not a requirement the posting states',
+      'gap "product area not stated" is not one the judgement found; use one of "8+ years required"',
+    ],
+    [{ gap: { requirement: "Kafka", advice: "x" } }, 'gap "Kafka" is not one the judgement found'],
+    [
+      { unknown: "whether they sponsor visas" },
+      "the judgement lists no unknowns; leave unknown empty",
     ],
     [
       { gap: { requirement: "", advice: "x" } },
@@ -88,6 +94,41 @@ describe("verifyExplanations", () => {
       found.some((f) => f.includes(problem)),
       found.join("; "),
     ).toBe(true);
+  });
+
+  it("accepts a gap or an unknown copied with a few words trimmed, and nothing else", () => {
+    expect(
+      verifyExplanations(
+        [good({ gap: { requirement: "8+ years", advice: "x" } })],
+        [pick],
+        RESUMES,
+      ),
+    ).toEqual([]);
+    expect(verifyExplanations([none({ unknown: "Years required." })], [gapless], RESUMES)).toEqual(
+      [],
+    );
+    expect(verifyExplanations([none({ unknown: "" })], [gapless], RESUMES)[0]).toContain(
+      'unknown must be one the judgement lists: "years required"',
+    );
+    expect(
+      verifyExplanations(
+        [none({ gap: { requirement: "Go", advice: "x" } })],
+        [gapless],
+        RESUMES,
+      )[0],
+    ).toContain("the judgement found no gap; leave the requirement empty");
+  });
+
+  it("accepts a fit quote that differs only in case, spacing or edge punctuation", () => {
+    const loose = good({ fit: { sentence: "x", quote: "- built  payment services in go." } });
+    expect(verifyExplanations([loose], [pick], RESUMES)).toEqual([]);
+  });
+
+  it("rejects a fit quote that joins two resume lines", () => {
+    const joined = good({ fit: { sentence: "x", quote: "Northwind Built payment services" } });
+    expect(verifyExplanations([joined], [pick], RESUMES)[0]).toContain(
+      'fit quote "Northwind Built payment services" is not a line of the Backend resume',
+    );
   });
 
   it("checks the quote against the resume chosen for the pick, not another", () => {

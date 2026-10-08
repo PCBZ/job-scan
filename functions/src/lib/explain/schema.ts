@@ -13,12 +13,12 @@ export const explanation = z.object({
     quote: z.string(),
   }),
   gap: z.object({
-    /** The unmet requirement, copied verbatim from the posting; "" when there is none. */
+    /** One of the judgement's gaps, copied; "" when it found none. */
     requirement: z.string(),
     /** What to do about it, or, with no gap, what to check before applying. */
     advice: z.string(),
   }),
-  /** What the alert didn't say; "" when nothing was missing. */
+  /** One of the judgement's unknowns, copied; "" when it lists none. */
   unknown: z.string(),
 });
 

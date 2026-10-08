@@ -88,6 +88,43 @@ describe("verifyJudgements", () => {
     ]);
   });
 
+  it("flags a gap taken from a field that isn't a requirement, such as the title", () => {
+    const j = judgement({
+      posting: { title: "Staff Engineer" },
+      answer: {
+        variants: [
+          {
+            variant: "Backend",
+            skills: dimension(),
+            domain: dimension({ gap: "Staff Engineer" }),
+            seniority: dimension(),
+          },
+        ],
+      },
+    });
+    expect(verifyJudgements([j], RESUMES)[0]).toContain(
+      'Backend domain: gap "Staff Engineer" is not a requirement',
+    );
+  });
+
+  it("rejects evidence that joins two resume lines", () => {
+    const j = judgement({
+      answer: {
+        variants: [
+          {
+            variant: "Backend",
+            skills: dimension({ evidence: "Northwind Built payment services" }),
+            domain: dimension(),
+            seniority: dimension({ gap: "8+ years required" }),
+          },
+        ],
+      },
+    });
+    expect(verifyJudgements([j], RESUMES)[0]).toContain(
+      'evidence "Northwind Built payment services" is not a line of that resume',
+    );
+  });
+
   it("allows a variant with no gap: rank caps it instead", () => {
     const j = judgement({
       answer: {
