@@ -2,6 +2,7 @@ import type { AppConfig } from "../../src/lib/config/load.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
 import type { ResumeSet } from "../../src/lib/resume/load.js";
 import type { DeterministicSteps, Effects, ModelSteps } from "../../src/lib/workflow/types.js";
+import { judgement, rankedOf } from "../judge/helpers.js";
 import { posting } from "../postings/helpers.js";
 
 export const CONFIG = { mail: {}, resume: {}, profile: {}, report: {} } as unknown as AppConfig;
@@ -81,7 +82,7 @@ export function fakes(o: FakeOptions = {}) {
           }
         : {
             kept: postings,
-            filtered: [],
+            filtered: [{ posting: posting({ title: "far away" }), gate: "location", reason: "x" }],
             notes: ["salary not compared for 1 posting(s): currency unknown"],
           };
     },
@@ -91,7 +92,14 @@ export function fakes(o: FakeOptions = {}) {
     },
     rank(judged) {
       log.push("rank");
-      return judged;
+      return {
+        top: judged.map((j) => rankedOf(j)),
+        rest: [],
+        filtered: [
+          { posting: posting({ title: "citizens only" }), gate: "sponsorship", reason: "y" },
+        ],
+        notes: ["needs_sponsorship wasn't applied"],
+      };
     },
     verifyExplanations() {
       log.push("verify_explanations");
@@ -111,6 +119,7 @@ export function fakes(o: FakeOptions = {}) {
         repeats: input.repeats,
         duplicates: input.duplicates,
         notes: input.notes,
+        filtered: input.filtered.map((f) => `${f.gate}: ${f.posting.title}`),
       };
     },
   };
@@ -132,7 +141,10 @@ export function fakes(o: FakeOptions = {}) {
     async judge(...args) {
       counters.judge++;
       llmCall("judge", args);
-      return { value: [{ score: 80, attempt: counters.judge }], usage: USAGE };
+      return {
+        value: [judgement({ posting: { title: `judged ${counters.judge}` } })],
+        usage: USAGE,
+      };
     },
     async explain(...args) {
       counters.explain++;

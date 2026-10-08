@@ -100,11 +100,15 @@ export function buildWorkflow(
       .join(["await_resumes", "canonicalize_resume_skills"], "judge")
       .node("judge", async (s, signal) => {
         const r = await model.judge(
-          { postings: s.postings, resumes: resumes(s).variants },
+          { postings: s.postings, resumes: resumes(s).variants, profile: config(s).profile },
           s.loops.judge.turns,
           signal,
         );
-        return { judged: r.value, usage: { judge: r.usage } };
+        return {
+          judged: r.value,
+          usage: { judge: r.usage },
+          ...(r.warnings?.length ? { warnings: r.warnings } : {}),
+        };
       })
       .repairLoop("judge", {
         generate: "judge",
@@ -113,7 +117,10 @@ export function buildWorkflow(
         output: (s) => s.judged,
         run: (s) => ({ problems: steps.verifyJudgements(s.judged, resumes(s)) }),
       })
-      .node("rank", (s) => ({ top: steps.rank(s.judged, config(s)) }))
+      .node("rank", (s) => {
+        const { top, rest, filtered, notes } = steps.rank(s.judged, config(s));
+        return { top, rest, filtered, notes };
+      })
       .edge("rank", "explain")
       .node("explain", async (s, signal) => {
         const r = await model.explain(
@@ -157,6 +164,7 @@ export function buildWorkflow(
           filtered: s.filtered,
           dropped: s.dropped,
           top: s.top,
+          rest: s.rest,
           explanations: s.explanations,
           coverage: s.coverage,
           warnings: s.warnings,

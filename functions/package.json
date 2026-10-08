@@ -14,6 +14,7 @@
     "typecheck": "tsc -p tsconfig.test.json",
     "test": "vitest run",
     "eval:extract": "EVAL_LIVE=1 vitest run test/eval/extract.live.test.ts",
+    "eval:judge": "EVAL_LIVE=1 vitest run test/eval/judge.live.test.ts",
     "eval:jev": "EVAL_LIVE=1 vitest run test/eval/jev.live.test.ts",
     "lint": "biome check .",
     "format": "biome check --write .",

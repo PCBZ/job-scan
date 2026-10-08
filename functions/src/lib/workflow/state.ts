@@ -51,10 +51,12 @@ export const WorkflowState = Annotation.Root({
   postings: last<Posting[]>([]),
   repeats: last<number>(0),
   duplicates: last<number>(0),
-  filtered: last<Filtered[]>([]),
+  // Code gates (#16), then model gates (#17).
+  filtered: appended<Filtered>(),
   dropped: last<Partial<Record<Source, number>>>({}),
   judged: last<Judgement[]>([]),
   top: last<Ranked[]>([]),
+  rest: last<Ranked[]>([]),
   explanations: last<Explanation[]>([]),
   postingSkills: last<SkillSets>({}),
   coverage: last<Coverage[]>([]),
