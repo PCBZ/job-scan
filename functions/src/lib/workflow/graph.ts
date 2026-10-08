@@ -85,9 +85,9 @@ export function buildWorkflow(
         return { postings: fresh, repeats, duplicates };
       })
       .edge("dedupe", "hard_gates")
-      .node("hard_gates", (s) => {
-        const { kept, filtered } = steps.hardGates(s.postings, config(s));
-        return { postings: kept, filtered };
+      .node("hard_gates", async (s) => {
+        const { kept, filtered, notes } = await steps.hardGates(s.postings, config(s));
+        return { postings: kept, filtered, notes };
       })
       .branch("hard_gates", (s) => (s.postings.length > 0 ? "continue" : "nothing_left"), {
         continue: "await_resumes",
@@ -160,6 +160,7 @@ export function buildWorkflow(
           explanations: s.explanations,
           coverage: s.coverage,
           warnings: s.warnings,
+          notes: s.notes,
         }),
       }))
       .edge("render_report", "deliver")

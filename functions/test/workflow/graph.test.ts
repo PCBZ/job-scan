@@ -41,6 +41,7 @@ describe("workflow graph", () => {
       dropped: {},
       repeats: 1,
       duplicates: 2,
+      notes: ["salary not compared for 1 posting(s): currency unknown"],
     });
   });
 

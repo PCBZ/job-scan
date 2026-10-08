@@ -150,6 +150,13 @@ needs_sponsorship = "unknown"
 # quoted in another currency a numeric floor here compares across units.
 min_salary_usd = 0
 
+# The cloud run's salary floor, in salary_currency (CAD or USD); it supersedes
+# min_salary_usd when set. A posting's currency comes from its salary text
+# (CA$, USD) or, for a bare "$", from its location's country, and is converted
+# at the Bank of Canada's daily rate. Unknown currencies are never filtered.
+# min_salary = 0
+# salary_currency = "CAD"
+
 # Weighted at 35% of the score. List what you can defend in an interview, not
 # everything you have touched. Empty means "infer from the resume".
 core_skills = []

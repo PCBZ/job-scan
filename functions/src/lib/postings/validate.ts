@@ -2,6 +2,7 @@
 // (or a model) that loses a row's alignment produces plausible nonsense, not
 // an error, and a schema can't see it: every field is still a string.
 
+import { isPlaceName, regionCode } from "./places.js";
 import type { Posting, Source } from "./types.js";
 
 /** Glassdoor badges and ages, LinkedIn's trailing lines: never a company or title. */
@@ -15,30 +16,16 @@ const MONEY =
   /[$£€]\s?\d|\b\d+(\.\d+)?\s?k\b|\b(a|an|per)\s+(year|hour|month)\b|\/\s?(yr|hr|year|hour)\b/i;
 /** "Vancouver, BC": a city with a province or state code. */
 const CITY_CODE = /^[A-Z][A-Za-z .'-]+,\s*([A-Z]{2})$/;
-// Only real codes, so a title like "Developer, AI" is not a place.
-const PLACE_CODES = new Set(
-  (
-    "AB BC MB NB NL NS NT NU ON PE QC SK YT " +
-    "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT " +
-    "NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY"
-  ).split(" "),
-);
-/** Region names read as a company or title: provinces, countries, "Remote". */
-const REGIONS = new Set(
-  (
-    "remote|canada|united states|usa|alberta|british columbia|manitoba|new brunswick|" +
-    "newfoundland and labrador|northwest territories|nova scotia|nunavut|ontario|" +
-    "prince edward island|quebec|saskatchewan|yukon"
-  ).split("|"),
-);
 const norm = (s: string) => s.trim().toLowerCase();
 
 function looksLikePlace(value: string, location: string): boolean {
   const v = norm(value);
   return (
     v === norm(location) ||
-    PLACE_CODES.has(CITY_CODE.exec(value.trim())?.[1] ?? "") ||
-    REGIONS.has(v)
+    // Only real codes, so a title like "Developer, AI" is not a place.
+    regionCode(CITY_CODE.exec(value.trim())?.[1] ?? "") !== undefined ||
+    v === "remote" ||
+    isPlaceName(value)
   );
 }
 

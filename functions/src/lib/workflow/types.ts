@@ -8,10 +8,11 @@
 import type { AppConfig } from "../config/load.js";
 import type { AllAccountsFailed, FetchedMessage, FetchPayload } from "../mail/types.js";
 import type { RepairTurn, TokenUsage } from "../model/types.js";
+import type { Filtered } from "../postings/gates.js";
 import type { Posting, Source } from "../postings/types.js";
 import type { ResumeSet, ResumeVariant } from "../resume/load.js";
 
-export type { Posting };
+export type { Filtered, Posting };
 
 // Shapes the node issues define; the graph only moves them between nodes.
 /** A posting with gates, rubric score, variant and evidence. Shape: #17. */
@@ -24,8 +25,6 @@ export type Explanation = Record<string, unknown>;
 export type SkillSets = Record<string, string[]>;
 /** Coverage of a top pick's requirements by its variant. Shape: #28. */
 export type Coverage = Record<string, unknown>;
-/** A posting a hard gate removed, with the reason. Shape: #16. */
-export type Filtered = Record<string, unknown>;
 /** The report every channel renders from. Shape: #19. */
 export type Report = Record<string, unknown>;
 
@@ -79,7 +78,11 @@ export interface DeterministicSteps {
     postings: Posting[],
     config: AppConfig,
   ): Promise<{ fresh: Posting[]; repeats: number; duplicates: number }>;
-  hardGates(postings: Posting[], config: AppConfig): { kept: Posting[]; filtered: Filtered[] };
+  /** Kept postings may carry gate_questions; notes say what a gate couldn't compare. */
+  hardGates(
+    postings: Posting[],
+    config: AppConfig,
+  ): Promise<{ kept: Posting[]; filtered: Filtered[]; notes: string[] }>;
   verifyJudgements(judged: Judgement[], resumes: ResumeSet): string[];
   rank(judged: Judgement[], config: AppConfig): Ranked[];
   verifyExplanations(explained: Explanation[], resumes: ResumeSet): string[];
@@ -111,6 +114,8 @@ export interface ReportInput {
   explanations: Explanation[];
   coverage: Coverage[];
   warnings: string[];
+  /** What a gate couldn't compare, said once in the report. */
+  notes: string[];
 }
 
 /** Told about every node run, for per-node telemetry (#31). */

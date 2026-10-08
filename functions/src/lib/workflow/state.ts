@@ -4,12 +4,12 @@ import { Annotation } from "@langchain/langgraph";
 import type { AppConfig } from "../config/load.js";
 import type { AllAccountsFailed, FetchPayload } from "../mail/types.js";
 import type { RepairTurn, TokenUsage } from "../model/types.js";
+import type { Filtered } from "../postings/gates.js";
 import type { Source } from "../postings/types.js";
 import type { ResumeSet } from "../resume/load.js";
 import type {
   Coverage,
   Explanation,
-  Filtered,
   Judgement,
   Outcome,
   Posting,
@@ -75,6 +75,7 @@ export const WorkflowState = Annotation.Root({
     default: () => ({ extract: NO_LOOP, judge: NO_LOOP, explain: NO_LOOP }),
   }),
   warnings: appended<string>(),
+  notes: appended<string>(),
   usage: Annotation<Record<string, TokenUsage>>({
     reducer: (old, next) => {
       const out = { ...old };

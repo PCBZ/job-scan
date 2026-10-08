@@ -43,6 +43,9 @@ const profile = z.strictObject({
   open_to_relocation: z.boolean().optional(),
   needs_sponsorship: z.union([z.boolean(), z.literal("unknown")]).optional(),
   min_salary_usd: z.number().nonnegative().optional(),
+  // Supersede min_salary_usd when set: an annual floor in salary_currency.
+  min_salary: z.number().nonnegative().optional(),
+  salary_currency: z.enum(["CAD", "USD"]).optional(),
   core_skills: strings.optional(),
   exclude_keywords: strings.optional(),
 });

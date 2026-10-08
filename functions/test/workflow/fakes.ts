@@ -71,11 +71,19 @@ export function fakes(o: FakeOptions = {}) {
       log.push("dedupe");
       return { fresh: postings, repeats: 1, duplicates: 2 };
     },
-    hardGates(postings) {
+    async hardGates(postings) {
       log.push("hard_gates");
       return o.keepNone
-        ? { kept: [], filtered: postings.map((p) => ({ ...p })) }
-        : { kept: postings, filtered: [] };
+        ? {
+            kept: [],
+            filtered: postings.map((p) => ({ posting: p, gate: "location" as const, reason: "x" })),
+            notes: [],
+          }
+        : {
+            kept: postings,
+            filtered: [],
+            notes: ["salary not compared for 1 posting(s): currency unknown"],
+          };
     },
     verifyJudgements() {
       log.push("verify_judgements");
@@ -102,6 +110,7 @@ export function fakes(o: FakeOptions = {}) {
         dropped: input.dropped,
         repeats: input.repeats,
         duplicates: input.duplicates,
+        notes: input.notes,
       };
     },
   };
