@@ -135,7 +135,7 @@ export function buildWorkflow(
         check: "verify_explanations",
         next: "canonicalize_posting_skills",
         output: (s) => s.explanations,
-        run: (s) => ({ problems: steps.verifyExplanations(s.explanations, resumes(s)) }),
+        run: (s) => ({ problems: steps.verifyExplanations(s.explanations, s.top, resumes(s)) }),
       })
       .node("canonicalize_posting_skills", async (s, signal) => {
         const r = await model.canonicalizePostingSkills({ top: s.top }, signal);

@@ -54,7 +54,7 @@ describe("verifyJudgements", () => {
             variant: "Backend",
             skills: dimension({ evidence: "Led a team of 12" }),
             domain: dimension(),
-            seniority: dimension({ gap: "x" }),
+            seniority: dimension({ gap: "8+ years required" }),
           },
         ],
       },
@@ -67,7 +67,28 @@ describe("verifyJudgements", () => {
     ]);
   });
 
-  it("flags a variant with no gap", () => {
+  it("flags a gap that isn't a requirement the posting states", () => {
+    const j = judgement({
+      answer: {
+        variants: [
+          {
+            variant: "Backend",
+            skills: dimension(),
+            domain: dimension({ gap: "product area not stated" }),
+            seniority: dimension(),
+          },
+        ],
+      },
+    });
+    expect(verifyJudgements([j], RESUMES)).toEqual([
+      problemAbout(
+        postingId(j.posting),
+        'Backend domain: gap "product area not stated" is not a requirement the posting states; copy it verbatim, or leave it empty',
+      ),
+    ]);
+  });
+
+  it("allows a variant with no gap: rank caps it instead", () => {
     const j = judgement({
       answer: {
         variants: [
@@ -75,9 +96,7 @@ describe("verifyJudgements", () => {
         ],
       },
     });
-    expect(verifyJudgements([j], RESUMES)[0]).toContain(
-      "Backend names no gap; find one, or lower the levels",
-    );
+    expect(verifyJudgements([j], RESUMES)).toEqual([]);
   });
 
   it("flags variants missing, extra or out of order", () => {
@@ -95,7 +114,7 @@ describe("verifyJudgements", () => {
   });
 
   it("flags a failed gate whose quote isn't in the posting, and allows a passing one without", () => {
-    const p = { requirements: ["Must be a US citizen"] };
+    const p = { requirements: ["Must be a US citizen", "8+ years required"] };
     const ok = judgement({
       posting: p,
       asked: ASKED,

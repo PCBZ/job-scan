@@ -37,7 +37,10 @@ export function judgement(
   over: { posting?: Partial<Posting>; asked?: AskedGate[]; answer?: Partial<JudgeAnswer> } = {},
 ): Judgement {
   return {
-    posting: posting({ requirements: ["Go", "Postgres", "Kafka"], ...over.posting }),
+    posting: posting({
+      requirements: ["Go", "Postgres", "Kafka", "8+ years required"],
+      ...over.posting,
+    }),
     asked: over.asked ?? [],
     answer: answer(over.answer),
   };
@@ -50,6 +53,7 @@ export const rankedOf = (j: Judgement, score = 80): Ranked => ({
   either: undefined,
   score,
   scores: { Backend: score },
+  caps: [],
   confidence: "high",
   noted: [],
 });

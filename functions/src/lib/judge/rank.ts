@@ -1,6 +1,7 @@
 // The rank node: levels become scores in code. Each variant is weighted
-// 35/25/20/10/10 into 0–100, the best one is named (or "either" when two are
-// within 5 points), thin postings are capped, and the floor and top N apply.
+// 35/25/20/10/10 into 0–100 and capped at 70 when the posting is thin or the
+// variant has no stated gap. The best one is named (or "either" when two are
+// within 5 points), and the floor and top N apply.
 // Failed model gates leave with their reasons; noted ones stay, flagged.
 
 import type { AppConfig } from "../config/load.js";
@@ -22,7 +23,8 @@ export const WEIGHTS = { skills: 35, domain: 25, seniority: 20, location: 10, si
 const EITHER_WITHIN = 5;
 /** SKILL.md: a posting with thin requirements is capped and low-confidence. */
 const THIN_BELOW = 3;
-const THIN_CAP = 70;
+/** The score a capped variant can't exceed: thin requirements, or no stated gap. */
+const CAP = 70;
 
 export interface Ranked {
   posting: Posting;
@@ -34,6 +36,8 @@ export interface Ranked {
   score: number;
   /** Every variant's score, before any cap. */
   scores: Record<string, number>;
+  /** Why the chosen variant's score was capped at 70, if it was. */
+  caps: string[];
   confidence: "high" | "medium" | "low";
   /** Gates switched off by a sentinel that this posting would have failed. */
   noted: string[];
@@ -75,18 +79,28 @@ export function rank(judged: Judgement[], config: AppConfig): RankResult {
       });
       continue;
     }
-    const scores = Object.fromEntries(j.answer.variants.map((v) => [v.variant, scoreOf(j, v)]));
-    const [best, second] = Object.entries(scores).sort(([, a], [, b]) => b - a);
-    if (!best) continue;
     const thin = j.posting.requirements.length < THIN_BELOW;
+    const variants = j.answer.variants.map((v) => {
+      const caps = [
+        ...(thin ? ["thin requirements"] : []),
+        // SKILL.md: a fit with no stated gap is not credible; lower the score.
+        ...(!v.skills.gap && !v.domain.gap && !v.seniority.gap ? ["no stated gap"] : []),
+      ];
+      const raw = scoreOf(j, v);
+      return { name: v.variant, raw, score: caps.length ? Math.min(raw, CAP) : raw, caps };
+    });
+    // The best variant after its caps: a capped one can lose to one with a gap.
+    const [best, second] = variants.sort((x, y) => y.score - x.score);
+    if (!best) continue;
     scored.push({
       posting: j.posting,
       judgement: j,
-      variant: best[0],
-      either: second && best[1] - second[1] <= EITHER_WITHIN ? second[0] : undefined,
-      score: thin ? Math.min(best[1], THIN_CAP) : best[1],
-      scores,
-      confidence: thin ? "low" : j.answer.unknowns.length > 0 ? "medium" : "high",
+      variant: best.name,
+      either: second && best.score - second.score <= EITHER_WITHIN ? second.name : undefined,
+      score: best.score,
+      scores: Object.fromEntries(variants.map((v) => [v.name, v.raw])),
+      caps: best.caps,
+      confidence: best.caps.length ? "low" : j.answer.unknowns.length > 0 ? "medium" : "high",
       noted: outcomes
         .filter((g) => g.fails && g.mode === "note")
         .map((g) => `${g.reason} ("${g.quote}")`),

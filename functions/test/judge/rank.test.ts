@@ -56,8 +56,46 @@ describe("rank", () => {
       answer: { variants: [variant("A", "exact")] },
     });
     const [r] = rank([j], config()).top;
-    expect([r?.score, r?.confidence]).toEqual([70, "low"]);
+    expect([r?.score, r?.confidence, r?.caps]).toEqual([70, "low", ["thin requirements"]]);
     expect(r?.scores).toEqual({ A: 98 });
+  });
+
+  it("caps a variant with no stated gap at 70, with low confidence", () => {
+    const gapless = {
+      variant: "A",
+      skills: dimension({ level: "exact" }),
+      domain: dimension({ level: "exact" }),
+      seniority: dimension({ level: "exact" }),
+    };
+    const [r] = rank([judgement({ answer: { variants: [gapless] } })], config()).top;
+    expect([r?.score, r?.confidence, r?.caps]).toEqual([70, "low", ["no stated gap"]]);
+    expect(r?.scores).toEqual({ A: 98 });
+  });
+
+  it("picks by the capped score, so a variant with a gap can win", () => {
+    const gapless = {
+      variant: "A",
+      skills: dimension({ level: "exact" }),
+      domain: dimension({ level: "exact" }),
+      seniority: dimension({ level: "exact" }),
+    };
+    const [r] = rank(
+      [judgement({ answer: { variants: [gapless, variant("B", "strong")] } })],
+      config(),
+    ).top;
+    // A: 98 capped to 70. B: 78 with a gap.
+    expect([r?.variant, r?.score, r?.either, r?.caps]).toEqual(["B", 78, undefined, []]);
+  });
+
+  it("names every reason a score was capped", () => {
+    const gapless = {
+      variant: "A",
+      skills: dimension(),
+      domain: dimension(),
+      seniority: dimension(),
+    };
+    const j = judgement({ posting: { requirements: ["Go"] }, answer: { variants: [gapless] } });
+    expect(rank([j], config()).top[0]?.caps).toEqual(["thin requirements", "no stated gap"]);
   });
 
   it("is medium-confidence when the alert left something unknown", () => {

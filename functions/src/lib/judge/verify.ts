@@ -1,7 +1,7 @@
 // The verify_judgements node: a judgement's reasons must be real. Resume quotes
-// must be in that resume, a failed gate must quote the posting, and every
-// variant must name a gap. Problems name their posting, so a repair goes back
-// to that posting only.
+// must be in that resume, and a failed gate and every gap must quote the
+// posting. A variant may have no gap; rank caps it rather than have the model
+// invent one. Problems name their posting, so a repair goes back to it only.
 
 import type { Posting } from "../postings/types.js";
 import type { ResumeSet } from "../resume/load.js";
@@ -30,11 +30,11 @@ const flat = (s: string) =>
     .toLowerCase()
     .replace(/\s+/g, " ")
     .replace(/^[\s\p{P}]+|[\s\p{P}]+$/gu, "");
-const quotes = (text: string, quote: string) =>
+export const quotes = (text: string, quote: string) =>
   flat(quote) !== "" && flat(text).includes(flat(quote));
 
 /** Everything the model was shown about the posting, which a gate may quote. */
-const postingText = (p: Posting) => Object.values(postingFields(p)).flat().join("\n");
+export const postingText = (p: Posting) => Object.values(postingFields(p)).flat().join("\n");
 
 export function verifyJudgements(judged: Judgement[], resumes: ResumeSet): string[] {
   const texts = new Map(resumes.variants.map((v) => [v.name, v.text]));
@@ -64,8 +64,13 @@ export function verifyJudgements(judged: Judgement[], resumes: ResumeSet): strin
           say(`${v.variant} ${dim}: evidence "${evidence}" is not a line of that resume`);
         }
       }
-      if (!v.skills.gap && !v.domain.gap && !v.seniority.gap) {
-        say(`${v.variant} names no gap; find one, or lower the levels`);
+      for (const dim of ["skills", "domain", "seniority"] as const) {
+        const { gap } = v[dim];
+        if (gap && !quotes(postingText(posting), gap)) {
+          say(
+            `${v.variant} ${dim}: gap "${gap}" is not a requirement the posting states; copy it verbatim, or leave it empty`,
+          );
+        }
       }
     }
   }
