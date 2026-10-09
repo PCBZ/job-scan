@@ -29,5 +29,7 @@ module "function_app" {
     # A Key Vault reference, resolved by the app's identity. The secret's value
     # is added by hand, so it never passes through Terraform state.
     "TYPESAFE_API_KEY" = "@Microsoft.KeyVault(SecretUri=${module.key_vault.uri}secrets/typesafe-api-key/)"
+    # The Telegram bot's token (#21), also a Key Vault reference added by hand.
+    "TELEGRAM_BOT_TOKEN" = "@Microsoft.KeyVault(SecretUri=${module.key_vault.uri}secrets/telegram-bot-token/)"
   }
 }

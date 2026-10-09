@@ -17,6 +17,8 @@
     "eval:extract": "EVAL_LIVE=1 vitest run test/eval/extract.live.test.ts",
     "eval:judge": "EVAL_LIVE=1 vitest run test/eval/judge.live.test.ts",
     "eval:email": "EVAL_LIVE=1 vitest run test/eval/email.live.test.ts",
+    "eval:telegram": "EVAL_LIVE=1 vitest run test/eval/telegram.live.test.ts",
+    "telegram:chat-id": "node scripts/telegram-chat-id.mjs",
     "eval:jev": "EVAL_LIVE=1 vitest run test/eval/jev.live.test.ts",
     "lint": "biome check .",
     "format": "biome check --write .",

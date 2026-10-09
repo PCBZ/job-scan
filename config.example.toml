@@ -175,3 +175,9 @@ suggest_variant = true      # name the best-fitting resume variant per posting
 # The recipient only ever comes from here, never from mail content.
 # email_account = "personal"
 # email_to = "me@example.com"
+
+# The cloud run also sends a short Telegram summary with Approve / Skip buttons
+# to this chat. The bot token stays out of this file (Key Vault in Azure,
+# TELEGRAM_BOT_TOKEN locally). Find the id with `npm run telegram:chat-id`
+# after messaging the bot once.
+# telegram_chat_id = 123456789
