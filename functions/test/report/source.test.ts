@@ -116,7 +116,16 @@ describe("buildReport", () => {
       NOW,
     );
     expect(all.alerts).toHaveLength(1);
-    expect(all.funnel).toContain("across no mailboxes");
+    expect(all.funnel).toBe("Every mailbox failed to sync, so nothing was scanned today.");
+    // Even with no failure detail to list, it still reads as a failure.
+    const bare = buildReport(
+      input({ outcome: "no_mail", mail: { error: "all_accounts_failed", failures: [] } }),
+      NOW,
+    );
+    expect([bare.alerts, bare.funnel]).toEqual([
+      [],
+      "Every mailbox failed to sync, so nothing was scanned today.",
+    ]);
   });
 
   it("joins each top pick with its explanation", () => {

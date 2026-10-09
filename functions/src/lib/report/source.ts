@@ -91,10 +91,13 @@ export function buildReport(input: ReportInput, now: Date = new Date()): Report 
   const accounts = payload
     ? `${payload.stats.accounts_scanned} of ${payload.stats.accounts_scanned + payload.stats.accounts_failed} mailboxes`
     : "no mailboxes";
+  // Every mailbox failing is a failure, not a quiet day, whatever the list says.
   const funnel =
-    input.outcome === "no_mail"
-      ? `No new mail across ${accounts}.`
-      : `Scanned ${plural(emails, "new email")} across ${accounts} → ${plural(postings, "posting")} → ${newPostings} new → ${inScope} in scope → ${input.top.length} worth your time.`;
+    mail && "error" in mail
+      ? "Every mailbox failed to sync, so nothing was scanned today."
+      : input.outcome === "no_mail"
+        ? `No new mail across ${accounts}.`
+        : `Scanned ${plural(emails, "new email")} across ${accounts} → ${plural(postings, "posting")} → ${newPostings} new → ${inScope} in scope → ${input.top.length} worth your time.`;
   const counts = [
     payload && payload.stats.already_seen > 0
       ? `${plural(payload.stats.already_seen, "email")} skipped as already seen`

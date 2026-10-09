@@ -79,6 +79,14 @@ describe("renderHtml", () => {
     expect(html.match(/Nothing\.<\/p>/g)).toHaveLength(2);
   });
 
+  it("points to the near misses only when there are some", () => {
+    const withOthers = renderHtml(report({ top: [] }));
+    expect(withOthers).toContain("Nothing cleared the floor today. The near misses are below.");
+    const bare = renderHtml(report({ top: [], others: [] }));
+    expect(bare).toContain("Nothing cleared the floor today.</p>");
+    expect(bare).not.toContain("near misses");
+  });
+
   it("drops the button and the link when a posting has no URL", () => {
     const html = renderHtml(
       report({ top: [{ ...top, url: "" }], others: [{ ...other, url: "" }] }),
