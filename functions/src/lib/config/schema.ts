@@ -55,6 +55,10 @@ const report = z.strictObject({
   min_score_to_recommend: z.number().min(0).max(100).optional(),
   repeat_suppression_days: z.number().int().nonnegative().optional(),
   suggest_variant: z.boolean().optional(),
+  // The cloud run's email (#20): which Gmail [[account]] sends it, reusing its
+  // app password, and to whom. Unset email_account sends no email.
+  email_account: z.string().min(1).optional(),
+  email_to: z.email().optional(),
 });
 
 // `lib` is a path on the operator's machine, used only by the local skill. The

@@ -293,6 +293,7 @@
                         <tr>
                             <td class="card" style="padding: 20px; font-family: sans-serif; font-size: 15px; line-height: 22px; color: #344054;">
                                 <h1 style="margin: 0 0 12px; font-size: 26px; line-height: 32px; color: #101828; font-weight: bold;">Job Scan — {{day}}</h1>
+                                {{#webUrl}}<p style="margin: 0 0 12px; font-size: 13px;"><a href="{{webUrl}}" style="color: #1d4ed8; text-decoration: underline;">View in a browser</a></p>{{/webUrl}}
                                 {{#alerts}}<p style="margin: 0 0 8px; color: #b42318; font-weight: bold;">⚠️ {{.}}</p>{{/alerts}}
                                 <p style="margin: 0 0 8px;">{{funnel}}</p>
                                 {{#counts}}<p style="margin: 0 0 8px; color: #667085;" class="muted"><i>{{counts}}</i></p>{{/counts}}

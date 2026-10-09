@@ -87,6 +87,13 @@ describe("renderHtml", () => {
     expect(bare).not.toContain("near misses");
   });
 
+  it("links to the browser copy only when given one", () => {
+    expect(renderHtml(SAMPLE, "https://reports.example/x?sig=a&b=c")).toContain(
+      'href="https:&#x2F;&#x2F;reports.example&#x2F;x?sig&#x3D;a&amp;b&#x3D;c" style="color: #1d4ed8; text-decoration: underline;">View in a browser</a>',
+    );
+    expect(renderHtml(SAMPLE)).not.toContain("View in a browser");
+  });
+
   it("drops the button and the link when a posting has no URL", () => {
     const html = renderHtml(
       report({ top: [{ ...top, url: "" }], others: [{ ...other, url: "" }] }),

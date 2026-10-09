@@ -13,10 +13,11 @@ const TEMPLATE = readFileSync(new URL("../../../templates/report.html", import.m
 const BADGE = { high: "#067647", medium: "#b54708", low: "#667085" } as const;
 
 /** The report shaped for the template: Mustache has no logic, so this does it. */
-export function view(r: Report) {
+export function view(r: Report, webUrl?: string) {
   const best = r.top[0];
   return {
     day: r.day,
+    webUrl: webUrl ?? "",
     preview: best ? `${best.title} at ${best.company}, ${best.score}/100` : r.funnel,
     alerts: r.alerts,
     funnel: r.funnel,
@@ -39,6 +40,7 @@ export function view(r: Report) {
   };
 }
 
-export function renderHtml(r: Report): string {
-  return Mustache.render(TEMPLATE, view(r));
+/** `webUrl`, the report's SAS link, adds "View in a browser" for the email. */
+export function renderHtml(r: Report, webUrl?: string): string {
+  return Mustache.render(TEMPLATE, view(r, webUrl));
 }

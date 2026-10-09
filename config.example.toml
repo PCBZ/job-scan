@@ -168,3 +168,10 @@ max_top_picks = 5
 min_score_to_recommend = 60
 repeat_suppression_days = 30
 suggest_variant = true      # name the best-fitting resume variant per posting
+
+# The cloud run emails the full report (the local skill ignores these). It is
+# sent through Gmail SMTP from the [[account]] named here, reusing that
+# account's app password, to email_to (default: that account's own address).
+# The recipient only ever comes from here, never from mail content.
+# email_account = "personal"
+# email_to = "me@example.com"
