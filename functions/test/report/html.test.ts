@@ -1,82 +1,50 @@
-import mjml2html from "mjml";
 import { describe, expect, it } from "vitest";
-import { renderHtml, reportMjml } from "../../src/lib/report/html.js";
-import type { Report, TopPick } from "../../src/lib/report/types.js";
+import { renderHtml, view } from "../../src/lib/report/html.js";
+import type { OtherPick, Report, TopPick } from "../../src/lib/report/types.js";
+import { SAMPLE } from "./sample.js";
 
-const top: TopPick = {
-  title: "Backend Engineer",
-  company: "Lumen Ridge",
-  location: "Vancouver, BC · hybrid",
-  salary: "$120K",
-  url: "https://jobs.example/1?a=1&b=2",
-  score: 87,
-  confidence: "medium",
-  variant: "Backend",
-  either: "Platform",
-  account: "personal",
-  fit: { sentence: "Shipped it.", quote: "Built payment services in Go" },
-  gap: { requirement: "8+ years required", advice: "Lead with scope." },
-  unknown: "team size",
-  caps: [],
-  noted: [],
-};
-
-function report(over: Partial<Report> = {}): Report {
-  return {
-    day: "2026-10-08",
-    outcome: "report",
-    alerts: [],
-    funnel: "Scanned 14 new emails → 4 worth your time.",
-    counts: "",
-    notes: [],
-    top: [top],
-    others: [],
-    filtered: [],
-    suspicious: "not checked",
-    housekeeping: [],
-    ...over,
-  };
-}
+const top = SAMPLE.top[0] as TopPick;
+const other = SAMPLE.others[0] as OtherPick;
+const report = (over: Partial<Report> = {}): Report => ({ ...SAMPLE, ...over });
 
 describe("renderHtml", () => {
-  it("compiles under strict validation into email-safe tables", async () => {
-    const html = await renderHtml(report());
-    expect(html).toContain("<table");
-    expect(html).toContain("Job Scan — 2026-10-08");
-    expect(html).toContain("87/100 · confidence: medium");
-    expect(html).toContain("send <b>Backend</b> or <b>Platform</b>");
-    expect(html).toContain("Built payment services in Go");
-    expect(html).toContain("8+ years required. Lead with scope.");
-    expect(html).toContain('href="https://jobs.example/1?a=1&amp;b=2"');
+  it("fills every section of the template", () => {
+    const html = renderHtml(SAMPLE);
+    for (const text of [
+      "<title>Job Scan — 2026-10-08</title>",
+      "⚠️ school mailbox failed to sync",
+      "→ 2 worth your time.",
+      "<i>38 emails skipped as already seen.",
+      "salary not compared for 2 posting(s): currency unknown",
+      "87/100",
+      "1. Backend Engineer, Payments — Lumen Ridge",
+      "Send <b>Backend</b>",
+      "Send <b>Data or Backend</b>",
+      "capped: no stated gap",
+      "<b>Gap:</b> Experience with Kafka Streams. Lead with",
+      "<b>Gap:</b> The requirements the alert lists are all met.",
+      "<b>Unknown from the email:</b> team size",
+      "<b>Would have been filtered:</b> Requires citizenship",
+      "Also worth a look",
+      "5+ years of Kubernetes",
+      "location (1)",
+      "outside locations: Toronto, ON",
+      "Not checked: no step looks for suspicious mail yet.",
+      "personal hit the message budget",
+    ]) {
+      expect(html, text).toContain(text.replace(/"/g, "&quot;"));
+    }
   });
 
-  it("is valid MJML in every section, so strict compilation never trips", async () => {
-    const full = report({
-      alerts: ["a"],
-      notes: ["n"],
-      counts: "c.",
-      others: [
-        {
-          title: "t",
-          company: "c",
-          location: "l",
-          salary: "s",
-          url: "https://x.example",
-          score: 50,
-          check: "k",
-        },
-      ],
-      filtered: [
-        { gate: "location", items: [{ title: "t", company: "c", location: "l", reason: "r" }] },
-      ],
-      housekeeping: ["h"],
-      top: [{ ...top, caps: ["no stated gap"], noted: ["n"] }],
-    });
-    const { errors } = await mjml2html(reportMjml(full), { validationLevel: "soft" });
-    expect(errors).toEqual([]);
+  it("keeps Cerberus's mail-client fixes and its license notice", () => {
+    const html = renderHtml(SAMPLE);
+    expect(html).toContain("<!--[if mso]>");
+    expect(html).toContain("@media (prefers-color-scheme: dark)");
+    expect(html).toContain("Copyright (c) 2017 Ted Goas");
+    expect(html).not.toMatch(/\{\{|\}\}/);
   });
 
-  it("escapes every string from the mail, in text and in links", async () => {
+  it("escapes every string from the mail, in text and in links", () => {
     const hostile = report({
       top: [
         {
@@ -95,72 +63,39 @@ describe("renderHtml", () => {
         },
       ],
     });
-    const html = await renderHtml(hostile);
+    const html = renderHtml(hostile);
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("<img src=x");
-    expect(html).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
+    expect(html).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;&#x2F;script&gt;");
     expect(html).toContain("A &amp; B");
     expect(html).not.toContain('"onmouseover="');
   });
 
-  it("states an empty day honestly, and never says Nothing for Suspicious", () => {
-    const mjml = reportMjml(report({ top: [] }));
-    expect(mjml).toContain("Nothing cleared the floor today.");
-    expect(mjml).toContain("Not checked: no step looks for suspicious mail yet.");
-    expect(mjml).not.toContain("Also worth a look");
+  it("states an empty day honestly, and leaves out empty tables", () => {
+    const html = renderHtml(report({ top: [], others: [], filtered: [], housekeeping: [] }));
+    expect(html).toContain("Nothing cleared the floor today.");
+    expect(html).not.toContain("Also worth a look");
+    expect(html).toContain("<h2");
+    expect(html.match(/Nothing\.<\/p>/g)).toHaveLength(2);
   });
 
-  it("shows caps, would-have-been-filtered notes, a stated no-gap, and the alerts", () => {
-    const mjml = reportMjml(
-      report({
-        alerts: ["school mailbox failed to sync"],
-        top: [
-          {
-            ...top,
-            caps: ["no stated gap"],
-            noted: ["Requires citizenship"],
-            gap: { requirement: "", advice: "All listed requirements met." },
-          },
-        ],
-      }),
+  it("drops the button and the link when a posting has no URL", () => {
+    const html = renderHtml(
+      report({ top: [{ ...top, url: "" }], others: [{ ...other, url: "" }] }),
     );
-    expect(mjml).toContain("(capped: no stated gap)");
-    expect(mjml).toContain("<b>Would have been filtered:</b> Requires citizenship");
-    expect(mjml).toContain("<b>Gap:</b> All listed requirements met.");
-    expect(mjml).toContain("⚠️ school mailbox failed to sync");
-    const noted = reportMjml(
-      report({ notes: ["salary not compared for 2 posting(s): currency unknown"] }),
-    );
-    expect(noted).toContain("<li>salary not compared for 2 posting(s): currency unknown</li>");
+    expect(html).not.toContain("Open the posting");
+    expect(html).not.toContain('href=""');
   });
+});
 
-  it("lays out the near misses and the filtered as tables", () => {
-    const mjml = reportMjml(
-      report({
-        others: [
-          {
-            title: "Data Engineer",
-            company: "Q",
-            location: "Vancouver",
-            salary: "",
-            url: "",
-            score: 55,
-            check: "years required",
-          },
-        ],
-        filtered: [
-          {
-            gate: "location",
-            items: [
-              { title: "SRE", company: "N", location: "Toronto, ON", reason: "outside locations" },
-            ],
-          },
-        ],
-      }),
-    );
-    expect(mjml).toContain("The one thing to check");
-    expect(mjml).toContain("years required");
-    expect(mjml).toContain("location (1)");
-    expect(mjml).toContain("Toronto, ON");
+describe("view", () => {
+  it("previews the best pick, colours the badge by confidence, numbers the picks", () => {
+    const v = view(SAMPLE);
+    expect(v.preview).toBe("Backend Engineer, Payments at Lumen Ridge, 87/100");
+    expect(v.top.map((p) => [p.n, p.badge])).toEqual([
+      [1, "#b54708"],
+      [2, "#667085"],
+    ]);
+    expect(view(report({ top: [] })).preview).toBe(SAMPLE.funnel);
   });
 });
