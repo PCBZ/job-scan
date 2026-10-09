@@ -5,12 +5,15 @@
 // Message the bot once first (e.g. /start). Prints chat ids and names only,
 // never message text, and never the token.
 
+/** The Bot API endpoint: https://core.telegram.org/bots/api#making-requests */
+const TELEGRAM_API = "https://api.telegram.org";
+
 const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
 if (!token) {
   console.error("Set TELEGRAM_BOT_TOKEN first.");
   process.exit(1);
 }
-const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
+const res = await fetch(`${TELEGRAM_API}/bot${token}/getUpdates`);
 const body = await res.json();
 if (!body.ok) {
   console.error(`Telegram said: ${body.description ?? res.status}`);

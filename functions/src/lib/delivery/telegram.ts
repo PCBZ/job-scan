@@ -9,7 +9,14 @@ import type { Report, TopPick } from "../report/types.js";
 
 type Env = Record<string, string | undefined>;
 
-/** Telegram's limit on a message's text. */
+/** The Bot API endpoint: https://core.telegram.org/bots/api#making-requests */
+const TELEGRAM_API = "https://api.telegram.org";
+
+/**
+ * A message's text is "1-4096 characters after entities parsing":
+ * https://core.telegram.org/bots/api#sendmessage. We count the HTML tags too,
+ * so the check is stricter than Telegram's.
+ */
 const MAX_TEXT = 4096;
 
 export class TelegramConfigError extends Error {
@@ -44,12 +51,13 @@ export function telegramSettings(config: AppConfig, env: Env): TelegramSettings 
 
 /**
  * A posting's key in button callbacks: 16 hex characters of the SHA-256 of
- * its fingerprint, so "a:<fp16>" stays far under the 64-byte callback limit.
+ * its fingerprint, so "a:<fp16>" stays far under callback_data's "1-64 bytes":
+ * https://core.telegram.org/bots/api#inlinekeyboardbutton
  */
 export const fp16 = (p: Pick<TopPick, "company" | "title">) =>
   createHash("sha256").update(fingerprint(p)).digest("hex").slice(0, 16);
 
-/** Telegram's HTML mode needs only these escaped. */
+/** HTML mode needs only <, > and & escaped: https://core.telegram.org/bots/api#html-style */
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 function pickLines(p: TopPick, n: number): string {
@@ -101,7 +109,7 @@ export async function telegramReport(
   signal?: AbortSignal,
 ): Promise<void> {
   const { text, buttons } = telegramMessage(report, webUrl);
-  const res = await fetchFn(`https://api.telegram.org/bot${s.token}/sendMessage`, {
+  const res = await fetchFn(`${TELEGRAM_API}/bot${s.token}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({

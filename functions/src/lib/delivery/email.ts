@@ -11,6 +11,12 @@ import type { Report } from "../report/types.js";
 
 type Env = Record<string, string | undefined>;
 
+/**
+ * Gmail's SMTP server, over SSL on 465 with the account's app password:
+ * https://support.google.com/a/answer/176600. Azure blocks outbound 25, not 465.
+ */
+const GMAIL_SMTP = { host: "smtp.gmail.com", port: 465, secure: true } as const;
+
 export class EmailConfigError extends Error {
   override name = "EmailConfigError";
 }
@@ -59,9 +65,7 @@ export function subjectOf(r: Report): string {
 
 export function gmailTransport(s: EmailSettings): Transporter {
   return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    ...GMAIL_SMTP,
     auth: { user: s.user, pass: s.password },
   });
 }
