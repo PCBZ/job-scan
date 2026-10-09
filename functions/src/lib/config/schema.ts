@@ -59,6 +59,9 @@ const report = z.strictObject({
   // app password, and to whom. Unset email_account sends no email.
   email_account: z.string().min(1).optional(),
   email_to: z.email().optional(),
+  // The Telegram chat the daily summary goes to (#21); unset sends none. Not a
+  // secret: a bot can only message chats that have started it.
+  telegram_chat_id: z.union([z.string().min(1), z.number().int()]).optional(),
 });
 
 // `lib` is a path on the operator's machine, used only by the local skill. The
