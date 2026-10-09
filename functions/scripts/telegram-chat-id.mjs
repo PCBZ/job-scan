@@ -14,9 +14,15 @@ if (!token) {
   process.exit(1);
 }
 const res = await fetch(`${TELEGRAM_API}/bot${token}/getUpdates`);
-const body = await res.json();
-if (!body.ok) {
-  console.error(`Telegram said: ${body.description ?? res.status}`);
+// A proxy can answer with HTML, and a malformed success has no result list:
+// say so rather than report "no chats".
+const body = await res.json().catch(() => null);
+if (!body?.ok) {
+  console.error(body ? `Telegram said: ${body.description ?? res.status}` : `Unreadable reply (HTTP ${res.status}).`);
+  process.exit(1);
+}
+if (!Array.isArray(body.result)) {
+  console.error("Telegram's reply had no list of updates; try again.");
   process.exit(1);
 }
 const chats = new Map();

@@ -57,6 +57,13 @@ export function telegramSettings(config: AppConfig, env: Env): TelegramSettings 
 export const fp16 = (p: Pick<TopPick, "company" | "title">) =>
   createHash("sha256").update(fingerprint(p)).digest("hex").slice(0, 16);
 
+/** One mailbox alert, before escaping: its error detail can be long. */
+const ALERT_MAX = 300;
+/** Room kept after the header for the closing line. */
+const TAIL_ROOM = 100;
+
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
 /** HTML mode needs only <, > and & escaped: https://core.telegram.org/bots/api#html-style */
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -76,11 +83,20 @@ export interface TelegramMessage {
 }
 
 export function telegramMessage(r: Report, webUrl?: string): TelegramMessage {
-  const head = [
-    `<b>Job Scan — ${esc(r.day)}</b>`,
-    ...r.alerts.map((a) => `⚠️ ${esc(a)}`),
-    esc(r.funnel),
-  ].join("\n");
+  // Lengths are bounded on plain text, before any markup is added, so the
+  // message never needs a raw cut that could split a tag or an entity.
+  const alerts = r.alerts.map((a) => `⚠️ ${esc(clip(a, ALERT_MAX))}`);
+  const headFor = (k: number) =>
+    [
+      `<b>Job Scan — ${esc(r.day)}</b>`,
+      ...alerts.slice(0, k),
+      ...(k < alerts.length ? [`⚠️ …and ${alerts.length - k} more alerts in the full report.`] : []),
+      esc(r.funnel),
+    ].join("\n");
+  // Leave room after the header for the empty-day or "…and N more" line.
+  let k = alerts.length;
+  while (k > 0 && headFor(k).length > MAX_TEXT - TAIL_ROOM) k--;
+  const head = headFor(k);
   const empty = r.top.length === 0 ? "\n\nNothing cleared the floor today." : "";
 
   // Drop picks from the end until the text fits, and say so.
@@ -97,7 +113,7 @@ export function telegramMessage(r: Report, webUrl?: string): TelegramMessage {
     { text: `⏭ Skip ${i + 1}`, callback_data: `s:${fp16(p)}` },
   ]);
   if (webUrl) buttons.push([{ text: "📄 Full report", url: webUrl }]);
-  return { text: textFor(shown).slice(0, MAX_TEXT), buttons };
+  return { text: textFor(shown), buttons };
 }
 
 /** Send the summary; `webUrl` is the report's SAS link (#19). */

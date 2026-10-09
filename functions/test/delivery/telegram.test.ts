@@ -90,6 +90,26 @@ describe("telegramMessage", () => {
     expect(telegramMessage({ ...SAMPLE, top: [] }).buttons).toEqual([]);
   });
 
+  it("bounds a flood of alerts before any markup, keeping tags and entities whole", () => {
+    // The first alert's clip point falls where escaping would put "&amp;".
+    const edge = `${"x".repeat(297)}&&&`;
+    const alerts = [
+      edge,
+      ...Array.from(
+        { length: 100 },
+        (_, i) => `mailbox ${i} failed: <timeout> & ${"x".repeat(1000)}`,
+      ),
+    ];
+    const { text } = telegramMessage({ ...SAMPLE, alerts, top: [] });
+    expect(text.length).toBeLessThanOrEqual(4096);
+    expect(text).toMatch(/⚠️ …and \d+ more alerts in the full report\./);
+    expect(text).toContain("Nothing cleared the floor today.");
+    expect(text.match(/<b>/g)?.length).toBe(text.match(/<\/b>/g)?.length);
+    expect(text).not.toMatch(/&(?!amp;|lt;|gt;)/);
+    // Each alert is clipped on its plain text, so it ends in an ellipsis, not a cut entity.
+    expect(text).toMatch(/x…\n/);
+  });
+
   it("drops picks from the end to fit 4096 characters, and says so", () => {
     const long: TopPick = { ...top, title: "x".repeat(900) };
     const r: Report = { ...SAMPLE, top: Array.from({ length: 6 }, () => long) };
