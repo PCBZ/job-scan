@@ -35,7 +35,8 @@ export function renderText(r: Report, webUrl?: string): string {
       ? section(
           "Also worth a look",
           r.others.map(
-            (o) => `- ${o.title} — ${o.company} · ${o.location} · ${o.score} · check: ${o.check}`,
+            (o) =>
+              `- ${o.title} — ${o.company} · ${o.location} · ${o.score} · check: ${o.check}${o.url ? `\n  ${o.url}` : ""}`,
           ),
         )
       : []),

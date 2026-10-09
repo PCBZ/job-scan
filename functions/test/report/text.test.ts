@@ -35,6 +35,18 @@ describe("renderText", () => {
     }
   });
 
+  it("gives each near miss its link, as the HTML does", () => {
+    expect(renderText(SAMPLE)).toContain(
+      "check: 5+ years of Kubernetes\n  https://jobs.example/postings/3",
+    );
+    const unlinked = renderText({
+      ...SAMPLE,
+      others: [{ ...(SAMPLE.others[0] as (typeof SAMPLE.others)[0]), url: "" }],
+    });
+    expect(unlinked).toContain("check: 5+ years of Kubernetes\n");
+    expect(unlinked).not.toContain("postings/3");
+  });
+
   it("states an empty day, and leaves the link out when there is none", () => {
     const text = renderText({ ...SAMPLE, top: [], others: [], filtered: [], housekeeping: [] });
     expect(text).toContain("Nothing cleared the floor today.\n");
