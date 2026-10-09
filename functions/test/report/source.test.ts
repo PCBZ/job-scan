@@ -50,7 +50,6 @@ function input(over: Partial<ReportInput> = {}): ReportInput {
     top: [],
     rest: [],
     explanations: [],
-    coverage: [],
     warnings: [],
     notes: [],
     ...over,

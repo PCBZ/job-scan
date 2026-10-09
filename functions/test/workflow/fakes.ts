@@ -112,10 +112,6 @@ export function fakes(o: FakeOptions = {}) {
       log.push("verify_explanations");
       return take(o.explainProblems, counters.explain - 1);
     },
-    keywordCoverage(top) {
-      log.push("keyword_coverage");
-      return top.map(() => ({ covered: 1, of: 2 }));
-    },
     renderReport(input) {
       log.push("render_report");
       reported.push(input);
@@ -145,10 +141,6 @@ export function fakes(o: FakeOptions = {}) {
         ...(o.extractWarnings ? { warnings: o.extractWarnings } : {}),
       };
     },
-    async canonicalizeResumeSkills(...args) {
-      llmCall("canonicalize_resume_skills", args);
-      return { value: { Resume: ["go", "postgresql"] }, usage: USAGE };
-    },
     async judge(...args) {
       counters.judge++;
       llmCall("judge", args);
@@ -171,10 +163,6 @@ export function fakes(o: FakeOptions = {}) {
         ],
         usage: USAGE,
       };
-    },
-    async canonicalizePostingSkills(...args) {
-      llmCall("canonicalize_posting_skills", args);
-      return { value: { p0: ["go", "kafka"] }, usage: USAGE };
     },
   };
 

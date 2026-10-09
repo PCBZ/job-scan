@@ -16,15 +16,11 @@ import type { RepairTurn, TokenUsage } from "../model/types.js";
 import type { Filtered } from "../postings/gates.js";
 import type { Posting, Source } from "../postings/types.js";
 import type { Report } from "../report/types.js";
-import type { ResumeSet, ResumeVariant } from "../resume/load.js";
+import type { ResumeSet } from "../resume/load.js";
 
 export type { Explanation, Filtered, Judgement, Posting, Ranked, Report };
 
 // Shapes the node issues define; the graph only moves them between nodes.
-/** Canonical skills per resume variant or per posting. Shape: #28. */
-export type SkillSets = Record<string, string[]>;
-/** Coverage of a top pick's requirements by its variant. Shape: #28. */
-export type Coverage = Record<string, unknown>;
 
 export interface LlmResult<T> {
   value: T;
@@ -40,10 +36,6 @@ export interface ModelSteps {
     repairs: RepairTurn[],
     signal?: AbortSignal,
   ): Promise<LlmResult<Posting[]>>;
-  canonicalizeResumeSkills(
-    input: { resumes: ResumeVariant[] },
-    signal?: AbortSignal,
-  ): Promise<LlmResult<SkillSets>>;
   judge(
     input: JudgeInput,
     repairs: RepairTurn[],
@@ -54,10 +46,6 @@ export interface ModelSteps {
     repairs: RepairTurn[],
     signal?: AbortSignal,
   ): Promise<LlmResult<Explanation[]>>;
-  canonicalizePostingSkills(
-    input: { top: Ranked[] },
-    signal?: AbortSignal,
-  ): Promise<LlmResult<SkillSets>>;
 }
 
 /** Steps computed exactly in code. A check returns its problems; empty means it passed. */
@@ -85,13 +73,13 @@ export interface DeterministicSteps {
   /** Top N past the floor, the rest, model-gate failures and notes. */
   rank(judged: Judgement[], config: AppConfig): RankResult;
   verifyExplanations(explained: Explanation[], top: Ranked[], resumes: ResumeSet): string[];
-  keywordCoverage(top: Ranked[], postingSkills: SkillSets, resumeSkills: SkillSets): Coverage[];
   renderReport(input: ReportInput): Report;
 }
 
 /** The only side effects in the run. */
 export interface Effects {
-  deliver(report: Report, signal?: AbortSignal): Promise<void>;
+  /** Publish and send the report; the config names the recipients. */
+  deliver(report: Report, config: AppConfig, signal?: AbortSignal): Promise<void>;
   /** After delivery: record seen messages and pending application rows. */
   markSeen(input: { mail: FetchPayload; top: Ranked[] }, signal?: AbortSignal): Promise<void>;
 }
@@ -113,7 +101,6 @@ export interface ReportInput {
   /** Scored postings outside the top, best first. */
   rest: Ranked[];
   explanations: Explanation[];
-  coverage: Coverage[];
   warnings: string[];
   /** What a gate couldn't compare, said once in the report. */
   notes: string[];

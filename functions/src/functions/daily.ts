@@ -1,8 +1,14 @@
 import { app, type InvocationContext, type Timer } from "@azure/functions";
+import { DefaultAzureCredential } from "@azure/identity";
+import { composeRun } from "../lib/run/compose.js";
+import { runDaily } from "../lib/run/daily.js";
 
-// Placeholder for the morning run: fetch → extract → gate → score → deliver.
+// The morning run (#22): every dependency from app settings, then the workflow.
+// The managed identity signs every Azure call; secrets come from Key Vault
+// references in the app settings.
 export async function daily(timer: Timer, context: InvocationContext): Promise<void> {
   context.log(`daily: triggered (past due: ${timer.isPastDue})`);
+  await runDaily(composeRun(process.env, new DefaultAzureCredential()), context);
 }
 
 app.timer("daily", {
