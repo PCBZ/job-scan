@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../../src/lib/config/load.js";
+import { TelegramConfigError } from "../../src/lib/delivery/telegram.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
 import { productionEffects } from "../../src/lib/run/effects.js";
 import { judgement, rankedOf } from "../judge/helpers.js";
@@ -29,11 +30,13 @@ const ENV = {
   TELEGRAM_BOT_TOKEN: "test-token",
 };
 
-function harness(over: { emailFails?: boolean; telegramFails?: boolean } = {}) {
+function harness(
+  over: { emailFails?: boolean; telegramFails?: boolean; env?: Record<string, string> } = {},
+) {
   const calls: string[] = [];
   const stream = nodemailer.createTransport({ streamTransport: true, buffer: true });
   const effects = productionEffects({
-    env: ENV,
+    env: over.env ?? ENV,
     publisher: {
       async publish(html, day) {
         calls.push(`publish ${day} ${html.length > 0}`);
@@ -92,6 +95,15 @@ describe("productionEffects.deliver", () => {
       effects.deliver(SAMPLE, config({ email_account: "gmail-main", telegram_chat_id: 42 })),
     ).rejects.toThrow("smtp down");
     expect(calls.some((c) => c.startsWith("telegram 42"))).toBe(true);
+  });
+
+  it("still emails when Telegram's settings are missing, then fails the delivery", async () => {
+    const { TELEGRAM_BOT_TOKEN: _token, ...noToken } = ENV;
+    const { effects, calls } = harness({ env: noToken });
+    await expect(
+      effects.deliver(SAMPLE, config({ email_account: "gmail-main", telegram_chat_id: 42 })),
+    ).rejects.toThrow(TelegramConfigError);
+    expect(calls).toEqual(["publish 2026-10-08 true", "email me@example.test true"]);
   });
 
   it("names every channel when all of them fail", async () => {

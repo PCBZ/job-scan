@@ -38,6 +38,7 @@ export interface FakeOptions {
   explainProblems?: string[][];
   resumeDelayMs?: number;
   deliverFails?: boolean;
+  noResumes?: boolean;
   extractWarnings?: string[];
 }
 
@@ -63,7 +64,7 @@ export function fakes(o: FakeOptions = {}) {
       log.push("load_resumes:start");
       if (o.resumeDelayMs) await new Promise((r) => setTimeout(r, o.resumeDelayMs));
       log.push("load_resumes:end");
-      return RESUMES;
+      return o.noResumes ? { ...RESUMES, variants: [], warnings: ["no resumes"] } : RESUMES;
     },
     async fetchMail() {
       log.push("fetch_mail");

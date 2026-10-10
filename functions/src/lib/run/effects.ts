@@ -36,16 +36,21 @@ export function productionEffects(d: EffectsServices): Effects {
     async deliver(report, config: AppConfig, signal) {
       // The browser copy first: both channels link to it.
       const url = await d.publisher.publish(renderHtml(report), report.day);
-      const email = emailSettings(config, d.env);
-      const telegram = telegramSettings(config, d.env);
-      // Try every channel; a failure in one doesn't keep the other from
-      // sending. Any failure fails the delivery, so mark_seen won't run and
-      // tomorrow's run reports the same mail again.
+      // Try every channel, its settings included; a failure in one doesn't keep
+      // the other from sending. Any failure fails the delivery, so mark_seen
+      // won't run and tomorrow's run reports the same mail again.
       const failures: unknown[] = [];
-      if (email)
-        await emailReport(transport(email), email, report, url).catch((e) => failures.push(e));
-      if (telegram) {
-        await telegramReport(d.fetch, telegram, report, url, signal).catch((e) => failures.push(e));
+      try {
+        const email = emailSettings(config, d.env);
+        if (email) await emailReport(transport(email), email, report, url);
+      } catch (e) {
+        failures.push(e);
+      }
+      try {
+        const telegram = telegramSettings(config, d.env);
+        if (telegram) await telegramReport(d.fetch, telegram, report, url, signal);
+      } catch (e) {
+        failures.push(e);
       }
       if (failures.length === 1) throw failures[0];
       if (failures.length > 1) throw new AggregateError(failures, "deliver: every channel failed");

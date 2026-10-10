@@ -128,21 +128,29 @@ describe("loadResumes", () => {
     );
   });
 
-  it("rethrows the GitHub failure when there is nothing to fall back to", async () => {
+  it("returns no variants, with the reason, when there is nothing to fall back to", async () => {
     const { state, source } = repo({ ...FILES });
     state.offline = true;
-    await expect(loadResumes(CFG, source, new MemoryTextStore(), NOW)).rejects.toThrow(
-      "GitHub contents 503",
-    );
+    expect(await loadResumes(CFG, source, new MemoryTextStore(), NOW)).toEqual({
+      variants: [],
+      defaultPath: "",
+      warnings: [
+        "Couldn't read resumes from GitHub (GitHub contents 503: Service Unavailable); no earlier versions are cached.",
+      ],
+      stale: false,
+      extracted: 0,
+    });
   });
 
-  it("rethrows when the index points at a text that is gone", async () => {
+  it("returns no variants when the index points at a text that is gone", async () => {
     const { state, source } = repo({ ...FILES });
     const store = new MemoryTextStore();
     await loadResumes(CFG, source, store, NOW, counting().extract);
     for (const k of [...store.objects.keys()]) if (k.startsWith("text/")) store.objects.delete(k);
     state.offline = true;
-    await expect(loadResumes(CFG, source, store, NOW)).rejects.toThrow("GitHub contents 503");
+    const set = await loadResumes(CFG, source, store, NOW);
+    expect(set.variants).toEqual([]);
+    expect(set.warnings[0]).toMatch(/GitHub contents 503.*the cached versions are incomplete\.$/);
   });
 
   it("skips PDF variants with a warning, and fails when nothing readable is left", async () => {

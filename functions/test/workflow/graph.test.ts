@@ -158,6 +158,15 @@ describe("workflow graph", () => {
     expect(f.log.slice(-2)).toEqual(["deliver", "mark_seen"]);
   });
 
+  it("with no resumes, skips judging, reports why, and marks nothing seen", async () => {
+    const f = fakes({ noResumes: true });
+    const out = await run(f);
+    expect(out.outcome).toBe("no_resumes");
+    for (const n of ["judge", "explain"]) expect(f.log).not.toContain(n);
+    expect(f.reported[0]?.resumes?.warnings).toEqual(["no resumes"]);
+    expect(f.log.at(-1)).toBe("deliver");
+  });
+
   it("never marks mail seen when delivery fails, and reports the failed node", async () => {
     const events: NodeEvent[] = [];
     const f = fakes({ deliverFails: true });

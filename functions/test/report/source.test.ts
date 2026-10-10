@@ -3,7 +3,7 @@ import type { AppConfig } from "../../src/lib/config/load.js";
 import type { Explanation } from "../../src/lib/explain/schema.js";
 import { postingId } from "../../src/lib/judge/verify.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
-import { buildReport } from "../../src/lib/report/source.js";
+import { buildReport, NO_RESUMES } from "../../src/lib/report/source.js";
 import type { ReportInput } from "../../src/lib/workflow/types.js";
 import { dimension, judgement, rankedOf } from "../judge/helpers.js";
 import { posting } from "../postings/helpers.js";
@@ -125,6 +125,21 @@ describe("buildReport", () => {
       [],
       "Every mailbox failed to sync, so nothing was scanned today.",
     ]);
+  });
+
+  it("without resumes, says first that nothing was scored, and why", () => {
+    const r = buildReport(
+      input({
+        outcome: "no_resumes",
+        mail: payload({ kept: 3 }, [{ account: "school", error: "auth_failed" }]),
+      }),
+      NOW,
+    );
+    expect(r.alerts[0]).toBe(NO_RESUMES);
+    expect(r.alerts).toHaveLength(2);
+    expect(r.funnel).toMatch(
+      /^Scanned 3 new emails across .*; nothing was scored without resumes\.$/,
+    );
   });
 
   it("joins each top pick with its explanation", () => {

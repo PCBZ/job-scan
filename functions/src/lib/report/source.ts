@@ -74,14 +74,21 @@ function filteredGroups(input: ReportInput): FilteredGroup[] {
   return [...groups.values()].sort((a, b) => rank(a.gate) - rank(b.gate));
 }
 
+/** The alert for a run with no resumes; subjectOf tells it from mailbox alerts. */
+export const NO_RESUMES =
+  "No resumes could be read, so today's postings weren't scored. The next run scores the same mail.";
+
 export function buildReport(input: ReportInput, now: Date = new Date()): Report {
   const mail = input.mail;
   const payload = mail && !("error" in mail) ? mail : null;
   const failures = mail ? (mail.failures ?? []) : [];
-  const alerts = failures.map(
-    (f) =>
-      `${f.account} mailbox failed to sync: ${f.error}${f.detail ? ` (${f.detail})` : ""}. Today's results cover the others only.`,
-  );
+  const alerts = [
+    ...(input.outcome === "no_resumes" ? [NO_RESUMES] : []),
+    ...failures.map(
+      (f) =>
+        `${f.account} mailbox failed to sync: ${f.error}${f.detail ? ` (${f.detail})` : ""}. Today's results cover the others only.`,
+    ),
+  ];
 
   const dropped = Object.values(input.dropped).reduce((n, c) => n + (c ?? 0), 0);
   const inScope = input.top.length + input.rest.length;
@@ -97,7 +104,9 @@ export function buildReport(input: ReportInput, now: Date = new Date()): Report 
       ? "Every mailbox failed to sync, so nothing was scanned today."
       : input.outcome === "no_mail"
         ? `No new mail across ${accounts}.`
-        : `Scanned ${plural(emails, "new email")} across ${accounts} → ${plural(postings, "posting")} → ${newPostings} new → ${inScope} in scope → ${input.top.length} worth your time.`;
+        : input.outcome === "no_resumes"
+          ? `Scanned ${plural(emails, "new email")} across ${accounts}; nothing was scored without resumes.`
+          : `Scanned ${plural(emails, "new email")} across ${accounts} → ${plural(postings, "posting")} → ${newPostings} new → ${inScope} in scope → ${input.top.length} worth your time.`;
   const counts = [
     payload && payload.stats.already_seen > 0
       ? `${plural(payload.stats.already_seen, "email")} skipped as already seen`

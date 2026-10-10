@@ -9,6 +9,7 @@ import {
   subjectOf,
 } from "../../src/lib/delivery/email.js";
 import type { MailAccount } from "../../src/lib/mail/types.js";
+import { NO_RESUMES } from "../../src/lib/report/source.js";
 import type { Report, TopPick } from "../../src/lib/report/types.js";
 import { SAMPLE } from "../report/sample.js";
 
@@ -89,6 +90,10 @@ describe("subjectOf", () => {
       "Job Scan — 2026-10-08: 0 worth your time (2 mailboxes failed)",
     ],
     [r({ outcome: "no_mail", alerts: [] }), "Job Scan — 2026-10-08: no new mail"],
+    [
+      r({ outcome: "no_resumes", top: [], alerts: [NO_RESUMES, "a"] }),
+      "Job Scan — 2026-10-08: no resumes, nothing scored (1 mailbox failed)",
+    ],
     [
       r({ funnel: "Every mailbox failed to sync, so nothing was scanned today." }),
       "Job Scan — 2026-10-08: every mailbox failed",

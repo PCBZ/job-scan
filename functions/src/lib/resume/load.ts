@@ -3,7 +3,8 @@
 // Extracted text is cached by a hash of the source, so an unchanged variant
 // is never re-extracted. Each successful load also records which text each
 // variant had; when GitHub can't be read, that last good set is used and the
-// run carries a warning instead of failing.
+// run carries a warning instead of failing. With no good set yet, the set is
+// empty and the run reports that nothing was scored.
 
 import { createHash } from "node:crypto";
 import type { ResumeConfig } from "../config/resume.js";
@@ -118,16 +119,24 @@ export async function loadResumes(
 }
 
 async function fallback(cfg: ResumeConfig, store: TextStore, cause: unknown): Promise<ResumeSet> {
+  const reason = cause instanceof Error ? cause.message : String(cause);
+  // No good set yet (a first run): an empty set, so the run still reports why.
+  const none = (detail: string): ResumeSet => ({
+    variants: [],
+    defaultPath: "",
+    warnings: [`Couldn't read resumes from GitHub (${reason.slice(0, 200)}); ${detail}.`],
+    stale: false,
+    extracted: 0,
+  });
   const raw = await store.get(indexKey(cfg));
-  if (raw === null) throw cause;
+  if (raw === null) return none("no earlier versions are cached");
   const index = JSON.parse(raw) as IndexFile;
   const variants: ResumeVariant[] = [];
   for (const v of index.variants) {
     const text = await store.get(v.text);
-    if (text === null) throw cause;
+    if (text === null) return none("the cached versions are incomplete");
     variants.push({ path: v.path, name: variantName(v.path), text });
   }
-  const reason = cause instanceof Error ? cause.message : String(cause);
   return {
     ...toSet(cfg, variants),
     warnings: [

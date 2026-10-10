@@ -84,7 +84,7 @@ export interface Effects {
   markSeen(input: { mail: FetchPayload; top: Ranked[] }, signal?: AbortSignal): Promise<void>;
 }
 
-export type Outcome = "report" | "no_mail" | "nothing_left";
+export type Outcome = "report" | "no_mail" | "nothing_left" | "no_resumes";
 
 /** Everything renderReport sees; the short paths leave the later fields empty. */
 export interface ReportInput {
