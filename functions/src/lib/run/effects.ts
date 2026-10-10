@@ -16,7 +16,7 @@ import type { Effects } from "../workflow/types.js";
 
 type Env = Record<string, string | undefined>;
 
-export interface EffectsDeps {
+export interface EffectsServices {
   env: Env;
   publisher: ReportPublisher;
   seen: Pick<SeenStore, "markSeen">;
@@ -30,7 +30,7 @@ export interface EffectsDeps {
   now: () => Date;
 }
 
-export function productionEffects(d: EffectsDeps): Effects {
+export function productionEffects(d: EffectsServices): Effects {
   const transport = d.transport ?? gmailTransport;
   return {
     async deliver(report, config: AppConfig, signal) {
