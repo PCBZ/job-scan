@@ -5,7 +5,10 @@ import { posting } from "../postings/helpers.js";
 import { fakes } from "./fakes.js";
 
 function run(f: ReturnType<typeof fakes>, options = {}, signal?: AbortSignal) {
-  return buildWorkflow(f.code, f.llm, f.effects, options).invoke({}, signal ? { signal } : {});
+  return buildWorkflow(f.deterministicSteps, f.modelSteps, f.effects, options).invoke(
+    {},
+    signal ? { signal } : {},
+  );
 }
 
 const ranBefore = (log: string[], a: string, b: string) => log.indexOf(a) < log.indexOf(b);
@@ -21,14 +24,12 @@ describe("workflow graph", () => {
       ["validate", "dedupe"],
       ["dedupe", "hard_gates"],
       ["hard_gates", "judge"],
-      ["canonicalize_resume_skills", "judge"],
+      ["load_resumes:end", "judge"],
       ["judge", "verify_judgements"],
       ["verify_judgements", "rank"],
       ["rank", "explain"],
       ["explain", "verify_explanations"],
-      ["verify_explanations", "canonicalize_posting_skills"],
-      ["canonicalize_posting_skills", "keyword_coverage"],
-      ["keyword_coverage", "render_report"],
+      ["verify_explanations", "render_report"],
       ["render_report", "deliver"],
     ]) {
       expect(ranBefore(f.log, a as string, b as string), `${a} before ${b}`).toBe(true);
@@ -70,7 +71,7 @@ describe("workflow graph", () => {
     expect(ranBefore(f.log, "fetch_mail", "load_resumes:end")).toBe(true);
     // judge runs once, after the slower resume branch finished.
     expect(f.log.filter((n) => n === "judge")).toHaveLength(1);
-    expect(ranBefore(f.log, "canonicalize_resume_skills", "judge")).toBe(true);
+    expect(ranBefore(f.log, "load_resumes:end", "judge")).toBe(true);
   });
 
   it("sends each failed check back with its problems, oldest repair first", async () => {
@@ -135,7 +136,7 @@ describe("workflow graph", () => {
     const f = fakes({ messages: 0 });
     const out = await run(f);
     expect(out.outcome).toBe("no_mail");
-    for (const n of ["extract_postings", "judge", "explain", "canonicalize_posting_skills"]) {
+    for (const n of ["extract_postings", "judge", "explain"]) {
       expect(f.log).not.toContain(n);
     }
     expect(f.log.slice(-2)).toEqual(["deliver", "mark_seen"]);
@@ -155,6 +156,15 @@ describe("workflow graph", () => {
     expect(out.outcome).toBe("nothing_left");
     expect(f.log).not.toContain("judge");
     expect(f.log.slice(-2)).toEqual(["deliver", "mark_seen"]);
+  });
+
+  it("with no resumes, skips judging, reports why, and marks nothing seen", async () => {
+    const f = fakes({ noResumes: true });
+    const out = await run(f);
+    expect(out.outcome).toBe("no_resumes");
+    for (const n of ["judge", "explain"]) expect(f.log).not.toContain(n);
+    expect(f.reported[0]?.resumes?.warnings).toEqual(["no resumes"]);
+    expect(f.log.at(-1)).toBe("deliver");
   });
 
   it("never marks mail seen when delivery fails, and reports the failed node", async () => {
@@ -179,13 +189,7 @@ describe("workflow graph", () => {
     for (const call of f.llmInputs) scan(call.args, call.node);
     // Every LLM node was exercised.
     expect(new Set(f.llmInputs.map((c) => c.node))).toEqual(
-      new Set([
-        "extract_postings",
-        "canonicalize_resume_skills",
-        "judge",
-        "explain",
-        "canonicalize_posting_skills",
-      ]),
+      new Set(["extract_postings", "judge", "explain"]),
     );
     expect(callables).toEqual([]);
   });

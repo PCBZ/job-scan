@@ -6,6 +6,7 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import type { AppConfig } from "../config/load.js";
 import { renderHtml } from "../report/html.js";
+import { NO_RESUMES } from "../report/source.js";
 import { renderText } from "../report/text.js";
 import type { Report } from "../report/types.js";
 
@@ -56,10 +57,14 @@ export function emailSettings(config: AppConfig, env: Env): EmailSettings | null
 export function subjectOf(r: Report): string {
   if (r.funnel.startsWith("Every mailbox failed"))
     return `Job Scan — ${r.day}: every mailbox failed`;
-  const head = r.outcome === "no_mail" ? "no new mail" : `${r.top.length} worth your time`;
-  const failed = r.alerts.length
-    ? ` (${r.alerts.length} mailbox${r.alerts.length === 1 ? "" : "es"} failed)`
-    : "";
+  const head =
+    r.outcome === "no_mail"
+      ? "no new mail"
+      : r.outcome === "no_resumes"
+        ? "no resumes, nothing scored"
+        : `${r.top.length} worth your time`;
+  const mailboxes = r.alerts.filter((a) => a !== NO_RESUMES).length;
+  const failed = mailboxes ? ` (${mailboxes} mailbox${mailboxes === 1 ? "" : "es"} failed)` : "";
   return `Job Scan — ${r.day}: ${head}${failed}`;
 }
 

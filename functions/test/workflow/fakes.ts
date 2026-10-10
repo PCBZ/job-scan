@@ -38,6 +38,7 @@ export interface FakeOptions {
   explainProblems?: string[][];
   resumeDelayMs?: number;
   deliverFails?: boolean;
+  noResumes?: boolean;
   extractWarnings?: string[];
 }
 
@@ -54,7 +55,7 @@ export function fakes(o: FakeOptions = {}) {
     llmInputs.push({ node, args });
   };
 
-  const code: DeterministicSteps = {
+  const deterministicSteps: DeterministicSteps = {
     async loadConfig() {
       log.push("load_config");
       return CONFIG;
@@ -63,7 +64,7 @@ export function fakes(o: FakeOptions = {}) {
       log.push("load_resumes:start");
       if (o.resumeDelayMs) await new Promise((r) => setTimeout(r, o.resumeDelayMs));
       log.push("load_resumes:end");
-      return RESUMES;
+      return o.noResumes ? { ...RESUMES, variants: [], warnings: ["no resumes"] } : RESUMES;
     },
     async fetchMail() {
       log.push("fetch_mail");
@@ -112,10 +113,6 @@ export function fakes(o: FakeOptions = {}) {
       log.push("verify_explanations");
       return take(o.explainProblems, counters.explain - 1);
     },
-    keywordCoverage(top) {
-      log.push("keyword_coverage");
-      return top.map(() => ({ covered: 1, of: 2 }));
-    },
     renderReport(input) {
       log.push("render_report");
       reported.push(input);
@@ -135,7 +132,7 @@ export function fakes(o: FakeOptions = {}) {
     },
   };
 
-  const llm: ModelSteps = {
+  const modelSteps: ModelSteps = {
     async extractPostings(...args) {
       counters.extract++;
       llmCall("extract_postings", args);
@@ -144,10 +141,6 @@ export function fakes(o: FakeOptions = {}) {
         usage: USAGE,
         ...(o.extractWarnings ? { warnings: o.extractWarnings } : {}),
       };
-    },
-    async canonicalizeResumeSkills(...args) {
-      llmCall("canonicalize_resume_skills", args);
-      return { value: { Resume: ["go", "postgresql"] }, usage: USAGE };
     },
     async judge(...args) {
       counters.judge++;
@@ -172,10 +165,6 @@ export function fakes(o: FakeOptions = {}) {
         usage: USAGE,
       };
     },
-    async canonicalizePostingSkills(...args) {
-      llmCall("canonicalize_posting_skills", args);
-      return { value: { p0: ["go", "kafka"] }, usage: USAGE };
-    },
   };
 
   const effects: Effects = {
@@ -188,5 +177,5 @@ export function fakes(o: FakeOptions = {}) {
     },
   };
 
-  return { code, llm, effects, log, llmInputs, counters, reported };
+  return { deterministicSteps, modelSteps, effects, log, llmInputs, counters, reported };
 }

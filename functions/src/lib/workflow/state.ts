@@ -7,16 +7,7 @@ import type { RepairTurn, TokenUsage } from "../model/types.js";
 import type { Filtered } from "../postings/gates.js";
 import type { Source } from "../postings/types.js";
 import type { ResumeSet } from "../resume/load.js";
-import type {
-  Coverage,
-  Explanation,
-  Judgement,
-  Outcome,
-  Posting,
-  Ranked,
-  Report,
-  SkillSets,
-} from "./types.js";
+import type { Explanation, Judgement, Outcome, Posting, Ranked, Report } from "./types.js";
 
 /** The three generate-and-check loops. */
 export type Loop = "extract" | "judge" | "explain";
@@ -44,7 +35,6 @@ export const WorkflowState = Annotation.Root({
   outcome: last<Outcome>("report"),
   config: last<AppConfig | null>(null),
   resumes: last<ResumeSet | null>(null),
-  resumeSkills: last<SkillSets>({}),
   mail: last<FetchPayload | AllAccountsFailed | null>(null),
 
   extracted: last<Posting[]>([]),
@@ -58,8 +48,6 @@ export const WorkflowState = Annotation.Root({
   top: last<Ranked[]>([]),
   rest: last<Ranked[]>([]),
   explanations: last<Explanation[]>([]),
-  postingSkills: last<SkillSets>({}),
-  coverage: last<Coverage[]>([]),
   report: last<Report | null>(null),
 
   loops: Annotation<Record<Loop, LoopState>, LoopUpdate>({

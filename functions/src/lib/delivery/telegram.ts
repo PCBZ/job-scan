@@ -2,10 +2,11 @@
 // Approve / Skip buttons and a link to the full report. Sent with one Bot API
 // call; the buttons' callbacks are handled by the webhook (#24).
 
-import { createHash } from "node:crypto";
 import type { AppConfig } from "../config/load.js";
-import { fingerprint } from "../fingerprint.js";
+import { fp16 } from "../fingerprint.js";
 import type { Report, TopPick } from "../report/types.js";
+
+export { fp16 };
 
 type Env = Record<string, string | undefined>;
 
@@ -48,14 +49,6 @@ export function telegramSettings(config: AppConfig, env: Env): TelegramSettings 
   if (!token) throw new TelegramConfigError("TELEGRAM_BOT_TOKEN must be set to send the summary");
   return { token, chatId: String(chat) };
 }
-
-/**
- * A posting's key in button callbacks: 16 hex characters of the SHA-256 of
- * its fingerprint, so "a:<fp16>" stays far under callback_data's "1-64 bytes":
- * https://core.telegram.org/bots/api#inlinekeyboardbutton
- */
-export const fp16 = (p: Pick<TopPick, "company" | "title">) =>
-  createHash("sha256").update(fingerprint(p)).digest("hex").slice(0, 16);
 
 /** One mailbox alert, before escaping: its error detail can be long. */
 const ALERT_MAX = 300;

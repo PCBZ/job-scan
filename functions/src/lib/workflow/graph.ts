@@ -1,10 +1,13 @@
 // The daily run as a LangGraph state graph (plan §3, #55).
 //
 //   load_config ─┬─ fetch_mail ─ extract_postings ⇄ validate ─ dedupe ─ hard_gates ─ await_resumes ─┐
-//                └─ load_resumes ─ canonicalize_resume_skills ──────────────────────────────────────┴─ judge ⇄ verify_judgements
-//   ─ rank ─ explain ⇄ verify_explanations ─ canonicalize_posting_skills ─ keyword_coverage ─ render_report ─ deliver ─ mark_seen
+//                └─ load_resumes ──────────────────────────────────────────────────────────────────┴─ check_resumes ─ judge ⇄ verify_judgements
+//   ─ rank ─ explain ⇄ verify_explanations ─ render_report ─ deliver ─ mark_seen
 //
-// No new mail, or nothing past the hard gates, skips straight to render_report.
+// No new mail, nothing past the hard gates, or no resumes to judge against
+// skips straight to render_report. Without resumes, nothing is marked seen, so
+// the next run judges the same mail.
+// Keyword insights (#28) add their nodes when they land.
 
 import type { FetchPayload } from "../mail/types.js";
 import { type BuilderOptions, END, START, WorkflowBuilder } from "./builder.js";
@@ -43,11 +46,6 @@ export function buildWorkflow(
       .node("load_resumes", async (s, signal) => {
         const set = await steps.loadResumes(config(s), signal);
         return { resumes: set, warnings: set.warnings };
-      })
-      .edge("load_resumes", "canonicalize_resume_skills")
-      .node("canonicalize_resume_skills", async (s, signal) => {
-        const r = await model.canonicalizeResumeSkills({ resumes: resumes(s).variants }, signal);
-        return { resumeSkills: r.value, usage: { canonicalize_resume_skills: r.usage } };
       })
 
       // Mail branch.
@@ -97,7 +95,12 @@ export function buildWorkflow(
       .node("await_resumes", () => ({}))
 
       // Both branches meet here.
-      .join(["await_resumes", "canonicalize_resume_skills"], "judge")
+      .join(["await_resumes", "load_resumes"], "check_resumes")
+      .node("check_resumes", () => ({}))
+      .branch("check_resumes", (s) => (resumes(s).variants.length > 0 ? "judge" : "no_resumes"), {
+        judge: "judge",
+        no_resumes: "short_no_resumes",
+      })
       .node("judge", async (s, signal) => {
         const r = await model.judge(
           { postings: s.postings, resumes: resumes(s).variants, profile: config(s).profile },
@@ -133,25 +136,18 @@ export function buildWorkflow(
       .repairLoop("explain", {
         generate: "explain",
         check: "verify_explanations",
-        next: "canonicalize_posting_skills",
+        next: "render_report",
         output: (s) => s.explanations,
         run: (s) => ({ problems: steps.verifyExplanations(s.explanations, s.top, resumes(s)) }),
       })
-      .node("canonicalize_posting_skills", async (s, signal) => {
-        const r = await model.canonicalizePostingSkills({ top: s.top }, signal);
-        return { postingSkills: r.value, usage: { canonicalize_posting_skills: r.usage } };
-      })
-      .edge("canonicalize_posting_skills", "keyword_coverage")
-      .node("keyword_coverage", (s) => ({
-        coverage: steps.keywordCoverage(s.top, s.postingSkills, s.resumeSkills),
-      }))
-      .edge("keyword_coverage", "render_report")
 
       // The short paths only set the outcome, then share the report.
       .node("short_no_mail", () => ({ outcome: "no_mail" as const }))
       .edge("short_no_mail", "render_report")
       .node("short_nothing_left", () => ({ outcome: "nothing_left" as const }))
       .edge("short_nothing_left", "render_report")
+      .node("short_no_resumes", () => ({ outcome: "no_resumes" as const }))
+      .edge("short_no_resumes", "render_report")
 
       .node("render_report", (s) => ({
         report: steps.renderReport({
@@ -166,20 +162,21 @@ export function buildWorkflow(
           top: s.top,
           rest: s.rest,
           explanations: s.explanations,
-          coverage: s.coverage,
           warnings: s.warnings,
           notes: s.notes,
         }),
       }))
       .edge("render_report", "deliver")
       .node("deliver", async (s, signal) => {
-        await effects.deliver(need(s.report, "report"), signal);
+        await effects.deliver(need(s.report, "report"), config(s), signal);
         return {};
       })
       .edge("deliver", "mark_seen")
       .node("mark_seen", async (s, signal) => {
-        // Only after a delivery: a failed run must see the same mail tomorrow.
-        if (isPayload(s.mail)) await effects.markSeen({ mail: s.mail, top: s.top }, signal);
+        // Only after a delivery, and only once judged: a failed or unjudged run
+        // must see the same mail tomorrow.
+        if (isPayload(s.mail) && s.outcome !== "no_resumes")
+          await effects.markSeen({ mail: s.mail, top: s.top }, signal);
         return {};
       })
       .edge("mark_seen", END)
