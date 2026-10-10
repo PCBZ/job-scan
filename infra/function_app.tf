@@ -1,3 +1,22 @@
+# Secrets reach the app as Key Vault references, resolved by its identity, so
+# no value passes through Terraform state. Each setting reads the secret named
+# after it: lowercase, "_" as "-" (Key Vault names allow only letters, digits
+# and "-"). The values are added by hand; see infra/README.md#secrets.
+locals {
+  secret_settings = concat(
+    [
+      "GITHUB_RESUME_PAT",  # the resume repo, read-only (#11)
+      "TELEGRAM_BOT_TOKEN", # the bot (#21)
+      "TYPESAFE_API_KEY",   # Jev
+    ],
+    var.mail_credential_envs, # IMAP, and the SMTP sender's (#9, #20)
+  )
+  secret_references = {
+    for k in local.secret_settings :
+    k => "@Microsoft.KeyVault(SecretUri=${module.key_vault.uri}secrets/${replace(lower(k), "_", "-")}/)"
+  }
+}
+
 module "function_app" {
   source              = "./modules/function_app"
   name                = "${var.name}-func-${local.suffix}"
@@ -12,7 +31,7 @@ module "function_app" {
 
   application_insights_connection_string = module.monitoring.connection_string
 
-  app_settings = {
+  app_settings = merge({
     "KEY_VAULT_URI" = module.key_vault.uri
     # Model selection, read by functions/src/lib/model/config.ts. A fallback
     # would add the same keys prefixed MODEL_FALLBACK_.
@@ -28,10 +47,5 @@ module "function_app" {
     # Jev, read by functions/src/lib/decision/config.ts. The model is pinned:
     # confidence thresholds are tuned against one version.
     "JEV_MODEL" = "jev-1.13.0"
-    # A Key Vault reference, resolved by the app's identity. The secret's value
-    # is added by hand, so it never passes through Terraform state.
-    "TYPESAFE_API_KEY" = "@Microsoft.KeyVault(SecretUri=${module.key_vault.uri}secrets/typesafe-api-key/)"
-    # The Telegram bot's token (#21), also a Key Vault reference added by hand.
-    "TELEGRAM_BOT_TOKEN" = "@Microsoft.KeyVault(SecretUri=${module.key_vault.uri}secrets/telegram-bot-token/)"
-  }
+  }, local.secret_references)
 }

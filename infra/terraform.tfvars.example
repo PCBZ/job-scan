@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars (gitignored). Names only: each setting is resolved
+# from the Key Vault secret named after it (GMAIL_MAIN_PASSWORD reads
+# gmail-main-password). List the keys your config.toml reads; see
+# infra/README.md#secrets.
+mail_credential_envs = [
+  "GMAIL_MAIN_USER",
+  "GMAIL_MAIN_PASSWORD",
+  "GMAIL_ALT_USER",
+  "GMAIL_ALT_PASSWORD",
+]

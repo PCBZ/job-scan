@@ -39,3 +39,16 @@ variable "config_toml_path" {
   type        = string
   default     = null
 }
+
+# Names only, never values: set in terraform.tfvars (gitignored), from the keys
+# config.toml reads (fetch_mail.py --env-template lists them).
+variable "mail_credential_envs" {
+  description = "App settings holding mailbox credentials, each resolved from the Key Vault secret named after it."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for k in var.mail_credential_envs : can(regex("^[A-Z][A-Z0-9_]*$", k))])
+    error_message = "Each entry is an app setting name like GMAIL_MAIN_PASSWORD: uppercase letters, digits and _."
+  }
+}
