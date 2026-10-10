@@ -28,10 +28,10 @@ variable "github_repository" {
   default     = "PCBZ@15225052/job-scan@1339064873"
 }
 
-variable "github_branch" {
-  description = "Branch whose workflow runs may deploy."
+variable "github_workflow" {
+  description = "Name of the workflow that may deploy, as in its name: field (.github/workflows/cd.yml)."
   type        = string
-  default     = "main"
+  default     = "CD"
 }
 
 variable "config_toml_path" {

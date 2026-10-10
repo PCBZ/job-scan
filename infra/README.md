@@ -48,3 +48,34 @@ value. The mail fetch treats that value as unset, so the report names the
 account as `missing_credentials`, not as a failed login. The portal also shows
 each reference's status under the Function App's **Settings › Environment
 variables**.
+
+## Releasing
+
+A release is a `v*` tag on `main`. Pushing one runs `.github/workflows/cd.yml`,
+which checks and builds the tagged commit, then deploys it:
+
+```sh
+git checkout main && git pull
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The workflow fails before deploying if the tag isn't on `main`, if any check
+fails, or if the `daily` function isn't registered afterwards.
+
+### How the deploy is trusted
+
+The workflow signs in to Azure over OIDC, so no secret is stored. The deploy
+identity trusts one subject, made up of the repository, the workflow name
+`CD` and the ref type `tag`:
+
+```
+repo:<owner>@<id>/<repo>@<id>:workflow:CD:ref_type:tag
+```
+
+A run from a branch carries `ref_type:branch` instead, so it gets no token.
+GitHub builds this subject only after the repository's subject template lists
+those claim keys. After an apply, run `infra/set-github-vars.sh`: it sets the
+template from `terraform output github_oidc_claim_keys`, and copies the
+repository variables the workflow reads. If you rename the workflow, change
+`github_workflow` to match.

@@ -1,6 +1,9 @@
 #!/bin/sh
 # Copy `terraform output github_variables` into the GitHub repository
-# variables that .github/workflows/cd.yml reads. Run after apply:
+# variables that .github/workflows/cd.yml reads, and set the repository's OIDC
+# subject template to the claims the deploy identity trusts
+# (`terraform output github_oidc_claim_keys`). Run after apply, so the
+# identity trusts the new subject before GitHub issues it:
 #
 #   infra/set-github-vars.sh [owner/repo]
 #
@@ -19,3 +22,10 @@ echo "$vars" | jq -r 'to_entries[] | "\(.key)\t\(.value)"' |
     gh variable set "$name" --repo "$repo" --body "$value"
     echo "set $name"
   done
+
+# Immutable subjects stay on: the repo segment keeps owner and repository IDs.
+# https://docs.github.com/en/rest/actions/oidc#set-the-customization-template-for-an-oidc-subject-claim-for-a-repository
+keys=$(terraform output -json github_oidc_claim_keys)
+printf '{"use_default":false,"use_immutable_subject":true,"include_claim_keys":%s}' "$keys" |
+  gh api -X PUT "repos/$repo/actions/oidc/customization/sub" --input - >/dev/null
+echo "set OIDC subject claims $keys"

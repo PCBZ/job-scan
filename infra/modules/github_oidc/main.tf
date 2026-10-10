@@ -6,13 +6,15 @@ resource "azurerm_user_assigned_identity" "this" {
   tags                = var.tags
 }
 
-# Trusts only workflow runs on the given branch of the given repository.
+# Trusts only workflow runs whose subject carries these claims. The repository's
+# subject template must list the same keys, in the same order:
+# https://docs.github.com/en/actions/reference/security/oidc
 resource "azurerm_federated_identity_credential" "this" {
-  name                      = "github-${var.branch}"
+  name                      = lower("github-${join("-", [for c in var.subject_claims : c.value])}")
   user_assigned_identity_id = azurerm_user_assigned_identity.this.id
   issuer                    = "https://token.actions.githubusercontent.com"
   audience                  = ["api://AzureADTokenExchange"]
-  subject                   = "repo:${var.repository}:ref:refs/heads/${var.branch}"
+  subject                   = join(":", concat(["repo", var.repository], flatten([for c in var.subject_claims : [c.key, c.value]])))
 }
 
 # Enough to deploy code to the Function App, nothing else.

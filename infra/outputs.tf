@@ -33,5 +33,12 @@ output "github_variables" {
     AZURE_TENANT_ID        = data.azurerm_client_config.current.tenant_id
     AZURE_SUBSCRIPTION_ID  = data.azurerm_client_config.current.subscription_id
     AZURE_FUNCTIONAPP_NAME = module.function_app.name
+    AZURE_RESOURCE_GROUP   = azurerm_resource_group.main.name
   }
+}
+
+# The repository's OIDC subject template: repo, then the claims the deploy
+# identity trusts, in order. infra/set-github-vars.sh applies it.
+output "github_oidc_claim_keys" {
+  value = concat(["repo"], [for c in local.github_subject_claims : c.key])
 }

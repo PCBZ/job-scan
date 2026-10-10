@@ -1,13 +1,108 @@
+# The deploy identity trusts this workflow by name: keep `name` in step with
+# infra's github_workflow.
 name: CD
 
-# Placeholder. Deployment will be added later, triggered by release tags.
+# A release is a v* tag on main: git tag vX.Y.Z && git push origin vX.Y.Z.
 on:
-  workflow_dispatch:
+  push:
+    tags: ["v*"]
 
 permissions: {}
 
+# One deploy at a time, and never cancel one half-way.
+concurrency:
+  group: cd
+  cancel-in-progress: false
+
 jobs:
-  placeholder:
+  build:
+    name: Check and package
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: functions
     steps:
-      - run: echo "No deployment configured yet."
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Azure only checks that this is a tag of this workflow; that the tag is
+      # on main is checked here.
+      - name: Tag is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        working-directory: .
+        run: functions/node_modules/.bin/biome check .
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      # What the app reads at runtime: the compiled code, its prompts and
+      # report template, and production dependencies only.
+      - name: Package
+        run: |
+          npm prune --omit=dev
+          zip -qr ../app.zip dist prompts templates host.json package.json node_modules
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app
+          path: app.zip
+          retention-days: 7
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: app
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Flex Consumption: https://github.com/Azure/functions-action
+      - uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
+          package: app.zip
+
+      - name: The daily function is registered
+        env:
+          APP: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
+          GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+        # The host can take a moment to index the new package.
+        run: |
+          for _ in $(seq 12); do
+            names=$(az functionapp function list --name "$APP" --resource-group "$GROUP" --query "[].name" -o tsv)
+            if echo "$names" | grep -Eq '(^|/)daily$'; then echo "$names"; exit 0; fi
+            sleep 10
+          done
+          echo "daily isn't registered on $APP; got: ${names:-nothing}" >&2
+          exit 1
