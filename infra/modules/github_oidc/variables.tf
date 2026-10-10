@@ -20,7 +20,7 @@ variable "subject_claims" {
   type        = list(object({ key = string, value = string }))
 }
 
-variable "function_app_id" {
+variable "key_vault_id" {
   type = string
 }
 

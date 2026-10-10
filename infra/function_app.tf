@@ -28,6 +28,7 @@ module "function_app" {
   storage_account_name          = module.storage.name
   deployment_container_endpoint = module.storage.container_endpoints["deployments"]
   key_vault_id                  = module.key_vault.id
+  app_package                   = var.app_package
 
   application_insights_connection_string = module.monitoring.connection_string
 

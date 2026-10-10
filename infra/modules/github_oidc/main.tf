@@ -17,9 +17,10 @@ resource "azurerm_federated_identity_credential" "this" {
   subject                   = join(":", concat(["repo", var.repository], flatten([for c in var.subject_claims : [c.key, c.value]])))
 }
 
-# Enough to deploy code to the Function App, nothing else.
-resource "azurerm_role_assignment" "deploy" {
-  scope                = var.function_app_id
-  role_definition_name = "Website Contributor"
+# Reads config-toml during apply. Its rights over the resource group and the
+# state are granted in infra/bootstrap, so a CD run can't change them.
+resource "azurerm_role_assignment" "config_reader" {
+  scope                = var.key_vault_id
+  role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.this.principal_id
 }

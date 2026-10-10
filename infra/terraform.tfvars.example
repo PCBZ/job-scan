@@ -8,3 +8,7 @@ mail_credential_envs = [
   "GMAIL_ALT_USER",
   "GMAIL_ALT_PASSWORD",
 ]
+
+# Your Object ID (portal: Microsoft Entra ID → Users → you). The Key Vault,
+# OpenAI and config roles stay with you, whoever runs the apply.
+operator_principal_id = "00000000-0000-0000-0000-000000000000"

@@ -49,10 +49,21 @@ account as `missing_credentials`, not as a failed login. The portal also shows
 each reference's status under the Function App's **Settings › Environment
 variables**.
 
+## config.toml
+
+The cloud run reads `config.toml` from the `config` blob. Its source is the
+Key Vault secret `config-toml`, so a CD run, which has no local file, applies
+the same config. Terraform copies the secret into the blob on every apply.
+The file carries no credentials by design; its text does pass through
+Terraform state. After editing your config, update the secret (a new version)
+before the next apply.
+
 ## Releasing
 
-A release is a `v*` tag on `main`. Pushing one runs `.github/workflows/cd.yml`,
-which checks and builds the tagged commit, then deploys it:
+A release is a `v*` tag on `main`. Pushing one runs `.github/workflows/cd.yml`:
+it checks and builds the tagged commit, then runs `terraform apply` on this
+directory as committed, with the tag's build as the app's code. There is no
+manual approval; the plan is printed in the log as it applies.
 
 ```sh
 git checkout main && git pull
@@ -60,12 +71,45 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The workflow fails before deploying if the tag isn't on `main`, if any check
-fails, or if the `daily` function isn't registered afterwards.
+The workflow stops before applying if the tag isn't on `main` or if any check
+fails. The code goes out through `zip_deploy_file`, which redeploys only when
+the package path changes, so each package is named after its tag. A local
+apply leaves `app_package` unset and keeps the deployed code.
 
-### How the deploy is trusted
+### Setting it up
 
-The workflow signs in to Azure over OIDC, so no secret is stored. The deploy
+Once, in this order, all by hand:
+
+1. Add `operator_principal_id` to `terraform.tfvars`: your Object ID, from
+   the portal's Microsoft Entra ID → Users → you. The Key Vault, OpenAI and config roles stay with you,
+   whoever runs the apply.
+2. Make sure the `config-toml` secret exists, then run `terraform apply` here.
+   This creates the CD identity and its OIDC trust.
+3. In `bootstrap/`, run `terraform apply -var "deployer=$(terraform -chdir=..
+   output -json deployer)"`. This grants the CD identity its rights (below).
+4. Run `infra/set-github-vars.sh`. It sets the OIDC subject template and the
+   repository variables the workflow reads.
+
+### What the CD identity can do
+
+Its rights live in `bootstrap/`, outside what a CD run applies, so a run can't
+widen them:
+
+- **Contributor** on the main resource group.
+- **Role Based Access Control Administrator** on the same group. A condition
+  limits it to assigning and removing the data roles this stack uses (Storage
+  Blob/Table/Queue data, Key Vault Secrets User/Officer, Cognitive Services
+  OpenAI User), so it can't grant Owner or more RBAC rights, its own
+  included.
+- **Storage Blob Data Contributor** on the state container.
+
+The main stack adds **Key Vault Secrets User**, for reading `config-toml`.
+CD skips resource provider registration, which needs subscription rights; a
+local apply registers them.
+
+### How the run is trusted
+
+The workflow signs in to Azure over OIDC, so no secret is stored. The CD
 identity trusts one subject, made up of the repository, the workflow name
 `CD` and the ref type `tag`:
 
@@ -75,7 +119,6 @@ repo:<owner>@<id>/<repo>@<id>:workflow:CD:ref_type:tag
 
 A run from a branch carries `ref_type:branch` instead, so it gets no token.
 GitHub builds this subject only after the repository's subject template lists
-those claim keys. After an apply, run `infra/set-github-vars.sh`: it sets the
-template from `terraform output github_oidc_claim_keys`, and copies the
-repository variables the workflow reads. If you rename the workflow, change
+those claim keys, which `set-github-vars.sh` sets from
+`terraform output github_oidc_claim_keys`. If you rename the workflow, change
 `github_workflow` to match.

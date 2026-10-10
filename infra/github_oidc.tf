@@ -16,6 +16,6 @@ module "github_oidc" {
   location            = azurerm_resource_group.main.location
   repository          = var.github_repository
   subject_claims      = local.github_subject_claims
-  function_app_id     = module.function_app.id
+  key_vault_id        = module.key_vault.id
   tags                = var.tags
 }
