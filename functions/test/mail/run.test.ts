@@ -110,6 +110,10 @@ describe("isPlaceholder", () => {
     ["xxxxxxxxxxxxxxxx", true],
     ["xxxx xxxx xxxx xxxx", false],
     ["real@gmail.com", false],
+    [
+      "@Microsoft.KeyVault(SecretUri=https://kv.vault.azure.net/secrets/gmail-main-password/)",
+      true,
+    ],
   ])("%j → %s", (value, expected) => {
     expect(isPlaceholder(value)).toBe(expected);
   });

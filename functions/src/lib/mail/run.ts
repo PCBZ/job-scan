@@ -24,10 +24,15 @@ const PLACEHOLDER_USERS = new Set([
   "you@outlook.com",
 ]);
 
-/** True for empty values and the untouched ones shipped in .env.example. */
+/**
+ * True for empty values, the untouched ones shipped in .env.example, and a Key
+ * Vault reference the platform couldn't resolve: it then passes the reference
+ * through as the value, which would fail as a confusing login error.
+ */
 export function isPlaceholder(value: string | undefined): boolean {
   const v = (value ?? "").trim().toLowerCase();
   if (!v) return true;
+  if (v.startsWith("@microsoft.keyvault(")) return true;
   if (PLACEHOLDER_USERS.has(v)) return true;
   // A run of x's stands in for the 16-character app password.
   return [...v].every((c) => c === "x");
