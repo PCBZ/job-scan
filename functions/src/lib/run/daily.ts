@@ -1,10 +1,10 @@
-// One morning run: the workflow over the composed dependencies, logged node by
+// One morning run: the workflow over the composed pipeline, logged node by
 // node. A failure is rethrown so the invocation fails and the host records it;
 // mark_seen then never ran, so tomorrow sees the same mail.
 
 import { buildWorkflow } from "../workflow/graph.js";
 import type { NodeEvent } from "../workflow/types.js";
-import type { Run } from "./compose.js";
+import type { Pipeline } from "./compose.js";
 
 /** Under host.json's functionTimeout of 30 minutes, so the run stops cleanly first. */
 export const RUN_TIMEOUT_MS = 25 * 60 * 1000;
@@ -22,7 +22,7 @@ export interface RunSummary {
 }
 
 export async function runDaily(
-  run: Run,
+  pipeline: Pipeline,
   log: RunLog,
   signal: AbortSignal = AbortSignal.timeout(RUN_TIMEOUT_MS),
 ) {
@@ -30,7 +30,12 @@ export async function runDaily(
     log.log(
       `node ${e.node} ${e.ok ? "ok" : "failed"} ${Math.round(e.ms)}ms${e.usage ? ` tokens ${e.usage.input}/${e.usage.output}` : ""}`,
     );
-  const workflow = buildWorkflow(run.steps, run.model, run.effects, { onNode });
+  const workflow = buildWorkflow(
+    pipeline.deterministicSteps,
+    pipeline.modelSteps,
+    pipeline.effects,
+    { onNode },
+  );
   try {
     const state = await workflow.invoke({}, { signal });
     const summary: RunSummary = {

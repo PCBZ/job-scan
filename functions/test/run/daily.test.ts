@@ -16,7 +16,7 @@ describe("runDaily", () => {
   it("runs the workflow, logs every node, and returns a summary", async () => {
     const f = fakes();
     const r = recorder();
-    const summary = await runDaily({ steps: f.code, model: f.llm, effects: f.effects }, r.log);
+    const summary = await runDaily(f, r.log);
     expect(summary).toMatchObject({ outcome: "report", top: 1, warnings: 0 });
     expect(summary.usage.judge).toEqual({ input: 10, output: 2 });
     expect(r.lines).toContainEqual(expect.stringMatching(/^node judge ok \d+ms tokens 10\/2$/));
@@ -27,9 +27,7 @@ describe("runDaily", () => {
   it("logs a failed run and rethrows, so the host records it and nothing is marked seen", async () => {
     const f = fakes({ deliverFails: true });
     const r = recorder();
-    await expect(
-      runDaily({ steps: f.code, model: f.llm, effects: f.effects }, r.log),
-    ).rejects.toThrow("smtp down");
+    await expect(runDaily(f, r.log)).rejects.toThrow("smtp down");
     expect(r.errors).toEqual(["daily: failed: Error: smtp down"]);
     expect(r.lines.some((l) => l.startsWith("node deliver failed"))).toBe(true);
     expect(f.log).not.toContain("mark_seen");
@@ -39,13 +37,7 @@ describe("runDaily", () => {
     const f = fakes({ resumeDelayMs: 50 });
     const controller = new AbortController();
     setTimeout(() => controller.abort(), 5);
-    await expect(
-      runDaily(
-        { steps: f.code, model: f.llm, effects: f.effects },
-        recorder().log,
-        controller.signal,
-      ),
-    ).rejects.toThrow();
+    await expect(runDaily(f, recorder().log, controller.signal)).rejects.toThrow();
     expect(f.log).not.toContain("deliver");
   });
 });

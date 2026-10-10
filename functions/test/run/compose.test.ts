@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composeRun, RunConfigError } from "../../src/lib/run/compose.js";
+import { composePipeline, RunConfigError } from "../../src/lib/run/compose.js";
 
 const credential = { getToken: async () => null };
 const ENV = {
@@ -13,20 +13,20 @@ const ENV = {
   MODEL_NAME: "gpt-5.4-mini",
 };
 
-describe("composeRun", () => {
+describe("composePipeline", () => {
   it("names every missing app setting at once", () => {
     expect(() =>
-      composeRun({ ...ENV, TABLES_URL: " ", GITHUB_RESUME_PAT: undefined }, credential),
+      composePipeline({ ...ENV, TABLES_URL: " ", GITHUB_RESUME_PAT: undefined }, credential),
     ).toThrow(new RunConfigError("missing app settings: TABLES_URL, GITHUB_RESUME_PAT"));
   });
 
   it("builds every node and effect without connecting to anything", () => {
-    const run = composeRun(ENV, credential, {
+    const pipeline = composePipeline(ENV, credential, {
       fetch: (async () => {
         throw new Error("no network in compose");
       }) as unknown as typeof fetch,
     });
-    expect(Object.keys(run.steps).sort()).toEqual(
+    expect(Object.keys(pipeline.deterministicSteps).sort()).toEqual(
       [
         "dedupe",
         "fetchMail",
@@ -40,12 +40,16 @@ describe("composeRun", () => {
         "verifyJudgements",
       ].sort(),
     );
-    expect(Object.keys(run.model).sort()).toEqual(["explain", "extractPostings", "judge"]);
-    expect(Object.keys(run.effects).sort()).toEqual(["deliver", "markSeen"]);
+    expect(Object.keys(pipeline.modelSteps).sort()).toEqual([
+      "explain",
+      "extractPostings",
+      "judge",
+    ]);
+    expect(Object.keys(pipeline.effects).sort()).toEqual(["deliver", "markSeen"]);
   });
 
   it("needs the model settings too", () => {
     const { MODEL_PROVIDER: _drop, ...noModel } = ENV;
-    expect(() => composeRun(noModel, credential)).toThrow("MODEL_PROVIDER is not set");
+    expect(() => composePipeline(noModel, credential)).toThrow("MODEL_PROVIDER is not set");
   });
 });

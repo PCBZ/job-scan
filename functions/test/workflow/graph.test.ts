@@ -5,7 +5,10 @@ import { posting } from "../postings/helpers.js";
 import { fakes } from "./fakes.js";
 
 function run(f: ReturnType<typeof fakes>, options = {}, signal?: AbortSignal) {
-  return buildWorkflow(f.code, f.llm, f.effects, options).invoke({}, signal ? { signal } : {});
+  return buildWorkflow(f.deterministicSteps, f.modelSteps, f.effects, options).invoke(
+    {},
+    signal ? { signal } : {},
+  );
 }
 
 const ranBefore = (log: string[], a: string, b: string) => log.indexOf(a) < log.indexOf(b);

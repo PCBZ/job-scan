@@ -54,7 +54,7 @@ export function fakes(o: FakeOptions = {}) {
     llmInputs.push({ node, args });
   };
 
-  const code: DeterministicSteps = {
+  const deterministicSteps: DeterministicSteps = {
     async loadConfig() {
       log.push("load_config");
       return CONFIG;
@@ -131,7 +131,7 @@ export function fakes(o: FakeOptions = {}) {
     },
   };
 
-  const llm: ModelSteps = {
+  const modelSteps: ModelSteps = {
     async extractPostings(...args) {
       counters.extract++;
       llmCall("extract_postings", args);
@@ -176,5 +176,5 @@ export function fakes(o: FakeOptions = {}) {
     },
   };
 
-  return { code, llm, effects, log, llmInputs, counters, reported };
+  return { deterministicSteps, modelSteps, effects, log, llmInputs, counters, reported };
 }

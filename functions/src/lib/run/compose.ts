@@ -58,13 +58,18 @@ export interface ComposeOptions {
   onFallback?: (err: ModelProviderError) => void;
 }
 
-export interface Run {
-  steps: DeterministicSteps;
-  model: ModelSteps;
+/** Everything buildWorkflow runs: the code steps, the model steps and the side effects. */
+export interface Pipeline {
+  deterministicSteps: DeterministicSteps;
+  modelSteps: ModelSteps;
   effects: Effects;
 }
 
-export function composeRun(env: Env, credential: TokenCredential, o: ComposeOptions = {}): Run {
+export function composePipeline(
+  env: Env,
+  credential: TokenCredential,
+  o: ComposeOptions = {},
+): Pipeline {
   const missing = REQUIRED.filter((key) => !env[key]?.trim());
   if (missing.length) throw new RunConfigError(`missing app settings: ${missing.join(", ")}`);
   const setting = (key: (typeof REQUIRED)[number]) => (env[key] as string).trim();
@@ -82,7 +87,7 @@ export function composeRun(env: Env, credential: TokenCredential, o: ComposeOpti
     o.onFallback ? { onFallback: o.onFallback } : {},
   );
 
-  const steps: DeterministicSteps = {
+  const deterministicSteps: DeterministicSteps = {
     loadConfig: () => loadConfig(configSource),
     loadResumes: (config) =>
       loadResumes(
@@ -102,7 +107,7 @@ export function composeRun(env: Env, credential: TokenCredential, o: ComposeOpti
     renderReport: (input) => buildReport(input, now()),
   };
 
-  const model: ModelSteps = {
+  const modelSteps: ModelSteps = {
     extractPostings: extractStep(client),
     judge: judgeStep(client),
     explain: explainStep(client),
@@ -118,5 +123,5 @@ export function composeRun(env: Env, credential: TokenCredential, o: ComposeOpti
     now,
   });
 
-  return { steps, model, effects };
+  return { deterministicSteps, modelSteps, effects };
 }
