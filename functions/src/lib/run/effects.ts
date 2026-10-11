@@ -7,7 +7,7 @@ import type { AppConfig } from "../config/load.js";
 import { addDays, runDay } from "../day.js";
 import { emailReport, emailSettings, gmailTransport } from "../delivery/email.js";
 import { telegramReport, telegramSettings } from "../delivery/telegram.js";
-import { SEEN_MESSAGE_DAYS, type SeenStore } from "../mail/seen-store.js";
+import { isPruneDay, SEEN_MESSAGE_DAYS, type SeenStore } from "../mail/seen-store.js";
 import type { TableApplications } from "../postings/applications.js";
 import type { TableSeenJobsStore } from "../postings/seen-jobs.js";
 import { renderHtml } from "../report/html.js";
@@ -67,9 +67,9 @@ export function productionEffects(d: EffectsServices): Effects {
         day,
       );
       await d.applications.addPending(top, day);
-      // Last: the report is out and this mail is recorded, so a failed prune
-      // fails the run visibly without bringing anything back tomorrow.
-      await d.seen.pruneOlderThan(addDays(day, -SEEN_MESSAGE_DAYS));
+      // Last, and weekly: the report is out and this mail is recorded, so a
+      // failed prune fails the run visibly without bringing anything back.
+      if (isPruneDay(day)) await d.seen.pruneOlderThan(addDays(day, -SEEN_MESSAGE_DAYS));
     },
   };
 }

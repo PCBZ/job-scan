@@ -1,6 +1,6 @@
 import type { TableClient, TransactionAction } from "@azure/data-tables";
 import { describe, expect, it } from "vitest";
-import { TableSeenStore } from "../../src/lib/mail/seen-store.js";
+import { isPruneDay, TableSeenStore } from "../../src/lib/mail/seen-store.js";
 
 class FakeTable {
   transactions: TransactionAction[][] = [];
@@ -92,6 +92,17 @@ describe("TableSeenStore.pruneOlderThan", () => {
     }
     expect(fake.transactions[2]).toEqual([
       ["delete", { partitionKey: "dropped-account", rowKey: "d0" }],
+    ]);
+  });
+});
+
+describe("isPruneDay", () => {
+  it("is Sunday only", () => {
+    // 2026-10-11 is a Sunday.
+    expect(["2026-10-10", "2026-10-11", "2026-10-12"].map(isPruneDay)).toEqual([
+      false,
+      true,
+      false,
     ]);
   });
 });

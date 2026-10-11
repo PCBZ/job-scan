@@ -13,6 +13,18 @@ import type { TokenCredential } from "@azure/identity";
  */
 export const SEEN_MESSAGE_DAYS = 90;
 
+/**
+ * Pruning runs on Sundays only: a day's worth of rows is too few to be worth a
+ * daily table scan. A missed Sunday leaves rows a week longer, which seenIds'
+ * cutoff never reads.
+ */
+export const PRUNE_WEEKDAY = 0;
+
+/** Whether `day` (YYYY-MM-DD) is the prune day. */
+export function isPruneDay(day: string): boolean {
+  return new Date(`${day}T00:00:00Z`).getUTCDay() === PRUNE_WEEKDAY;
+}
+
 export interface SeenStore {
   /** Message-IDs recorded for this account on or after `since` (YYYY-MM-DD). */
   seenIds(account: string, since: string): Promise<Set<string>>;

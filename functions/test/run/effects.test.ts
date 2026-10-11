@@ -31,7 +31,12 @@ const ENV = {
 };
 
 function harness(
-  over: { emailFails?: boolean; telegramFails?: boolean; env?: Record<string, string> } = {},
+  over: {
+    emailFails?: boolean;
+    telegramFails?: boolean;
+    env?: Record<string, string>;
+    now?: Date;
+  } = {},
 ) {
   const calls: string[] = [];
   const stream = nodemailer.createTransport({ streamTransport: true, buffer: true });
@@ -73,7 +78,7 @@ function harness(
         return stream.sendMail(m);
       },
     }),
-    now: () => NOW,
+    now: () => over.now ?? NOW,
   });
   return { effects, calls };
 }
@@ -126,21 +131,28 @@ describe("productionEffects.deliver", () => {
 });
 
 describe("productionEffects.markSeen", () => {
-  it("records the messages, the recommended postings and a pending row each, then prunes", async () => {
+  const mail = {
+    messages: [
+      { account: "a", message_id: "<1@x>" },
+      { account: "a", message_id: "<2@x>" },
+    ],
+  } as FetchPayload;
+
+  it("records the messages, the recommended postings and a pending row each, on the run's day", async () => {
+    // 2026-10-09 is a Friday: no prune.
     const { effects, calls } = harness();
-    const mail = {
-      messages: [
-        { account: "a", message_id: "<1@x>" },
-        { account: "a", message_id: "<2@x>" },
-      ],
-    } as FetchPayload;
     await effects.markSeen({ mail, top: [rankedOf(judgement())] });
-    // 90 days before the run's day, 2026-10-09.
+    expect(calls).toEqual(["seen 2 2026-10-09", "jobs 1 2026-10-09", "pending 1 2026-10-09"]);
+  });
+
+  it("on Sundays, prunes last, 90 days back", async () => {
+    const { effects, calls } = harness({ now: new Date("2026-10-11T15:00:00Z") });
+    await effects.markSeen({ mail, top: [rankedOf(judgement())] });
     expect(calls).toEqual([
-      "seen 2 2026-10-09",
-      "jobs 1 2026-10-09",
-      "pending 1 2026-10-09",
-      "prune before 2026-07-11",
+      "seen 2 2026-10-11",
+      "jobs 1 2026-10-11",
+      "pending 1 2026-10-11",
+      "prune before 2026-07-13",
     ]);
   });
 });

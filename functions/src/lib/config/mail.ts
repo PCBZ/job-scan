@@ -26,6 +26,13 @@ const SHARED_DEFAULTS = {
   maxCharsPerMessage: 6000,
 };
 
+/**
+ * [mail] days when unset, as in the local skill (workspace.mail_config). The
+ * run is daily, so two days overlap by one: a late or failed run misses
+ * nothing, and Message-ID dedupe drops the repeats.
+ */
+export const DEFAULT_LOOKBACK_DAYS = 2;
+
 export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
   const mail = raw.mail ?? {};
   const shared = {
@@ -114,10 +121,9 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
     accounts.push(account);
   });
 
-  // max_messages is per account, so the whole-run ceiling caps total volume.
   // Seen Message-IDs are kept SEEN_MESSAGE_DAYS; a window reaching past that
   // would bring forgotten mail back as new.
-  const days = mail.days ?? 2;
+  const days = mail.days ?? DEFAULT_LOOKBACK_DAYS;
   if (days >= SEEN_MESSAGE_DAYS) {
     throw new ConfigError(
       `[mail] days = ${days} in ${origin} reaches past the ${SEEN_MESSAGE_DAYS}-day seen-message retention. ` +
@@ -125,6 +131,7 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
     );
   }
 
+  // max_messages is per account, so the whole-run ceiling caps total volume.
   return {
     accounts,
     maxTotalMessages: mail.max_total_messages ?? 150,
