@@ -2,10 +2,11 @@
 // scripts/fetch_mail.py: one failing mailbox never sinks the run, and a
 // whole-run budget keeps the newest messages.
 
+import { addDays, runDay } from "../day.js";
 import { codePointLength } from "../unicode.js";
 import { fetchAccount } from "./fetch.js";
 import type { ConnectMailbox } from "./mailbox.js";
-import type { SeenStore } from "./seen-store.js";
+import { SEEN_MESSAGE_DAYS, type SeenStore } from "./seen-store.js";
 import type {
   AccountFailure,
   AccountStats,
@@ -40,7 +41,7 @@ export function isPlaceholder(value: string | undefined): boolean {
 
 export interface RunDeps {
   connect: ConnectMailbox;
-  seen: SeenStore;
+  seen: Pick<SeenStore, "seenIds">;
   env: Record<string, string | undefined>;
   now: Date;
 }
@@ -53,6 +54,7 @@ export async function runFetch(
   const perAccount: AccountStats[] = [];
   const failures: AccountFailure[] = [];
 
+  const since = addDays(runDay(deps.now), -SEEN_MESSAGE_DAYS);
   for (const account of config.accounts) {
     const user = deps.env[account.userEnv];
     const password = deps.env[account.passwordEnv];
@@ -63,7 +65,7 @@ export async function runFetch(
     try {
       const mailbox = await deps.connect(account, user as string, password as string);
       try {
-        const seenIds = await deps.seen.seenIds(account.name);
+        const seenIds = await deps.seen.seenIds(account.name, since);
         const got = await fetchAccount(mailbox, account, config.days, seenIds, deps.now);
         messages.push(...got.messages);
         perAccount.push(got.stats);

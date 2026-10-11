@@ -3,6 +3,7 @@
 // whether a key is set. Credentials are not here; an account names the
 // environment variables that hold them.
 
+import { SEEN_MESSAGE_DAYS } from "../mail/seen-store.js";
 import type { MailAccount, MailRunConfig } from "../mail/types.js";
 import { ConfigError } from "./error.js";
 import type { RawConfig } from "./schema.js";
@@ -24,6 +25,13 @@ const SHARED_DEFAULTS = {
   maxMessages: 60,
   maxCharsPerMessage: 6000,
 };
+
+/**
+ * [mail] days when unset, as in the local skill (workspace.mail_config). The
+ * run is daily, so two days overlap by one: a late or failed run misses
+ * nothing, and Message-ID dedupe drops the repeats.
+ */
+export const DEFAULT_LOOKBACK_DAYS = 2;
 
 export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
   const mail = raw.mail ?? {};
@@ -113,10 +121,20 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
     accounts.push(account);
   });
 
+  // Seen Message-IDs are kept SEEN_MESSAGE_DAYS; a window reaching past that
+  // would bring forgotten mail back as new.
+  const days = mail.days ?? DEFAULT_LOOKBACK_DAYS;
+  if (days >= SEEN_MESSAGE_DAYS) {
+    throw new ConfigError(
+      `[mail] days = ${days} in ${origin} reaches past the ${SEEN_MESSAGE_DAYS}-day seen-message retention. ` +
+        `Use fewer than ${SEEN_MESSAGE_DAYS}.`,
+    );
+  }
+
   // max_messages is per account, so the whole-run ceiling caps total volume.
   return {
     accounts,
     maxTotalMessages: mail.max_total_messages ?? 150,
-    days: mail.days ?? 2,
+    days,
   };
 }

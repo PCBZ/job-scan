@@ -126,6 +126,11 @@ describe("parseConfig rejects", () => {
       MIN.replace('senders = ["linkedin.com"]', 'senders = ["linkedin.com"]\ndays = "seven"'),
       "mail.days",
     ],
+    [
+      "a lookback reaching past the seen-message retention",
+      MIN.replace('senders = ["linkedin.com"]', 'senders = ["linkedin.com"]\ndays = 90'),
+      "[mail] days = 90 in config.toml reaches past the 90-day seen-message retention",
+    ],
     ["a value outside an enum", `${MIN}\n[profile]\nseniority = "lead"\n`, "profile.seniority"],
     ["an unknown top-level table", `${MIN}\n[extras]\nx = 1\n`, 'Unrecognized key: "extras"'],
     ["a config with no accounts", `[mail]\nsenders = ["x"]\n`, "no [[account]] block"],
