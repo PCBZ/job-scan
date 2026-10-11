@@ -121,3 +121,11 @@ GitHub builds this subject only after the repository's subject template lists
 those claim keys, which `set-github-vars.sh` sets from
 `terraform output github_oidc_claim_keys`. If you rename the workflow, change
 `github_workflow` to match.
+
+The subject names neither the tag nor the workflow file. Any tag gets a token
+for a workflow named `CD`, and the `v*` and "on `main`" checks live in
+`cd.yml` at the tagged commit, which whoever pushes the tag controls. So
+creating a tag is the real boundary: `set-github-vars.sh` applies a tag
+ruleset (**Release tags**) that lets only repository admins create, move or
+delete tags. A collaborator with write access can't release, and if you add
+one, keep them below admin.

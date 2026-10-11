@@ -41,3 +41,21 @@ keys=$(terraform output -json github_oidc_claim_keys)
 printf '{"use_default":false,"use_immutable_subject":true,"include_claim_keys":%s}' "$keys" |
   gh api -X PUT "repos/$repo/actions/oidc/customization/sub" --input - >/dev/null
 echo "set OIDC subject claims $keys"
+
+# Any tag of a workflow named CD gets a token (see infra/github_oidc.tf), so
+# only admins may create, move or delete tags: a writer can't release.
+# RepositoryRole 5 is the admin role.
+# https://docs.github.com/en/rest/repos/rules#create-a-repository-ruleset
+ruleset='{"name":"Release tags","target":"tag","enforcement":"active",
+  "bypass_actors":[{"actor_id":5,"actor_type":"RepositoryRole","bypass_mode":"always"}],
+  "conditions":{"ref_name":{"include":["~ALL"],"exclude":[]}},
+  "rules":[{"type":"creation"},
+    {"type":"update","parameters":{"update_allows_fetch_and_merge":false}},
+    {"type":"deletion"}]}'
+id=$(gh api "repos/$repo/rulesets?targets=tag" --jq '.[] | select(.name == "Release tags") | .id')
+if [ -n "$id" ]; then
+  printf '%s' "$ruleset" | gh api -X PUT "repos/$repo/rulesets/$id" --input - >/dev/null
+else
+  printf '%s' "$ruleset" | gh api -X POST "repos/$repo/rulesets" --input - >/dev/null
+fi
+echo "set tag ruleset: only admins create, move or delete tags"

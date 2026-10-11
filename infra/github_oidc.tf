@@ -1,7 +1,10 @@
-# Only tag pushes of the CD workflow may deploy: GitHub puts the workflow's
-# name and the ref type in the subject (set by infra/set-github-vars.sh from
-# github_oidc_claim_keys), so a branch run gets ref_type:branch and no token.
-# The workflow itself checks that the tag is v* and on main.
+# Trusts a run of a workflow named CD on any tag of this repository: GitHub
+# puts the workflow's name and the ref type in the subject (set by
+# infra/set-github-vars.sh from github_oidc_claim_keys), so a branch run gets
+# ref_type:branch and no token. Which tag, and what the workflow file says,
+# isn't part of the subject: v* and "on main" are checked by cd.yml, which
+# whoever creates the tag controls. So creating tags is the boundary, limited
+# to admins by the tag ruleset set-github-vars.sh applies.
 locals {
   github_subject_claims = [
     { key = "workflow", value = var.github_workflow },
