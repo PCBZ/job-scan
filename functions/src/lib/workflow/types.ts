@@ -14,11 +14,15 @@ import type { Judgement } from "../judge/verify.js";
 import type { AllAccountsFailed, FetchedMessage, FetchPayload } from "../mail/types.js";
 import type { RepairTurn, TokenUsage } from "../model/types.js";
 import type { Filtered } from "../postings/gates.js";
+import type { SuspiciousFlag } from "../postings/schema.js";
 import type { Posting, Source } from "../postings/types.js";
 import type { Report } from "../report/types.js";
 import type { ResumeSet } from "../resume/load.js";
 
-export type { Explanation, Filtered, Judgement, Posting, Ranked, Report };
+export type { Explanation, Filtered, Judgement, Posting, Ranked, Report, SuspiciousFlag };
+
+/** Suspicious flags by Message-ID. A message with no entry wasn't checked. */
+export type SuspiciousByMessage = Record<string, SuspiciousFlag[]>;
 
 // Shapes the node issues define; the graph only moves them between nodes.
 
@@ -31,11 +35,12 @@ export interface LlmResult<T> {
 
 /** Steps that call the model. Inputs are plain data. */
 export interface ModelSteps {
+  /** Also flags suspicious content, per message asked this time (#66). */
   extractPostings(
     input: { messages: FetchedMessage[] },
     repairs: RepairTurn[],
     signal?: AbortSignal,
-  ): Promise<LlmResult<Posting[]>>;
+  ): Promise<LlmResult<Posting[]> & { suspicious: SuspiciousByMessage }>;
   judge(
     input: JudgeInput,
     repairs: RepairTurn[],
@@ -101,6 +106,7 @@ export interface ReportInput {
   /** Scored postings outside the top, best first. */
   rest: Ranked[];
   explanations: Explanation[];
+  suspicious: SuspiciousByMessage;
   warnings: string[];
   /** What a gate couldn't compare, said once in the report. */
   notes: string[];

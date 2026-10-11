@@ -94,6 +94,17 @@ export const SAMPLE: Report = {
       ],
     },
   ],
-  suspicious: "not checked",
+  suspicious: {
+    items: [
+      {
+        kind: "payment",
+        from: "Talent Desk <hr@quickhire.example>",
+        subject: "Offer: remote data entry, start today",
+        reason: "Asks for an upfront fee before any interview.",
+        quote: "pay a $49 onboarding fee to secure your position",
+      },
+    ],
+    unchecked: 0,
+  },
   housekeeping: ["personal hit the message budget: 3 messages left for the next run."],
 };

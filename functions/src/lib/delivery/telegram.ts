@@ -79,11 +79,16 @@ export function telegramMessage(r: Report, webUrl?: string): TelegramMessage {
   // Lengths are bounded on plain text, before any markup is added, so the
   // message never needs a raw cut that could split a tag or an entity.
   const alerts = r.alerts.map((a) => `⚠️ ${esc(clip(a, ALERT_MAX))}`);
+  // A count only: quotes are the mail's own words, and they belong in the
+  // full report, not in a chat.
+  const n = r.suspicious === "not checked" ? 0 : r.suspicious.items.length;
+  const flagged = n ? [`🚩 ${n} suspicious item${n === 1 ? "" : "s"}: see the full report.`] : [];
   const headFor = (k: number) =>
     [
       `<b>Job Scan — ${esc(r.day)}</b>`,
       ...alerts.slice(0, k),
       ...(k < alerts.length ? [`⚠️ …and ${alerts.length - k} more alerts in the full report.`] : []),
+      ...flagged,
       esc(r.funnel),
     ].join("\n");
   // Leave room after the header for the empty-day or "…and N more" line.

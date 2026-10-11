@@ -14,7 +14,7 @@ import type { RepairTurn } from "../../src/lib/model/types.js";
 import { extractStep } from "../../src/lib/postings/extract.js";
 import type { Posting } from "../../src/lib/postings/types.js";
 import { validatePostings } from "../../src/lib/postings/validate.js";
-import { fixture, VENDORS } from "../postings/fixtures.js";
+import { fixture, SUSPICIOUS, suspiciousFixture, VENDORS } from "../postings/fixtures.js";
 
 const MAX_REPAIRS = 2;
 
@@ -59,4 +59,24 @@ describe.skipIf(process.env.EVAL_LIVE !== "1")("extraction, live", () => {
       expect(rows.map((r) => r.salary)).toEqual(expected.map((e) => e.salary));
     },
   );
+
+  it.each(SUSPICIOUS)(
+    "%s: flags what it should, quoting the email",
+    { timeout: 120_000 },
+    async (name) => {
+      const { message, expected_kinds } = suspiciousFixture(name);
+      const out = await extract()({ messages: [message] }, []);
+      const flags = out.suspicious[message.message_id] ?? [];
+      for (const f of flags) console.log(`  ${f.kind}: ${f.reason} | "${f.quote}"`);
+      for (const w of out.warnings ?? []) console.log(`  warning: ${w}`);
+      // verifiedFlags already dropped any flag whose quote isn't in the email.
+      for (const kind of expected_kinds) expect(flags.map((f) => f.kind)).toContain(kind);
+    },
+  );
+
+  it.each(VENDORS)("%s: an ordinary alert raises no flag", { timeout: 120_000 }, async (vendor) => {
+    const { message } = fixture(vendor);
+    const out = await extract()({ messages: [message] }, []);
+    expect(out.suspicious[message.message_id]).toEqual([]);
+  });
 });

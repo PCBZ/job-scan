@@ -78,6 +78,24 @@ function filteredGroups(input: ReportInput): FilteredGroup[] {
 export const NO_RESUMES =
   "No resumes could be read, so today's postings weren't scored. The next run scores the same mail.";
 
+/** Flags in the mail's order, with the message they came from. */
+function suspiciousSection(input: ReportInput): Report["suspicious"] {
+  const mail = input.mail;
+  if (!mail || "error" in mail) return "not checked";
+  return {
+    items: mail.messages.flatMap((m) =>
+      (input.suspicious[m.message_id] ?? []).map((f) => ({
+        kind: f.kind,
+        from: m.from,
+        subject: m.subject,
+        reason: f.reason,
+        quote: f.quote,
+      })),
+    ),
+    unchecked: mail.messages.filter((m) => !Object.hasOwn(input.suspicious, m.message_id)).length,
+  };
+}
+
 export function buildReport(input: ReportInput, now: Date = new Date()): Report {
   const mail = input.mail;
   const payload = mail && !("error" in mail) ? mail : null;
@@ -140,7 +158,7 @@ export function buildReport(input: ReportInput, now: Date = new Date()): Report 
     top: input.top.map((pick) => topPick(pick, input)),
     others: input.rest.map(otherPick),
     filtered: filteredGroups(input),
-    suspicious: "not checked",
+    suspicious: suspiciousSection(input),
     housekeeping,
   };
 }

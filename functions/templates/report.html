@@ -407,7 +407,9 @@
                         <tr>
                             <td class="card" style="padding: 20px; font-family: sans-serif; font-size: 15px; line-height: 22px; color: #344054;">
                                 <h2 style="margin: 0 0 12px; font-size: 20px; line-height: 26px; color: #101828; font-weight: bold;">Suspicious</h2>
-                                <p style="margin: 0 0 8px; color: #667085;" class="muted">Not checked: no step looks for suspicious mail yet.</p>
+                                {{#suspicious}}{{#lead}}<p style="margin: 0 0 8px;">{{.}}</p>{{/lead}}
+                                {{#items}}<p style="margin: 0 0 4px;"><b>{{kind}}</b>: {{from}} — “{{subject}}”</p><p style="margin: 0 0 4px;">{{reason}}</p><p style="margin: 0 0 12px; padding-left: 10px; border-left: 3px solid #b42318; color: #475467;" class="muted">{{quote}}</p>{{/items}}
+                                {{#unchecked}}<p style="margin: 0 0 8px; color: #667085;" class="muted">{{unchecked}}</p>{{/unchecked}}{{/suspicious}}
                             </td>
                         </tr>
                     </table>

@@ -132,6 +132,19 @@ describe("workflow graph", () => {
     ]);
   });
 
+  it("keeps each message's suspicious flags across repairs, replacing only re-asked ones", async () => {
+    const flag = (quote: string) => [{ kind: "scam" as const, reason: "r", quote }];
+    const f = fakes({
+      extractProblems: [["x"], []],
+      extractSuspicious: [{ "<m0@x>": flag("first"), "<m1@x>": [] }, { "<m1@x>": flag("second") }],
+    });
+    await run(f);
+    expect(f.reported.at(-1)?.suspicious).toEqual({
+      "<m0@x>": flag("first"),
+      "<m1@x>": flag("second"),
+    });
+  });
+
   it("with no new mail, skips extraction and judging and sends a short report", async () => {
     const f = fakes({ messages: 0 });
     const out = await run(f);
