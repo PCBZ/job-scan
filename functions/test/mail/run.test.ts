@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ConnectMailbox } from "../../src/lib/mail/mailbox.js";
 import { isPlaceholder, runFetch } from "../../src/lib/mail/run.js";
-import { MemorySeenStore } from "../../src/lib/mail/seen-store.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
 import { account, eml, FakeMailbox, LONG_PLAIN } from "./helpers.js";
 
@@ -12,6 +11,8 @@ const ENV = {
   B_USER: "b@gmail.com",
   B_PASSWORD: "test-password-b",
 };
+/** Nothing seen yet: the fetch only reads seen IDs. */
+const noneSeen = { seenIds: async () => new Set<string>() };
 const A = account({ name: "a", userEnv: "A_USER", passwordEnv: "A_PASSWORD" });
 const B = account({ name: "b", userEnv: "B_USER", passwordEnv: "B_PASSWORD" });
 
@@ -34,8 +35,6 @@ describe("runFetch", () => {
         asked.push([account, since]);
         return new Set<string>();
       },
-      markSeen: async () => {},
-      pruneOlderThan: async () => 0,
     };
     await runFetch(
       { accounts: [A], maxTotalMessages: 150, days: 2 },
@@ -54,7 +53,7 @@ describe("runFetch", () => {
     };
     const out = (await runFetch(
       { accounts: [A, B], maxTotalMessages: 150, days: 2 },
-      { connect, seen: new MemorySeenStore(), env: ENV, now: NOW },
+      { connect, seen: noneSeen, env: ENV, now: NOW },
     )) as FetchPayload;
     expect(out.failures).toEqual([
       { account: "a", error: "AuthError", detail: "AUTHENTICATIONFAILED" },
@@ -73,7 +72,7 @@ describe("runFetch", () => {
       { accounts: [A], maxTotalMessages: 150, days: 2 },
       {
         connect,
-        seen: new MemorySeenStore(),
+        seen: noneSeen,
         env: { A_USER: "you@gmail.com", A_PASSWORD: "xxxxxxxxxxxxxxxx" },
         now: NOW,
       },
@@ -89,7 +88,7 @@ describe("runFetch", () => {
     const box = new FakeMailbox(new Map(), () => new Error("search down"));
     const out = await runFetch(
       { accounts: [A], maxTotalMessages: 150, days: 2 },
-      { connect: async () => box, seen: new MemorySeenStore(), env: ENV, now: NOW },
+      { connect: async () => box, seen: noneSeen, env: ENV, now: NOW },
     );
     expect(box.closed).toBe(true);
     expect(out).toMatchObject({ error: "all_accounts_failed" });
@@ -105,7 +104,7 @@ describe("runFetch", () => {
       { accounts: [A, B], maxTotalMessages: 2, days: 2 },
       {
         connect: async (acct) => (acct.name === "a" ? boxA : boxB),
-        seen: new MemorySeenStore(),
+        seen: noneSeen,
         env: ENV,
         now: NOW,
       },

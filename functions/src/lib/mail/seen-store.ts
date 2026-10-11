@@ -22,26 +22,6 @@ export interface SeenStore {
   pruneOlderThan(cutoff: string): Promise<number>;
 }
 
-export class MemorySeenStore implements SeenStore {
-  private readonly ids = new Map<string, Set<string>>();
-
-  async seenIds(account: string): Promise<Set<string>> {
-    return new Set(this.ids.get(account) ?? []);
-  }
-
-  async pruneOlderThan(): Promise<number> {
-    return 0;
-  }
-
-  async markSeen(messages: { account: string; message_id: string }[]): Promise<void> {
-    for (const m of messages) {
-      const set = this.ids.get(m.account) ?? new Set<string>();
-      set.add(m.message_id);
-      this.ids.set(m.account, set);
-    }
-  }
-}
-
 // A type alias, not an interface: the Tables SDK needs Record<string, unknown>.
 type SeenEntity = {
   partitionKey: string;

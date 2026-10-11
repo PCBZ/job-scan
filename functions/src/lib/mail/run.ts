@@ -41,7 +41,7 @@ export function isPlaceholder(value: string | undefined): boolean {
 
 export interface RunDeps {
   connect: ConnectMailbox;
-  seen: SeenStore;
+  seen: Pick<SeenStore, "seenIds">;
   env: Record<string, string | undefined>;
   now: Date;
 }
