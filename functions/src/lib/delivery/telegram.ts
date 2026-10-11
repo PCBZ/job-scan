@@ -123,16 +123,33 @@ export async function telegramReport(
   signal?: AbortSignal,
 ): Promise<void> {
   const { text, buttons } = telegramMessage(report, webUrl);
-  const res = await fetchFn(`${TELEGRAM_API}/bot${s.token}/sendMessage`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
+  await callBotApi(
+    fetchFn,
+    s.token,
+    "sendMessage",
+    {
       chat_id: s.chatId,
       text,
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
       ...(buttons.length ? { reply_markup: { inline_keyboard: buttons } } : {}),
-    }),
+    },
+    signal,
+  );
+}
+
+/** One Bot API method, failing with Telegram's reason, never the token. */
+export async function callBotApi(
+  fetchFn: typeof fetch,
+  token: string,
+  method: string,
+  payload: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetchFn(`${TELEGRAM_API}/bot${token}/${method}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
     ...(signal ? { signal } : {}),
   });
   const body = (await res.json().catch(() => ({}))) as {

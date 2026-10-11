@@ -19,6 +19,7 @@ because Key Vault names allow only letters, digits and `-`.
 |---|---|---|
 | `GITHUB_RESUME_PAT` | `github-resume-pat` | Fine-grained PAT, read-only Contents on the resume repo |
 | `TELEGRAM_BOT_TOKEN` | `telegram-bot-token` | The bot's token from @BotFather |
+| `TELEGRAM_WEBHOOK_SECRET` | `telegram-webhook-secret` | The webhook's secret token, 32+ of `A-Z a-z 0-9 _ -` (`openssl rand -hex 32`) |
 | `TYPESAFE_API_KEY` | `typesafe-api-key` | Jev's API key |
 | `GMAIL_MAIN_USER` | `gmail-main-user` | A mailbox's address, one pair per account |
 | `GMAIL_MAIN_PASSWORD` | `gmail-main-password` | That mailbox's app password |

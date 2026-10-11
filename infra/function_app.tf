@@ -5,9 +5,10 @@
 locals {
   secret_settings = concat(
     [
-      "GITHUB_RESUME_PAT",  # the resume repo, read-only (#11)
-      "TELEGRAM_BOT_TOKEN", # the bot (#21)
-      "TYPESAFE_API_KEY",   # Jev
+      "GITHUB_RESUME_PAT",       # the resume repo, read-only (#11)
+      "TELEGRAM_BOT_TOKEN",      # the bot (#21)
+      "TELEGRAM_WEBHOOK_SECRET", # its webhook's secret token (#24)
+      "TYPESAFE_API_KEY",        # Jev
     ],
     var.mail_credential_envs, # IMAP, and the SMTP sender's (#9, #20)
   )

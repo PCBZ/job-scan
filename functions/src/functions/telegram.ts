@@ -1,18 +1,17 @@
-import {
-  app,
-  type HttpRequest,
-  type HttpResponseInit,
-  type InvocationContext,
-} from "@azure/functions";
+import { app, type HttpRequest, type InvocationContext } from "@azure/functions";
+import { handleWebhook } from "../lib/delivery/webhook.js";
 
-// Placeholder for Telegram button callbacks. Telegram only needs a 200 ack;
-// secret-token verification and state updates arrive with the webhook issue.
-export async function telegram(
-  _request: HttpRequest,
-  context: InvocationContext,
-): Promise<HttpResponseInit> {
-  context.log("telegram: callback received");
-  return { status: 200 };
+// The Telegram webhook (#24), registered by `npm run telegram:webhook`. Public
+// (anonymous): Telegram can't send a function key, so its secret token header
+// is the authentication.
+export async function telegram(request: HttpRequest, context: InvocationContext) {
+  return handleWebhook(
+    {
+      secretHeader: request.headers.get("x-telegram-bot-api-secret-token"),
+      body: await request.text(),
+    },
+    { env: process.env, fetch, log: context },
+  );
 }
 
 app.http("telegram", {
