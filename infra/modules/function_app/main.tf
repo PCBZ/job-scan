@@ -20,6 +20,12 @@ resource "azurerm_function_app_flex_consumption" "this" {
   storage_container_endpoint  = var.deployment_container_endpoint
   storage_authentication_type = "SystemAssignedIdentity"
 
+  # The release's package, uploaded through Kudu with the site's publishing
+  # credentials, which the provider reads over ARM; that needs basic auth on.
+  # Only a new path redeploys, so CD names each package after its tag.
+  zip_deploy_file                                = var.app_package
+  webdeploy_publish_basic_authentication_enabled = true
+
   instance_memory_in_mb  = var.instance_memory_in_mb
   maximum_instance_count = var.maximum_instance_count
   https_only             = true

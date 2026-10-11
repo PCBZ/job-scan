@@ -2,12 +2,13 @@ variable "container_id" {
   type = string
 }
 
-variable "source_path" {
-  description = "Local path of the config.toml to upload."
+variable "content" {
+  description = "config.toml's text."
   type        = string
+  sensitive   = true
 }
 
-variable "operator_principal_id" {
-  description = "Object ID of whoever runs Terraform; it uploads the blob."
-  type        = string
+variable "writer_principal_ids" {
+  description = "Who uploads the blob: every principal that runs Terraform."
+  type        = map(string)
 }

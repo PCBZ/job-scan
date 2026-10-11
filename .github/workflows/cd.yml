@@ -1,13 +1,120 @@
+# The deploy identity trusts this workflow by name: keep `name` in step with
+# infra's github_workflow.
 name: CD
 
-# Placeholder. Deployment will be added later, triggered by release tags.
+# A release is a v* tag on main: git tag vX.Y.Z && git push origin vX.Y.Z.
+# It applies infra/ as committed, with the tag's build as the app's code.
 on:
-  workflow_dispatch:
+  push:
+    tags: ["v*"]
 
 permissions: {}
 
+# One apply at a time, and never cancel one half-way.
+concurrency:
+  group: cd
+  cancel-in-progress: false
+
 jobs:
-  placeholder:
+  build:
+    name: Check and package
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: functions
     steps:
-      - run: echo "No deployment configured yet."
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Azure only checks that this is a tag of this workflow; that the tag is
+      # on main is checked here.
+      - name: Tag is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        working-directory: .
+        run: functions/node_modules/.bin/biome check .
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      # What the app reads at runtime: the compiled code, its prompts and
+      # report template, and production dependencies only. Named after the tag:
+      # Terraform redeploys only when the package path changes.
+      - name: Package
+        run: |
+          npm prune --omit=dev
+          zip -qr "../app-$GITHUB_REF_NAME.zip" dist prompts templates host.json package.json node_modules
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app
+          path: app-${{ github.ref_name }}.zip
+          retention-days: 7
+
+  deploy:
+    name: Terraform apply
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: infra
+    env:
+      # The azurerm provider and backend sign in with the job's OIDC token.
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      TF_VAR_operator_principal_id: ${{ vars.TF_VAR_operator_principal_id }}
+      TF_VAR_mail_credential_envs: ${{ vars.TF_VAR_mail_credential_envs }}
+      # The identity's rights stop at the resource group.
+      TF_VAR_register_resource_providers: "false"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: app
+          path: ${{ runner.temp }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.2"
+          terraform_wrapper: false
+
+      - name: Init
+        run: >-
+          terraform init
+          -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}"
+          -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}"
+          -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}"
+          -backend-config="key=${{ vars.TFSTATE_KEY }}"
+          -backend-config="use_azuread_auth=true"
+
+      - name: Apply
+        run: terraform apply -auto-approve -var "app_package=$RUNNER_TEMP/app-$GITHUB_REF_NAME.zip"

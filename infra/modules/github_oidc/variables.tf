@@ -15,12 +15,12 @@ variable "repository" {
   type        = string
 }
 
-variable "branch" {
-  description = "Branch whose workflow runs may deploy."
-  type        = string
+variable "subject_claims" {
+  description = "The claims after repo in the OIDC subject, in the order of the repository's include_claim_keys."
+  type        = list(object({ key = string, value = string }))
 }
 
-variable "function_app_id" {
+variable "key_vault_id" {
   type = string
 }
 

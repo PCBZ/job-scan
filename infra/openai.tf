@@ -12,6 +12,6 @@ module "openai" {
 
   user_principal_ids = {
     function = module.function_app.principal_id
-    operator = data.azurerm_client_config.current.object_id
+    operator = var.operator_principal_id
   }
 }
