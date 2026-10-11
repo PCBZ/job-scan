@@ -1,0 +1,145 @@
+{
+  "_note": "Generated from scripts/fetch_mail.py (passes_filter, search_terms). Synthetic addresses; no real mail.",
+  "passes_filter": [
+    {
+      "name": "allowlisted sender, any subject",
+      "sender": "Jobs <jobs-noreply@linkedin.com>",
+      "subject": "Your daily digest",
+      "senders": ["linkedin.com", "indeed.com"],
+      "subject_keywords": ["hiring", "招聘"],
+      "exclude_senders": ["noreply@github.com"],
+      "expected": true
+    },
+    {
+      "name": "unlisted sender, keyword in subject",
+      "sender": "Dana <dana@fabrikam.example>",
+      "subject": "We're HIRING a backend engineer",
+      "senders": ["linkedin.com", "indeed.com"],
+      "subject_keywords": ["hiring", "招聘"],
+      "exclude_senders": ["noreply@github.com"],
+      "expected": true
+    },
+    {
+      "name": "unlisted sender, CJK keyword",
+      "sender": "HR <hr@contoso.example>",
+      "subject": "后端工程师招聘",
+      "senders": ["linkedin.com", "indeed.com"],
+      "subject_keywords": ["hiring", "招聘"],
+      "exclude_senders": ["noreply@github.com"],
+      "expected": true
+    },
+    {
+      "name": "unlisted sender, no keyword",
+      "sender": "News <news@contoso.example>",
+      "subject": "Weekly newsletter",
+      "senders": ["linkedin.com", "indeed.com"],
+      "subject_keywords": ["hiring", "招聘"],
+      "exclude_senders": ["noreply@github.com"],
+      "expected": false
+    },
+    {
+      "name": "senders only: unlisted sender is dropped",
+      "sender": "News <news@contoso.example>",
+      "subject": "We're hiring",
+      "senders": ["linkedin.com", "indeed.com"],
+      "subject_keywords": [],
+      "exclude_senders": ["noreply@github.com"],
+      "expected": false
+    },
+    {
+      "name": "senders only: allowlisted sender is kept",
+      "sender": "Indeed <alert@indeed.com>",
+      "subject": "New jobs",
+      "senders": ["linkedin.com", "indeed.com"],
+      "subject_keywords": [],
+      "exclude_senders": ["noreply@github.com"],
+      "expected": true
+    },
+    {
+      "name": "keywords only: keyword is kept",
+      "sender": "Dana <dana@fabrikam.example>",
+      "subject": "Hiring now",
+      "senders": [],
+      "subject_keywords": ["hiring", "招聘"],
+      "exclude_senders": [],
+      "expected": true
+    },
+    {
+      "name": "keywords only: no keyword is dropped",
+      "sender": "Dana <dana@fabrikam.example>",
+      "subject": "Lunch?",
+      "senders": [],
+      "subject_keywords": ["hiring", "招聘"],
+      "exclude_senders": [],
+      "expected": false
+    },
+    {
+      "name": "neither list: everything in the window",
+      "sender": "Anyone <a@b.example>",
+      "subject": "Anything",
+      "senders": [],
+      "subject_keywords": [],
+      "exclude_senders": [],
+      "expected": true
+    },
+    {
+      "name": "excluded beats the allowlist and keywords",
+      "sender": "GitHub <noreply@github.com>",
+      "subject": "hiring at linkedin.com",
+      "senders": ["github.com"],
+      "subject_keywords": ["hiring", "招聘"],
+      "exclude_senders": ["noreply@github.com"],
+      "expected": false
+    },
+    {
+      "name": "sender case is ignored",
+      "sender": "Dana <Dana@Fabrikam.example>",
+      "subject": "Quick question",
+      "senders": ["FABRIKAM.example"],
+      "subject_keywords": ["Hiring"],
+      "exclude_senders": [],
+      "expected": true
+    },
+    {
+      "name": "keyword case is ignored",
+      "sender": "News <news@contoso.example>",
+      "subject": "now hiring",
+      "senders": ["linkedin.com"],
+      "subject_keywords": ["Hiring"],
+      "exclude_senders": [],
+      "expected": true
+    }
+  ],
+  "search_terms": [
+    {
+      "senders": [],
+      "subject_keywords": [],
+      "expected": []
+    },
+    {
+      "senders": ["linkedin.com", "indeed.com"],
+      "subject_keywords": [],
+      "expected": [["from", "linkedin.com"], ["from", "indeed.com"]]
+    },
+    {
+      "senders": [],
+      "subject_keywords": ["hiring", "招聘"],
+      "expected": [["subject", "hiring"], ["subject", "招聘"]]
+    },
+    {
+      "senders": ["linkedin.com", "indeed.com"],
+      "subject_keywords": ["hiring", "招聘"],
+      "expected": [
+        ["from", "linkedin.com"],
+        ["from", "indeed.com"],
+        ["subject", "hiring"],
+        ["subject", "招聘"]
+      ]
+    },
+    {
+      "senders": ["a\"b.com"],
+      "subject_keywords": ["say \"hi\""],
+      "expected": [["from", "a\"b.com"], ["subject", "say \"hi\""]]
+    }
+  ]
+}

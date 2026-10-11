@@ -18,11 +18,11 @@ export async function fetchAccount(
   const since = new Date(now.getTime() - days * DAY_MS);
   let uids: number[];
   try {
-    uids = await mailbox.search({ since, from: account.senders });
+    uids = await mailbox.search({ since, from: account.senders, subject: account.subjectKeywords });
   } catch {
-    // Some servers reject long OR chains; fall back to the date alone and let
-    // the per-message filters do the work.
-    uids = await mailbox.search({ since, from: [] });
+    // Some servers reject long OR chains or UTF-8; fall back to the date
+    // alone, and passesFilter applies the same rule to each message.
+    uids = await mailbox.search({ since, from: [], subject: [] });
   }
   // Newest last: keep the most recent max_messages.
   uids = uids.slice(-account.maxMessages);

@@ -59,7 +59,7 @@ describe("processMessage", () => {
     expect(out).toEqual({ kind: "filtered" });
   });
 
-  it("applies subject keywords only to senders not on the allowlist", async () => {
+  it("keeps an allowlisted sender, or another sender with a keyword subject", async () => {
     const acct = account({ senders: ["linkedin.com"], subjectKeywords: ["engineer"] });
     const allowlisted = await processMessage(
       eml({ subject: "Weekly digest", plain: LONG_PLAIN }),
@@ -79,6 +79,16 @@ describe("processMessage", () => {
     expect(allowlisted.kind).toBe("kept");
     expect(otherNoKeyword).toEqual({ kind: "filtered" });
     expect(otherWithKeyword.kind).toBe("kept");
+  });
+
+  it("with senders only, drops mail from anyone else", async () => {
+    const acct = account({ senders: ["linkedin.com"], subjectKeywords: [] });
+    const other = await processMessage(
+      eml({ from: "news@contoso.example", subject: "We're hiring", plain: LONG_PLAIN }),
+      acct,
+      none,
+    );
+    expect(other).toEqual({ kind: "filtered" });
   });
 
   it("uses the plain body when it has more than 200 characters", async () => {
