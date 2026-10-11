@@ -5,11 +5,21 @@ import { createHash } from "node:crypto";
 import { odata, TableClient, type TableTransaction } from "@azure/data-tables";
 import type { TokenCredential } from "@azure/identity";
 
+/**
+ * How long a Message-ID stays seen, as in the local skill
+ * (workspace.SEEN_MESSAGE_DAYS). Table Storage has no TTL, so the daily run
+ * prunes older rows. It must exceed the lookback window ([mail] days), or seen
+ * mail would come back as new; the config load checks that.
+ */
+export const SEEN_MESSAGE_DAYS = 90;
+
 export interface SeenStore {
-  /** Message-IDs already recorded for this account. */
-  seenIds(account: string): Promise<Set<string>>;
+  /** Message-IDs recorded for this account on or after `since` (YYYY-MM-DD). */
+  seenIds(account: string, since: string): Promise<Set<string>>;
   /** Record messages as seen on `day` (YYYY-MM-DD). */
   markSeen(messages: { account: string; message_id: string }[], day: string): Promise<void>;
+  /** Forget every account's messages seen before `cutoff` (YYYY-MM-DD). Returns how many. */
+  pruneOlderThan(cutoff: string): Promise<number>;
 }
 
 export class MemorySeenStore implements SeenStore {
@@ -17,6 +27,10 @@ export class MemorySeenStore implements SeenStore {
 
   async seenIds(account: string): Promise<Set<string>> {
     return new Set(this.ids.get(account) ?? []);
+  }
+
+  async pruneOlderThan(): Promise<number> {
+    return 0;
   }
 
   async markSeen(messages: { account: string; message_id: string }[]): Promise<void> {
@@ -49,10 +63,15 @@ export class TableSeenStore implements SeenStore {
     return new TableSeenStore(new TableClient(tableEndpoint, tableName, credential));
   }
 
-  async seenIds(account: string): Promise<Set<string>> {
+  async seenIds(account: string, since: string): Promise<Set<string>> {
     const ids = new Set<string>();
+    // Bounded by the retention even when a prune failed. seenOn is YYYY-MM-DD,
+    // so string order is date order.
     const entities = this.client.listEntities<SeenEntity>({
-      queryOptions: { filter: odata`PartitionKey eq ${account}`, select: ["messageId"] },
+      queryOptions: {
+        filter: odata`PartitionKey eq ${account} and seenOn ge ${since}`,
+        select: ["messageId"],
+      },
     });
     for await (const entity of entities) ids.add(entity.messageId);
     return ids;
@@ -82,5 +101,31 @@ export class TableSeenStore implements SeenStore {
         await this.client.submitTransaction(actions);
       }
     }
+  }
+
+  async pruneOlderThan(cutoff: string): Promise<number> {
+    // Across the table, not per configured account: an account dropped from
+    // the config leaves rows behind too.
+    const old = this.client.listEntities<{ partitionKey: string; rowKey: string }>({
+      queryOptions: { filter: odata`seenOn lt ${cutoff}`, select: ["PartitionKey", "RowKey"] },
+    });
+    const byAccount = new Map<string, string[]>();
+    for await (const e of old) {
+      const rows = byAccount.get(e.partitionKey) ?? [];
+      rows.push(e.rowKey);
+      byAccount.set(e.partitionKey, rows);
+    }
+    let pruned = 0;
+    // As in markSeen: one partition and at most 100 operations per transaction.
+    for (const [partitionKey, rowKeys] of byAccount) {
+      for (let i = 0; i < rowKeys.length; i += 100) {
+        const actions: TableTransaction["actions"] = rowKeys
+          .slice(i, i + 100)
+          .map((rowKey) => ["delete", { partitionKey, rowKey }]);
+        await this.client.submitTransaction(actions);
+        pruned += actions.length;
+      }
+    }
+    return pruned;
   }
 }

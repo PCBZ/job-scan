@@ -3,6 +3,7 @@
 // whether a key is set. Credentials are not here; an account names the
 // environment variables that hold them.
 
+import { SEEN_MESSAGE_DAYS } from "../mail/seen-store.js";
 import type { MailAccount, MailRunConfig } from "../mail/types.js";
 import { ConfigError } from "./error.js";
 import type { RawConfig } from "./schema.js";
@@ -114,9 +115,19 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
   });
 
   // max_messages is per account, so the whole-run ceiling caps total volume.
+  // Seen Message-IDs are kept SEEN_MESSAGE_DAYS; a window reaching past that
+  // would bring forgotten mail back as new.
+  const days = mail.days ?? 2;
+  if (days >= SEEN_MESSAGE_DAYS) {
+    throw new ConfigError(
+      `[mail] days = ${days} in ${origin} reaches past the ${SEEN_MESSAGE_DAYS}-day seen-message retention. ` +
+        `Use fewer than ${SEEN_MESSAGE_DAYS}.`,
+    );
+  }
+
   return {
     accounts,
     maxTotalMessages: mail.max_total_messages ?? 150,
-    days: mail.days ?? 2,
+    days,
   };
 }

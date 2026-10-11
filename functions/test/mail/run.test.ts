@@ -27,6 +27,24 @@ function inbox(dates: (string | null)[], prefix: string) {
 }
 
 describe("runFetch", () => {
+  it("reads each account's seen Message-IDs from the retention window only", async () => {
+    const asked: [string, string][] = [];
+    const seen = {
+      seenIds: async (account: string, since: string) => {
+        asked.push([account, since]);
+        return new Set<string>();
+      },
+      markSeen: async () => {},
+      pruneOlderThan: async () => 0,
+    };
+    await runFetch(
+      { accounts: [A], maxTotalMessages: 150, days: 2 },
+      { connect: async () => inbox([], "a"), seen, env: ENV, now: NOW },
+    );
+    // 90 days before Vancouver's 2026-10-03.
+    expect(asked).toEqual([["a", "2026-07-05"]]);
+  });
+
   it("records a failing account and keeps going", async () => {
     const boxB = inbox(["Sat, 03 Oct 2026 08:00:00 -0700"], "b");
     const connect: ConnectMailbox = async (acct) => {
