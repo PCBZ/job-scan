@@ -81,8 +81,8 @@ apply leaves `app_package` unset and keeps the deployed code.
 Once, in this order, all by hand:
 
 1. Add `operator_principal_id` to `terraform.tfvars`: your Object ID, from
-   the portal's Microsoft Entra ID → Users → you. The Key Vault, OpenAI and config roles stay with you,
-   whoever runs the apply.
+   the portal's Microsoft Entra ID → Users → you. The Key Vault, OpenAI and
+   config roles stay with you, whoever runs the apply.
 2. Make sure the `config-toml` secret exists, then run `terraform apply` here.
    This creates the CD identity and its OIDC trust.
 3. In `bootstrap/`, run `terraform apply -var "deployer=$(terraform -chdir=..
@@ -96,16 +96,15 @@ Its rights live in `bootstrap/`, outside what a CD run applies, so a run can't
 widen them:
 
 - **Contributor** on the main resource group.
-- **Role Based Access Control Administrator** on the same group. A condition
-  limits it to assigning and removing the data roles this stack uses (Storage
-  Blob/Table/Queue data, Key Vault Secrets User/Officer, Cognitive Services
-  OpenAI User), so it can't grant Owner or more RBAC rights, its own
-  included.
 - **Storage Blob Data Contributor** on the state container.
 
 The main stack adds **Key Vault Secrets User**, for reading `config-toml`.
-CD skips resource provider registration, which needs subscription rights; a
-local apply registers them.
+
+CD can't grant rights. Contributor reads role assignments but can't create or
+remove them, so a change to the stack's role assignments is applied locally,
+by you, before the next tag. A tag that reaches one first fails on it.
+Resource provider registration needs subscription rights too, so CD skips it
+and a local apply registers them.
 
 ### How the run is trusted
 
