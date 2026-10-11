@@ -266,6 +266,28 @@
           "url": "https://example.com/j?id=5"
         }
       ]
+    },
+    {
+      "name": "utm keys with underscores",
+      "html": "<a href=\"https://example.com/j?id=5&amp;utm_source_platform=x&amp;utm_creative_format=y\">x</a>",
+      "limit": 60,
+      "expected": [
+        {
+          "text": "x",
+          "url": "https://example.com/j?id=5"
+        }
+      ]
+    },
+    {
+      "name": "question mark inside the fragment",
+      "html": "<a href=\"https://example.com/j#details?trk=mail&amp;utm_source=a\">x</a>",
+      "limit": 60,
+      "expected": [
+        {
+          "text": "x",
+          "url": "https://example.com/j#details?trk=mail&utm_source=a"
+        }
+      ]
     }
   ],
   "dedupe_key": [

@@ -16,7 +16,7 @@ import {
   stripWhitespace,
 } from "./unicode.js";
 
-const TRACKING_KEY = /^(?:utm_[a-z]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga)$/iu;
+const TRACKING_KEY = /^(?:utm_[a-z_]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga)$/iu;
 
 // Character references in an href, ended by ";". HTML writes & as &amp; in
 // attributes. A legacy reference without ";" stays as is: in an attribute it
@@ -101,11 +101,12 @@ export function decodeHref(url: string): string {
 
 /**
  * Drop tracking params by key, keeping the rest in order, unencoded. Removing
- * them as substrings left "?trk=x&jk=1" as "path&jk=1".
+ * them as substrings left "?trk=x&jk=1" as "path&jk=1". A "?" after "#" is
+ * part of the fragment, not a query.
  */
 export function stripTracking(url: string): string {
   const at = url.indexOf("?");
-  if (at === -1) return url;
+  if (at === -1 || url.lastIndexOf("#", at) !== -1) return url;
   const rest = url.slice(at + 1);
   const hash = rest.indexOf("#");
   const query = hash === -1 ? rest : rest.slice(0, hash);

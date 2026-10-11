@@ -11,7 +11,7 @@ import re
 from html import unescape
 
 TRACKING_KEY = re.compile(
-    r"utm_[a-z]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga", re.I
+    r"utm_[a-z_]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga", re.I
 )
 
 # Character references in an href, ended by ";". HTML writes & as &amp; in
@@ -101,10 +101,11 @@ def decode_href(url):
 def strip_tracking(url):
     """Drop tracking params by key, keeping the rest in order, unencoded.
 
-    Removing them as substrings left "?trk=x&jk=1" as "path&jk=1".
+    Removing them as substrings left "?trk=x&jk=1" as "path&jk=1". A "?"
+    after "#" is part of the fragment, not a query.
     """
     base, sep, query = url.partition("?")
-    if not sep:
+    if not sep or "#" in base:
         return url
     query, hash_sep, fragment = query.partition("#")
     kept = [
