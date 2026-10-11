@@ -16,8 +16,12 @@ import {
   stripWhitespace,
 } from "./unicode.js";
 
-const TRACKING_PARAMS =
-  /[?&](utm_[a-z]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga)=[^&]*/giu;
+const TRACKING_KEY = /^(?:utm_[a-z_]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga)$/iu;
+
+// Character references in an href, ended by ";". HTML writes & as &amp; in
+// attributes. A legacy reference without ";" stays as is: in an attribute it
+// isn't one, and decoding it would turn ?a=1&region=us into ?a=1®ion=us.
+const HREF_REF = /&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);/giu;
 
 // text/plain has no hyperlinks, so senders inline full tracking URLs as text
 // and wrap them across lines. extractLinks() keeps the URLs.
@@ -90,15 +94,38 @@ export interface Link {
 const ANCHOR = new RegExp(`<a${S}[^>]*href=["']([^"']+)["'][^>]*>([\\s\\S]*?)</a>`, "giu");
 const SPACE_RUN = new RegExp(`${S}+`, "gu");
 
+/** An href as the browser reads it: only ";"-terminated references. */
+export function decodeHref(url: string): string {
+  return url.replace(HREF_REF, (ref) => decodeHTML(ref));
+}
+
+/**
+ * Drop tracking params by key, keeping the rest in order, unencoded. Removing
+ * them as substrings left "?trk=x&jk=1" as "path&jk=1". A "?" after "#" is
+ * part of the fragment, not a query.
+ */
+export function stripTracking(url: string): string {
+  const at = url.indexOf("?");
+  if (at === -1 || url.lastIndexOf("#", at) !== -1) return url;
+  const rest = url.slice(at + 1);
+  const hash = rest.indexOf("#");
+  const query = hash === -1 ? rest : rest.slice(0, hash);
+  const fragment = hash === -1 ? "" : rest.slice(hash);
+  const kept = query
+    .split("&")
+    .filter((p) => p !== "" && !TRACKING_KEY.test(p.split("=", 1)[0] ?? ""));
+  return url.slice(0, at) + (kept.length ? `?${kept.join("&")}` : "") + fragment;
+}
+
 /** (anchor text, url) pairs, de-tracked and deduped, in order. */
 export function extractLinks(html: string, limit = 60): Link[] {
   const links: Link[] = [];
   const seen = new Set<string>();
   for (const match of html.matchAll(ANCHOR)) {
-    const rawUrl = match[1] ?? "";
+    const decoded = decodeHref(match[1] ?? "");
     const rawLabel = match[2] ?? "";
-    if (!rawUrl.toLowerCase().startsWith("http")) continue;
-    const url = rawUrl.replace(TRACKING_PARAMS, "").replace(/[?&]+$/u, "");
+    if (!decoded.toLowerCase().startsWith("http")) continue;
+    const url = stripTracking(decoded);
     const label = stripWhitespace(rawLabel.replace(TAGS, " ").replace(SPACE_RUN, " "));
     const key = dedupeKey(url);
     if (seen.has(key)) continue;
