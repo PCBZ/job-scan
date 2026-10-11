@@ -6,6 +6,7 @@ import type {
   Effects,
   ModelSteps,
   ReportInput,
+  SuspiciousByMessage,
 } from "../../src/lib/workflow/types.js";
 import { judgement, rankedOf } from "../judge/helpers.js";
 import { posting } from "../postings/helpers.js";
@@ -40,6 +41,8 @@ export interface FakeOptions {
   deliverFails?: boolean;
   noResumes?: boolean;
   extractWarnings?: string[];
+  /** Flags each extraction attempt returns, until the list runs out. */
+  extractSuspicious?: SuspiciousByMessage[];
 }
 
 /** Nodes that record every call, in order, with their arguments. */
@@ -126,7 +129,7 @@ export function fakes(o: FakeOptions = {}) {
         top: [],
         others: [],
         filtered: [],
-        suspicious: "not checked",
+        suspicious: "not checked" as const,
         housekeeping: [],
       };
     },
@@ -139,6 +142,7 @@ export function fakes(o: FakeOptions = {}) {
       return {
         value: [posting({ title: `attempt ${counters.extract}` })],
         usage: USAGE,
+        suspicious: o.extractSuspicious?.[counters.extract - 1] ?? {},
         ...(o.extractWarnings ? { warnings: o.extractWarnings } : {}),
       };
     },

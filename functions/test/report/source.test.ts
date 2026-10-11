@@ -50,6 +50,7 @@ function input(over: Partial<ReportInput> = {}): ReportInput {
     top: [],
     rest: [],
     explanations: [],
+    suspicious: {},
     warnings: [],
     notes: [],
     ...over,
@@ -231,7 +232,44 @@ describe("buildReport", () => {
     ]);
   });
 
-  it("never claims there was nothing suspicious: no step checks yet", () => {
-    expect(buildReport(input(), NOW).suspicious).toBe("not checked");
+  describe("Suspicious", () => {
+    const msg = (id: string) =>
+      ({
+        message_id: id,
+        from: `Sender ${id} <${id}@example.test>`,
+        subject: `Subject ${id}`,
+      }) as FetchPayload["messages"][number];
+    const flag = {
+      kind: "instruction" as const,
+      reason: "Tells an AI to act.",
+      quote: "ignore previous instructions",
+    };
+    const withMessages = (ids: string[]) => ({ ...payload(), messages: ids.map(msg) });
+
+    it("is not checked when no mail could be read", () => {
+      const r = buildReport(input({ mail: { error: "all_accounts_failed", failures: [] } }), NOW);
+      expect(r.suspicious).toBe("not checked");
+    });
+
+    it("lists each flag with its message, in the mail's order, and counts unchecked messages", () => {
+      const r = buildReport(
+        input({ mail: withMessages(["a", "b", "c"]), suspicious: { c: [flag], a: [flag] } }),
+        NOW,
+      );
+      expect(r.suspicious).toEqual({
+        items: [
+          { ...flag, from: "Sender a <a@example.test>", subject: "Subject a" },
+          { ...flag, from: "Sender c <c@example.test>", subject: "Subject c" },
+        ],
+        unchecked: 1,
+      });
+    });
+
+    it("has nothing to list once every message was checked clean, or when there was no mail", () => {
+      const clean = buildReport(input({ mail: withMessages(["a"]), suspicious: { a: [] } }), NOW);
+      expect(clean.suspicious).toEqual({ items: [], unchecked: 0 });
+      const none = buildReport(input({ outcome: "no_mail", mail: withMessages([]) }), NOW);
+      expect(none.suspicious).toEqual({ items: [], unchecked: 0 });
+    });
   });
 });

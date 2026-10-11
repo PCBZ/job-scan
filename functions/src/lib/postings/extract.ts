@@ -12,8 +12,14 @@ import {
 import { mapWithLimit } from "../workflow/limit.js";
 import type { ModelSteps } from "../workflow/types.js";
 import { EXTRACT_SYSTEM, extractUser } from "./prompt.js";
-import { type ExtractedPosting, extractedPosting, extractedPostings } from "./schema.js";
+import {
+  type ExtractedPosting,
+  extractedPosting,
+  extractedPostings,
+  type SuspiciousFlag,
+} from "./schema.js";
 import { sourceOf } from "./source.js";
+import { verifiedFlags } from "./suspicious.js";
 import type { Posting } from "./types.js";
 import { problemsFor } from "./validate.js";
 
@@ -31,22 +37,27 @@ export function extractStep(
     const last = repairs.at(-1);
     const usage: TokenUsage = { input: 0, output: 0 };
     const warnings: string[] = [];
+    // Only the messages asked this time: a message kept from an earlier
+    // attempt keeps its flags in the state too.
+    const suspicious: Record<string, SuspiciousFlag[]> = {};
 
     const perMessage = await mapWithLimit(messages, concurrency, async (m) => {
       const kept = rowsOf(last?.previous, m.message_id);
       // On a repair, a message whose rows all passed keeps them as they are.
       if (last && problemsFor(last.problems, m.message_id).length === 0) return kept;
       try {
+        const user = extractUser(m);
         const r = await client.structured({
           name: "postings",
           system: EXTRACT_SYSTEM,
-          user: extractUser(m),
+          user,
           schema: extractedPostings,
           repairs: historyOf(repairs, m.message_id),
           ...(signal ? { signal } : {}),
         });
         usage.input += r.usage.input;
         usage.output += r.usage.output;
+        suspicious[m.message_id] = verifiedFlags(r.value.suspicious, user, m.message_id, warnings);
         return r.value.postings.map((e, row) => toPosting(e, m, row));
       } catch (err) {
         // One unusable answer costs that message's rows, not the run. A
@@ -57,7 +68,7 @@ export function extractStep(
       }
     });
 
-    return { value: perMessage.flat(), usage, warnings };
+    return { value: perMessage.flat(), usage, warnings, suspicious };
   };
 }
 

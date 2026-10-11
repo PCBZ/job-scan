@@ -7,7 +7,15 @@ import type { RepairTurn, TokenUsage } from "../model/types.js";
 import type { Filtered } from "../postings/gates.js";
 import type { Source } from "../postings/types.js";
 import type { ResumeSet } from "../resume/load.js";
-import type { Explanation, Judgement, Outcome, Posting, Ranked, Report } from "./types.js";
+import type {
+  Explanation,
+  Judgement,
+  Outcome,
+  Posting,
+  Ranked,
+  Report,
+  SuspiciousByMessage,
+} from "./types.js";
 
 /** The three generate-and-check loops. */
 export type Loop = "extract" | "judge" | "explain";
@@ -49,6 +57,11 @@ export const WorkflowState = Annotation.Root({
   rest: last<Ranked[]>([]),
   explanations: last<Explanation[]>([]),
   report: last<Report | null>(null),
+  // Per message: a re-asked message replaces its flags, the rest keep theirs.
+  suspicious: Annotation<SuspiciousByMessage>({
+    reducer: (old, next) => ({ ...old, ...next }),
+    default: () => ({}),
+  }),
 
   loops: Annotation<Record<Loop, LoopState>, LoopUpdate>({
     reducer: (old, next) => {

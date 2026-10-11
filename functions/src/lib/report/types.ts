@@ -44,6 +44,22 @@ export interface FilteredGroup {
   items: { title: string; company: string; location: string; reason: string }[];
 }
 
+/** A flagged message, quoted in its own words. */
+export interface SuspiciousItem {
+  kind: "scam" | "payment" | "credentials" | "instruction";
+  from: string;
+  subject: string;
+  reason: string;
+  quote: string;
+}
+
+/**
+ * "not checked" when no mail could be read. Otherwise the flags, and how many
+ * messages went unchecked (their extraction failed), so an empty list only
+ * reads as "Nothing" when every message was checked.
+ */
+export type SuspiciousSection = "not checked" | { items: SuspiciousItem[]; unchecked: number };
+
 export interface Report {
   /** The run's day in Vancouver, YYYY-MM-DD. */
   day: string;
@@ -59,7 +75,6 @@ export interface Report {
   top: TopPick[];
   others: OtherPick[];
   filtered: FilteredGroup[];
-  /** No step checks for suspicious mail yet (#66). */
-  suspicious: "not checked";
+  suspicious: SuspiciousSection;
   housekeeping: string[];
 }

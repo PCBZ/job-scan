@@ -8,7 +8,7 @@ import {
 } from "../../src/lib/model/types.js";
 import { extractStep } from "../../src/lib/postings/extract.js";
 import { EXTRACT_SYSTEM } from "../../src/lib/postings/prompt.js";
-import type { ExtractedPosting } from "../../src/lib/postings/schema.js";
+import type { ExtractedPosting, SuspiciousFlag } from "../../src/lib/postings/schema.js";
 import type { Posting } from "../../src/lib/postings/types.js";
 import { problemFor } from "../../src/lib/postings/validate.js";
 import { fixture } from "./fixtures.js";
@@ -42,14 +42,22 @@ function message(id: string, over: Partial<FetchedMessage> = {}): FetchedMessage
   };
 }
 
-/** Answers each call from `answer`, keyed by the message's subject line. */
-function client(answer: (user: string, req: StructuredRequest<unknown>) => ExtractedPosting[]) {
+/** Answers each call from `answer`, keyed by the message's subject line, with `flags`. */
+function client(
+  answer: (user: string, req: StructuredRequest<unknown>) => ExtractedPosting[],
+  flags: (user: string) => SuspiciousFlag[] = () => [],
+) {
   const calls: StructuredRequest<unknown>[] = [];
   const c: ModelClient = {
     async structured<T>(req: StructuredRequest<T>) {
       calls.push(req as StructuredRequest<unknown>);
       const postings = answer(req.user, req as StructuredRequest<unknown>);
-      return { value: { postings } as T, usage: { input: 100, output: 10 }, served_by: "primary" };
+      const suspicious = flags(req.user);
+      return {
+        value: { postings, suspicious } as T,
+        usage: { input: 100, output: 10 },
+        served_by: "primary",
+      };
     },
   };
   return { c, calls };
@@ -137,7 +145,7 @@ describe("extractStep", () => {
       async structured<T>() {
         if (refuse) throw new ModelOutputError("postings: cut off");
         return {
-          value: { postings: [row()] } as T,
+          value: { postings: [row()], suspicious: [] } as T,
           usage: { input: 1, output: 1 },
           served_by: "p",
         };
@@ -158,7 +166,7 @@ describe("extractStep", () => {
       async structured<T>(req: StructuredRequest<T>) {
         if (req.user.includes("<b@x>")) throw new ModelOutputError("postings: the model refused");
         return {
-          value: { postings: [row()] } as T,
+          value: { postings: [row()], suspicious: [] } as T,
           usage: { input: 1, output: 1 },
           served_by: "primary",
         };
@@ -185,5 +193,38 @@ describe("extractStep", () => {
     const { c, calls } = client(() => []);
     await extractStep(c)({ messages: [message("<a@x>")] }, [], controller.signal);
     expect(calls[0]?.signal).toBe(controller.signal);
+  });
+
+  it("keeps flags whose quote is in the email, and drops the rest with a warning", async () => {
+    const m = message("<a@x>", {
+      subject: "Offer: remote data entry",
+      body: "Congratulations! To start, pay a $49\n  onboarding fee by Friday.",
+    });
+    const { c } = client(
+      () => [],
+      () => [
+        { kind: "payment", reason: " Asks for a fee. ", quote: "pay a $49 onboarding fee" },
+        { kind: "credentials", reason: "Asks for a code.", quote: "send us your one-time code" },
+      ],
+    );
+    const out = await extractStep(c)({ messages: [m] }, []);
+    expect(out.suspicious).toEqual({
+      "<a@x>": [{ kind: "payment", reason: "Asks for a fee.", quote: "pay a $49 onboarding fee" }],
+    });
+    expect(out.warnings).toEqual([
+      'extract_postings: message <a@x>: dropped a "credentials" flag whose quote isn\'t in the email',
+    ]);
+  });
+
+  it("checks a message only when it is asked: one kept from an earlier attempt gets no entry", async () => {
+    const messages = [message("<a@x>"), message("<b@x>")];
+    const { c } = client(() => [row()]);
+    const step = extractStep(c);
+    const first = await step({ messages }, []);
+    expect(first.suspicious).toEqual({ "<a@x>": [], "<b@x>": [] });
+    const second = await step({ messages }, [
+      { previous: first.value, problems: [problemFor("<b@x>", 0, "x")] },
+    ]);
+    expect(Object.keys(second.suspicious)).toEqual(["<b@x>"]);
   });
 });

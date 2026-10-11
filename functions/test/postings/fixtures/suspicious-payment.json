@@ -1,0 +1,19 @@
+{
+  "_note": "Synthetic. No real sender or mail.",
+  "message": {
+    "account": "personal",
+    "date": "Fri, 09 Oct 2026 08:00:00 -0700",
+    "body_source": "plain",
+    "message_id": "<offer-77@quickhire.example>",
+    "from": "Talent Desk <hr@quickhire.example>",
+    "subject": "Offer: Remote Data Entry Specialist, start today",
+    "body": "Hi there,\n\nYour profile was selected for our Remote Data Entry Specialist role at QuickHire Partners. No interview is needed. The role pays $45 an hour, fully remote.\n\nTo activate your account, pay a $49 onboarding fee for your training kit, by e-transfer to payroll@quickhire.example. Then reply with your SIN and banking details so we can set up direct deposit.\n\nBest,\nTalent Desk",
+    "links": [
+      {
+        "text": "Remote Data Entry Specialist",
+        "url": "https://quickhire.example/jobs/77"
+      }
+    ]
+  },
+  "expected_kinds": ["payment", "credentials"]
+}

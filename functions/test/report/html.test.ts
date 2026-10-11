@@ -29,7 +29,9 @@ describe("renderHtml", () => {
       "5+ years of Kubernetes",
       "location (1)",
       "outside locations: Toronto, ON",
-      "Not checked: no step looks for suspicious mail yet.",
+      "<b>payment</b>: Talent Desk &lt;hr@quickhire.example&gt; — “Offer: remote data entry, start today”",
+      "Asks for an upfront fee before any interview.",
+      "pay a $49 onboarding fee to secure your position",
       "personal hit the message budget",
     ]) {
       expect(html, text).toContain(text.replace(/"/g, "&quot;"));

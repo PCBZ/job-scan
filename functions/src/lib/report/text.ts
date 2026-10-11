@@ -1,6 +1,7 @@
 // The report as plain text: the text/plain part of the email, for clients
 // and filters that read it. Same content as the HTML, in the same order.
 
+import { suspiciousLines } from "./html.js";
 import type { Report } from "./types.js";
 
 const section = (title: string, lines: string[]) => [`## ${title}`, ...lines, ""];
@@ -49,7 +50,7 @@ export function renderText(r: Report, webUrl?: string): string {
           ])
         : ["Nothing."],
     ),
-    ...section("Suspicious", ["Not checked: no step looks for suspicious mail yet."]),
+    ...section("Suspicious", suspiciousText(r.suspicious)),
     ...section(
       "Housekeeping",
       r.housekeeping.length ? r.housekeeping.map((h) => `- ${h}`) : ["Nothing."],
@@ -58,4 +59,17 @@ export function renderText(r: Report, webUrl?: string): string {
     .join("\n")
     .trimEnd()
     .concat("\n");
+}
+
+function suspiciousText(s: Report["suspicious"]): string[] {
+  const { lead, unchecked } = suspiciousLines(s);
+  const items =
+    s === "not checked"
+      ? []
+      : s.items.flatMap((i) => [
+          `- ${i.kind}: ${i.from} — "${i.subject}"`,
+          `  ${i.reason}`,
+          `  > ${i.quote}`,
+        ]);
+  return [...lead, ...items, ...(unchecked ? [unchecked] : [])];
 }

@@ -24,7 +24,9 @@ describe("renderText", () => {
       "## Filtered out",
       "location (1)",
       "## Suspicious",
-      "Not checked",
+      '- payment: Talent Desk <hr@quickhire.example> — "Offer: remote data entry, start today"',
+      "  Asks for an upfront fee before any interview.",
+      "  > pay a $49 onboarding fee to secure your position",
       "## Housekeeping",
     ];
     let at = -1;
@@ -53,5 +55,19 @@ describe("renderText", () => {
     expect(text).not.toContain("near misses");
     expect(text).not.toContain("View in a browser");
     expect(text.match(/^Nothing\.$/gm)).toHaveLength(2);
+  });
+
+  it.each([
+    ["no mail could be read", "not checked" as const, ["Not checked: no mail could be read."]],
+    ["every message checked, nothing found", { items: [], unchecked: 0 }, ["Nothing."]],
+    [
+      'some messages unchecked: never "Nothing"',
+      { items: [], unchecked: 2 },
+      ["2 messages couldn't be checked; see Housekeeping."],
+    ],
+  ])("says what the Suspicious check covered: %s", (_name, suspicious, lines) => {
+    const text = renderText({ ...SAMPLE, suspicious });
+    const section = text.slice(text.indexOf("## Suspicious\n"), text.indexOf("## Housekeeping"));
+    expect(section.trim().split("\n").slice(1)).toEqual(lines);
   });
 });

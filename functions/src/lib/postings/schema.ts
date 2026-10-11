@@ -20,7 +20,21 @@ export const extractedPosting = z.object({
   link: z.number().int().nullable(),
 });
 
-// Structured outputs need an object at the top level.
-export const extractedPostings = z.object({ postings: z.array(extractedPosting) });
+/** Something to warn about in the email: SKILL.md's Suspicious section. */
+export const suspiciousFlag = z.object({
+  kind: z.enum(["scam", "payment", "credentials", "instruction"]),
+  /** One sentence: why. */
+  reason: z.string(),
+  /** The email's own words, verbatim; code checks they're there. */
+  quote: z.string(),
+});
+
+// Structured outputs need an object at the top level. The flags ride on the
+// extraction call, so checking for them costs no extra call.
+export const extractedPostings = z.object({
+  postings: z.array(extractedPosting),
+  suspicious: z.array(suspiciousFlag),
+});
 
 export type ExtractedPosting = z.infer<typeof extractedPosting>;
+export type SuspiciousFlag = z.infer<typeof suspiciousFlag>;

@@ -181,3 +181,18 @@ describe("telegramReport", () => {
     await expect(telegramReport(fetchFn, settings, SAMPLE)).rejects.toThrow("chat not found");
   });
 });
+
+describe("telegramMessage, suspicious mail", () => {
+  it("counts flagged items under the alerts, and never quotes them in chat", () => {
+    const { text } = telegramMessage(SAMPLE);
+    expect(text).toContain("🚩 1 suspicious item: see the full report.");
+    expect(text).not.toContain("onboarding fee");
+    expect(text.indexOf("🚩")).toBeLessThan(text.indexOf("→ 2 worth your time."));
+  });
+  it("says nothing when nothing was flagged", () => {
+    expect(
+      telegramMessage({ ...SAMPLE, suspicious: { items: [], unchecked: 0 } }).text,
+    ).not.toContain("🚩");
+    expect(telegramMessage({ ...SAMPLE, suspicious: "not checked" }).text).not.toContain("🚩");
+  });
+});

@@ -64,6 +64,7 @@ export function buildWorkflow(
         );
         return {
           extracted: r.value,
+          suspicious: r.suspicious,
           usage: { extract_postings: r.usage },
           ...(r.warnings?.length ? { warnings: r.warnings } : {}),
         };
@@ -162,6 +163,7 @@ export function buildWorkflow(
           top: s.top,
           rest: s.rest,
           explanations: s.explanations,
+          suspicious: s.suspicious,
           warnings: s.warnings,
           notes: s.notes,
         }),
