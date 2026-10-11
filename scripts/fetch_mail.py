@@ -32,16 +32,52 @@ from workspace import (DEFAULT_WORKSPACE, config_path, infer_provider,
 # IMAP
 # --------------------------------------------------------------------------- #
 
-def build_search(days, senders):
+def passes_filter(sender, subject, senders, keywords, blocked):
+    """Keep mail from an allowlisted sender, or with a keyword in its subject.
+
+    Keywords catch recruiters mailing from an unlisted address. With neither
+    list set, everything in the window is kept. Excluded senders never are.
+    The search below asks the server for the same set; this applies the rule
+    exactly, whichever search ran.
+    """
+    low_sender, low_subject = sender.lower(), subject.lower()
+    if any(b.lower() in low_sender for b in blocked):
+        return False
+    if not senders and not keywords:
+        return True
+    return (any(s.lower() in low_sender for s in senders)
+            or any(k.lower() in low_subject for k in keywords))
+
+
+def search_terms(senders, keywords):
+    """The server-side half of passes_filter: any sender, or any keyword."""
+    return ([("from", s.replace('"', "")) for s in senders]
+            + [("subject", k.replace('"', "")) for k in keywords])
+
+
+def build_search(days, senders, keywords):
     since = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
     criteria = '(SINCE %s)' % since
-    if senders:
-        terms = ['FROM "%s"' % s.replace('"', "") for s in senders]
+    terms = ['%s "%s"' % (key.upper(), value)
+             for key, value in search_terms(senders, keywords)]
+    if terms:
         combined = terms[0]
         for term in terms[1:]:
             combined = "OR %s %s" % (term, combined)
         criteria += " (%s)" % combined
     return criteria, since
+
+
+def search(conn, criteria):
+    """SEARCH, in UTF-8 when the criteria need it ("招聘"). None on failure."""
+    try:
+        if criteria.isascii():
+            typ, data = conn.search(None, criteria)
+        else:
+            typ, data = conn.search("UTF-8", criteria.encode("utf-8"))
+    except imaplib.IMAP4.error:
+        return None
+    return data if typ == "OK" else None
 
 
 def connect(account, user, password):
@@ -61,13 +97,18 @@ def fetch(cfg, user, password, days, state, verbose=False):
         if typ != "OK":
             raise RuntimeError("cannot open folder %r" % folder)
 
-        criteria, since = build_search(days, cfg.get("senders") or [])
-        typ, data = conn.search(None, criteria)
-        if typ != "OK":
+        senders = cfg.get("senders") or []
+        keywords = cfg.get("subject_keywords") or []
+        blocked = cfg.get("exclude_senders") or []
+        criteria, since = build_search(days, senders, keywords)
+        data = search(conn, criteria)
+        if data is None:
+            # Some servers reject long OR chains or UTF-8; passes_filter
+            # below applies the same rule to the date-only window.
             if verbose:
                 sys.stderr.write("warn: search %r failed, falling back to SINCE\n" % criteria)
-            typ, data = conn.search(None, "(SINCE %s)" % since)
-            if typ != "OK":
+            data = search(conn, "(SINCE %s)" % since)
+            if data is None:
                 raise RuntimeError("IMAP SEARCH failed")
 
         ids = (data[0] or b"").split()
@@ -76,8 +117,6 @@ def fetch(cfg, user, password, days, state, verbose=False):
             sys.stderr.write("info: [%s] %d candidate messages in %s\n"
                              % (account_name, len(ids), folder))
 
-        keywords = [k.lower() for k in (cfg.get("subject_keywords") or [])]
-        blocked = [b.lower() for b in (cfg.get("exclude_senders") or [])]
         max_chars = int(cfg.get("max_chars_per_message", 6000))
         seen = state.get("seen_messages", {})
 
@@ -98,18 +137,9 @@ def fetch(cfg, user, password, days, state, verbose=False):
 
             sender = decode_header_value(msg.get("From"))
             subject = decode_header_value(msg.get("Subject"))
-            low_sender, low_subject = sender.lower(), subject.lower()
-
-            if any(b in low_sender for b in blocked):
+            if not passes_filter(sender, subject, senders, keywords, blocked):
                 skipped_filter += 1
                 continue
-            # Keyword filter only applies to senders not on the allowlist.
-            if keywords and not any(
-                s.lower() in low_sender for s in (cfg.get("senders") or [])
-            ):
-                if not any(k in low_subject for k in keywords):
-                    skipped_filter += 1
-                    continue
 
             try:
                 dt = email.utils.parsedate_to_datetime(msg.get("Date"))

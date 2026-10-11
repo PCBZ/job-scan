@@ -7,8 +7,9 @@ import type { MailAccount } from "./types.js";
 
 export interface SearchQuery {
   since: Date;
-  /** Match any of these in From. Empty means no sender filter. */
+  /** Match any of these in From, or any of `subject` in Subject. Both empty means the window alone. */
   from: string[];
+  subject: string[];
 }
 
 export interface Mailbox {
@@ -27,11 +28,20 @@ export type ConnectMailbox = (
   password: string,
 ) => Promise<Mailbox>;
 
+/** The server-side half of passesFilter: any sender, or any keyword. Mirrors search_terms. */
+export function searchTerms(query: Pick<SearchQuery, "from" | "subject">): [string, string][] {
+  return [
+    ...query.from.map((s): [string, string] => ["from", s.replaceAll('"', "")]),
+    ...query.subject.map((k): [string, string] => ["subject", k.replaceAll('"', "")]),
+  ];
+}
+
+// imapflow picks CHARSET UTF-8 itself when a term needs it ("招聘").
 export function toImapSearch(query: SearchQuery): SearchObject {
-  const from = query.from.map((s) => s.replaceAll('"', ""));
-  if (from.length === 0) return { since: query.since };
-  if (from.length === 1) return { since: query.since, from: from[0] };
-  return { since: query.since, or: from.map((f) => ({ from: f })) };
+  const terms = searchTerms(query).map(([key, value]) => ({ [key]: value }));
+  if (terms.length === 0) return { since: query.since };
+  if (terms.length === 1) return { since: query.since, ...terms[0] };
+  return { since: query.since, or: terms };
 }
 
 /** The parts of ImapFlow the adapter uses, so tests can supply a fake client. */

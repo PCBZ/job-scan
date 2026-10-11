@@ -32,7 +32,7 @@ describe("imapConnector", () => {
     const fake = new FakeImapFlow();
     const box = await connector(fake)(account(), "u", "p");
     await box.open("INBOX");
-    expect(await box.search({ since: new Date(), from: [] })).toEqual([1, 2, 3]);
+    expect(await box.search({ since: new Date(), from: [], subject: [] })).toEqual([1, 2, 3]);
     expect(await box.fetchSource(1)).toEqual(new Uint8Array(Buffer.from("raw")));
     await box.close();
     expect(fake.calls).toEqual(["connect", "open INBOX readOnly=true", "logout"]);

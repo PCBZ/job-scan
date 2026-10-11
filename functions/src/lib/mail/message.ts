@@ -35,6 +35,28 @@ class OwnPartsParser extends PostalMime {
   }
 }
 
+/**
+ * Keep mail from an allowlisted sender, or with a keyword in its subject:
+ * keywords catch recruiters mailing from an unlisted address. With neither
+ * list set, everything in the window is kept; excluded senders never are. The
+ * search asks the server for the same set; this applies the rule exactly,
+ * whichever search ran. Mirrors passes_filter in scripts/fetch_mail.py.
+ */
+export function passesFilter(
+  sender: string,
+  subject: string,
+  account: Pick<MailAccount, "senders" | "subjectKeywords" | "excludeSenders">,
+): boolean {
+  const lowSender = sender.toLowerCase();
+  const lowSubject = subject.toLowerCase();
+  if (account.excludeSenders.some((b) => lowSender.includes(b.toLowerCase()))) return false;
+  if (account.senders.length === 0 && account.subjectKeywords.length === 0) return true;
+  return (
+    account.senders.some((s) => lowSender.includes(s.toLowerCase())) ||
+    account.subjectKeywords.some((k) => lowSubject.includes(k.toLowerCase()))
+  );
+}
+
 export type MessageOutcome =
   | { kind: "kept"; message: FetchedMessage }
   | { kind: "seen" }
@@ -61,18 +83,8 @@ export async function processMessage(
 
   const sender = decodeWords(header("from"));
   const subject = decodeWords(header("subject"));
-  const lowSender = sender.toLowerCase();
-  const lowSubject = subject.toLowerCase();
 
-  if (account.excludeSenders.some((b) => lowSender.includes(b.toLowerCase()))) {
-    return { kind: "filtered" };
-  }
-  // The keyword filter only applies to senders not on the allowlist.
-  const keywords = account.subjectKeywords.map((k) => k.toLowerCase());
-  const allowlisted = account.senders.some((s) => lowSender.includes(s.toLowerCase()));
-  if (keywords.length > 0 && !allowlisted && !keywords.some((k) => lowSubject.includes(k))) {
-    return { kind: "filtered" };
-  }
+  if (!passesFilter(sender, subject, account)) return { kind: "filtered" };
 
   const plain = email.text ?? "";
   const html = email.html ?? "";
