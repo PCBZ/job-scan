@@ -10,10 +10,14 @@ import email.header
 import re
 from html import unescape
 
-TRACKING_PARAMS = re.compile(
-    r"[?&](utm_[a-z]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga)=[^&]*",
-    re.I,
+TRACKING_KEY = re.compile(
+    r"utm_[a-z]+|trk|trkEmail|midToken|midSig|eid|ct|lipi|refId|_ga", re.I
 )
+
+# Character references in an href, ended by ";". HTML writes & as &amp; in
+# attributes. A legacy reference without ";" stays as is: in an attribute it
+# isn't one, and decoding it would turn ?a=1&region=us into ?a=1®ion=us.
+HREF_REF = re.compile(r"&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);", re.I)
 
 # text/plain has no hyperlinks, so senders inline full tracking URLs as visible
 # text and wrap them across lines. Measured at 63% of body text, which was
@@ -89,6 +93,27 @@ def dedupe_key(url):
     return base + "?" + "&".join(sorted(p for p in query.split("&") if p))
 
 
+def decode_href(url):
+    """An href as the browser reads it: only ";"-terminated references."""
+    return HREF_REF.sub(lambda m: unescape(m.group(0)), url)
+
+
+def strip_tracking(url):
+    """Drop tracking params by key, keeping the rest in order, unencoded.
+
+    Removing them as substrings left "?trk=x&jk=1" as "path&jk=1".
+    """
+    base, sep, query = url.partition("?")
+    if not sep:
+        return url
+    query, hash_sep, fragment = query.partition("#")
+    kept = [
+        p for p in query.split("&")
+        if p and not TRACKING_KEY.fullmatch(p.partition("=")[0])
+    ]
+    return base + ("?" + "&".join(kept) if kept else "") + hash_sep + fragment
+
+
 def extract_links(html, limit=60):
     """(anchor text, url) pairs, de-tracked and deduped, in order.
 
@@ -100,10 +125,10 @@ def extract_links(html, limit=60):
     for match in re.finditer(
         r'<a\s[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', html, re.I | re.S
     ):
-        url, label = match.group(1), match.group(2)
+        url, label = decode_href(match.group(1)), match.group(2)
         if not url.lower().startswith("http"):
             continue
-        url = TRACKING_PARAMS.sub("", url).rstrip("?&")
+        url = strip_tracking(url)
         label = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", label)).strip()
         key = dedupe_key(url)
         if key in seen:
