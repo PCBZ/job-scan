@@ -139,7 +139,7 @@
     {
       "senders": ["a\"b.com"],
       "subject_keywords": ["say \"hi\""],
-      "expected": [["from", "ab.com"], ["subject", "say hi"]]
+      "expected": [["from", "a\"b.com"], ["subject", "say \"hi\""]]
     }
   ]
 }

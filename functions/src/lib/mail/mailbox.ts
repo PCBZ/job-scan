@@ -28,15 +28,20 @@ export type ConnectMailbox = (
   password: string,
 ) => Promise<Mailbox>;
 
-/** The server-side half of passesFilter: any sender, or any keyword. Mirrors search_terms. */
+/**
+ * The server-side half of passesFilter: any sender, or any keyword. Mirrors
+ * search_terms. Values stay as configured, quotes included, so the server
+ * matches what passesFilter does.
+ */
 export function searchTerms(query: Pick<SearchQuery, "from" | "subject">): [string, string][] {
   return [
-    ...query.from.map((s): [string, string] => ["from", s.replaceAll('"', "")]),
-    ...query.subject.map((k): [string, string] => ["subject", k.replaceAll('"', "")]),
+    ...query.from.map((s): [string, string] => ["from", s]),
+    ...query.subject.map((k): [string, string] => ["subject", k]),
   ];
 }
 
-// imapflow picks CHARSET UTF-8 itself when a term needs it ("招聘").
+// imapflow encodes each value itself: an ASCII one as a quoted string with
+// quotes escaped, a non-ASCII one ("招聘") as a literal under CHARSET UTF-8.
 export function toImapSearch(query: SearchQuery): SearchObject {
   const terms = searchTerms(query).map(([key, value]) => ({ [key]: value }));
   if (terms.length === 0) return { since: query.since };

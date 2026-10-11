@@ -50,15 +50,24 @@ def passes_filter(sender, subject, senders, keywords, blocked):
 
 
 def search_terms(senders, keywords):
-    """The server-side half of passes_filter: any sender, or any keyword."""
-    return ([("from", s.replace('"', "")) for s in senders]
-            + [("subject", k.replace('"', "")) for k in keywords])
+    """The server-side half of passes_filter: any sender, or any keyword.
+
+    Values stay as configured, quotes included, so the server matches what
+    passes_filter does; build_search escapes them.
+    """
+    return ([("from", s) for s in senders]
+            + [("subject", k) for k in keywords])
+
+
+def quoted(value):
+    """An IMAP quoted string (RFC 3501): backslash and double quote escaped."""
+    return '"%s"' % value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def build_search(days, senders, keywords):
     since = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
     criteria = '(SINCE %s)' % since
-    terms = ['%s "%s"' % (key.upper(), value)
+    terms = ["%s %s" % (key.upper(), quoted(value))
              for key, value in search_terms(senders, keywords)]
     if terms:
         combined = terms[0]

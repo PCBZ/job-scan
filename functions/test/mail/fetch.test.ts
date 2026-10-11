@@ -104,10 +104,10 @@ describe("toImapSearch", () => {
       from: "linkedin.com",
     });
   });
-  it("ORs several senders and strips quotes", () => {
+  it("ORs several senders, passing quotes through for imapflow to escape", () => {
     expect(toImapSearch({ since, from: ['a"b.com', "indeed.com"], subject: [] })).toEqual({
       since,
-      or: [{ from: "ab.com" }, { from: "indeed.com" }],
+      or: [{ from: 'a"b.com' }, { from: "indeed.com" }],
     });
   });
   it("uses one SUBJECT for a single keyword", () => {
@@ -121,7 +121,7 @@ describe("toImapSearch", () => {
       toImapSearch({ since, from: ["linkedin.com"], subject: ["hiring", 'say "hi"'] }),
     ).toEqual({
       since,
-      or: [{ from: "linkedin.com" }, { subject: "hiring" }, { subject: "say hi" }],
+      or: [{ from: "linkedin.com" }, { subject: "hiring" }, { subject: 'say "hi"' }],
     });
   });
 });
