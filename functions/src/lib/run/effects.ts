@@ -8,7 +8,6 @@ import { addDays, runDay } from "../day.js";
 import { emailReport, emailSettings, gmailTransport } from "../delivery/email.js";
 import { telegramReport, telegramSettings } from "../delivery/telegram.js";
 import { isPruneDay, SEEN_MESSAGE_DAYS, type SeenStore } from "../mail/seen-store.js";
-import type { TableApplications } from "../postings/applications.js";
 import type { TableSeenJobsStore } from "../postings/seen-jobs.js";
 import { renderHtml } from "../report/html.js";
 import type { ReportPublisher } from "../report/publish.js";
@@ -21,7 +20,6 @@ export interface EffectsServices {
   publisher: ReportPublisher;
   seen: Pick<SeenStore, "markSeen" | "pruneOlderThan">;
   seenJobs: Pick<TableSeenJobsStore, "recordRecommended">;
-  applications: Pick<TableApplications, "addPending">;
   fetch: typeof fetch;
   /** Builds the SMTP transport; nodemailer's own in production. */
   transport?: (
@@ -66,7 +64,6 @@ export function productionEffects(d: EffectsServices): Effects {
         top.map((r) => r.posting),
         day,
       );
-      await d.applications.addPending(top, day);
       // Last, and weekly: the report is out and this mail is recorded, so a
       // failed prune fails the run visibly without bringing anything back.
       if (isPruneDay(day)) await d.seen.pruneOlderThan(addDays(day, -SEEN_MESSAGE_DAYS));

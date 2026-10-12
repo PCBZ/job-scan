@@ -1,8 +1,6 @@
-import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../../src/lib/config/load.js";
 import {
-  fp16,
   TelegramConfigError,
   TelegramError,
   telegramMessage,
@@ -30,17 +28,6 @@ describe("telegramSettings", () => {
   });
 });
 
-describe("fp16", () => {
-  it("is 16 hex characters of the fingerprint's SHA-256, alike across wordings", () => {
-    const fp = createHash("sha256")
-      .update("lumen ridge|backend engineer payments")
-      .digest("hex")
-      .slice(0, 16);
-    expect(fp16(top)).toBe(fp);
-    expect(fp16({ company: "Lumen Ridge Inc.", title: "Backend Engineer, Payments" })).toBe(fp);
-  });
-});
-
 describe("telegramMessage", () => {
   it("summarises each pick in a few lines, under a header with the alerts", () => {
     const { text } = telegramMessage(SAMPLE);
@@ -57,22 +44,11 @@ describe("telegramMessage", () => {
     expect(text).not.toMatch(/Gap:\s*$/m);
   });
 
-  it("gives each pick Approve / Skip buttons with short callbacks, then the report link", () => {
-    const { buttons } = telegramMessage(SAMPLE, "https://reports.example/x");
-    expect(buttons).toEqual([
-      [
-        { text: "✅ Approve 1", callback_data: `a:${fp16(top)}` },
-        { text: "⏭ Skip 1", callback_data: `s:${fp16(top)}` },
-      ],
-      [
-        { text: "✅ Approve 2", callback_data: `a:${fp16(SAMPLE.top[1] as TopPick)}` },
-        { text: "⏭ Skip 2", callback_data: `s:${fp16(SAMPLE.top[1] as TopPick)}` },
-      ],
+  it("has one button, the full report's link, and none without a link", () => {
+    expect(telegramMessage(SAMPLE, "https://reports.example/x").buttons).toEqual([
       [{ text: "📄 Full report", url: "https://reports.example/x" }],
     ]);
-    for (const b of buttons.flat()) {
-      if ("callback_data" in b) expect(Buffer.byteLength(b.callback_data)).toBeLessThanOrEqual(64);
-    }
+    expect(telegramMessage(SAMPLE).buttons).toEqual([]);
   });
 
   it("escapes what Telegram's HTML mode needs", () => {
@@ -118,7 +94,7 @@ describe("telegramMessage", () => {
     const shown = (text.match(/^\d+\. /gm) ?? []).length;
     expect(shown).toBeLessThan(6);
     expect(text).toContain(`…and ${6 - shown} more in the full report.`);
-    expect(buttons).toHaveLength(shown);
+    expect(buttons).toEqual([]);
   });
 });
 

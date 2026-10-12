@@ -56,7 +56,6 @@ function harness(
       },
     },
     seenJobs: { recordRecommended: async (j, day) => void calls.push(`jobs ${j.length} ${day}`) },
-    applications: { addPending: async (t, day) => void calls.push(`pending ${t.length} ${day}`) },
     fetch: (async (_url: string, init: RequestInit) => {
       const body = JSON.parse(String(init.body));
       calls.push(
@@ -138,21 +137,16 @@ describe("productionEffects.markSeen", () => {
     ],
   } as FetchPayload;
 
-  it("records the messages, the recommended postings and a pending row each, on the run's day", async () => {
+  it("records the messages and the recommended postings, on the run's day", async () => {
     // 2026-10-09 is a Friday: no prune.
     const { effects, calls } = harness();
     await effects.markSeen({ mail, top: [rankedOf(judgement())] });
-    expect(calls).toEqual(["seen 2 2026-10-09", "jobs 1 2026-10-09", "pending 1 2026-10-09"]);
+    expect(calls).toEqual(["seen 2 2026-10-09", "jobs 1 2026-10-09"]);
   });
 
   it("on Sundays, prunes last, 90 days back", async () => {
     const { effects, calls } = harness({ now: new Date("2026-10-11T15:00:00Z") });
     await effects.markSeen({ mail, top: [rankedOf(judgement())] });
-    expect(calls).toEqual([
-      "seen 2 2026-10-11",
-      "jobs 1 2026-10-11",
-      "pending 1 2026-10-11",
-      "prune before 2026-07-13",
-    ]);
+    expect(calls).toEqual(["seen 2 2026-10-11", "jobs 1 2026-10-11", "prune before 2026-07-13"]);
   });
 });

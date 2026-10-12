@@ -41,7 +41,7 @@ module "function_app" {
     "MODEL_NAME"       = module.openai.deployment_name
     "CONFIG_BLOB_URL"  = module.config_blob.url
     "RESUME_CACHE_URL" = module.storage.container_endpoints["resume-cache"]
-    # seenmessages, seenjobs and applications (#22).
+    # seenmessages and seenjobs (#9, #15).
     "TABLES_URL" = module.storage.table_endpoint
     # Private; reports are read through user delegation SAS links (#19).
     "REPORTS_URL" = module.storage.container_endpoints["reports"]

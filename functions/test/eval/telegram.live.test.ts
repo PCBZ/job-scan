@@ -1,6 +1,5 @@
 // One real Telegram send of the synthetic sample report, to check #21's
-// "Done when": the message arrives, the report link opens, and the buttons
-// show. (Pressing them needs the webhook, #24.) Skipped unless EVAL_LIVE is
+// "Done when": the message arrives and the report link opens. Skipped unless EVAL_LIVE is
 // exactly 1. Uses ../config.toml's report.telegram_chat_id:
 //
 //   export TELEGRAM_BOT_TOKEN=...
