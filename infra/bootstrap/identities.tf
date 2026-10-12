@@ -84,6 +84,15 @@ resource "azurerm_role_assignment" "deployer_vault_reader" {
   principal_id         = module.github_oidc.principal_id
 }
 
+# Attaching the app's identity to the Function App needs assign on the identity
+# itself, a linked check across resource groups (#85). Managed Identity Operator
+# on that one identity: read and assign it, never change or delete it.
+resource "azurerm_role_assignment" "deployer_app_identity" {
+  scope                = azurerm_user_assigned_identity.app.id
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = module.github_oidc.principal_id
+}
+
 # The backend authenticates with Entra ID: read and write the state.
 resource "azurerm_role_assignment" "deployer_state" {
   scope                = azurerm_storage_container.tfstate.id
