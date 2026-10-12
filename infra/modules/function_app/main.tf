@@ -60,4 +60,11 @@ resource "azurerm_function_app_flex_consumption" "this" {
   )
 
   tags = var.tags
+
+  # Azure drops an app setting whose value is empty, so the blank above never
+  # sticks and every plan would add it back (#59). It's still written on
+  # create; only its drift is ignored, and every other setting is compared.
+  lifecycle {
+    ignore_changes = [app_settings["AzureWebJobsStorage"]]
+  }
 }
