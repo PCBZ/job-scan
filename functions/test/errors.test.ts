@@ -14,7 +14,9 @@ describe("appError", () => {
 
   it("leaves cause unset when none is given", () => {
     expect("cause" in appError("config", "x")).toBe(false);
-    expect("cause" in appError("telegram", "x", { status: 400, retryAfter: undefined })).toBe(false);
+    expect("cause" in appError("telegram", "x", { status: 400, retryAfter: undefined })).toBe(
+      false,
+    );
   });
 });
 
