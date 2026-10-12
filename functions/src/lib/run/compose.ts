@@ -58,6 +58,8 @@ export interface Pipeline {
   deterministicSteps: DeterministicSteps;
   modelSteps: ModelSteps;
   effects: Effects;
+  /** How long model calls have waited for the TPM budget so far, for the run's summary. */
+  throttledMs?: () => number;
 }
 
 export function composePipeline(
@@ -76,11 +78,13 @@ export function composePipeline(
   const seenJobs = TableSeenJobsStore.connect(tables, "seenjobs", credential);
   const configSource = blobConfigSource(setting("CONFIG_BLOB_URL"), credential);
   const resumeStore = blobTextStore(setting("RESUME_CACHE_URL"), credential);
-  const client = modelClientFromEnv(
-    env,
-    credential,
-    o.onFallback ? { onFallback: o.onFallback } : {},
-  );
+  let throttledMs = 0;
+  const client = modelClientFromEnv(env, credential, {
+    ...(o.onFallback ? { onFallback: o.onFallback } : {}),
+    onThrottle: (ms) => {
+      throttledMs += ms;
+    },
+  });
 
   const deterministicSteps: DeterministicSteps = {
     loadConfig: () => loadConfig(configSource),
@@ -117,5 +121,5 @@ export function composePipeline(
     now,
   });
 
-  return { deterministicSteps, modelSteps, effects };
+  return { deterministicSteps, modelSteps, effects, throttledMs: () => throttledMs };
 }

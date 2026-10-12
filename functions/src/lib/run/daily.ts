@@ -19,6 +19,8 @@ export interface RunSummary {
   top: number;
   warnings: number;
   usage: Record<string, { input: number; output: number }>;
+  /** Time model calls spent waiting for the TPM budget. */
+  throttledMs: number;
 }
 
 export async function runDaily(
@@ -43,6 +45,7 @@ export async function runDaily(
       top: state.top.length,
       warnings: state.warnings.length,
       usage: state.usage,
+      throttledMs: Math.round(pipeline.throttledMs?.() ?? 0),
     };
     log.log(`daily: done ${JSON.stringify(summary)}`);
     return summary;
