@@ -5,6 +5,7 @@ import { z } from "zod";
 import { modelClientFromEnv } from "../../src/lib/model/config.js";
 import { FallbackClient } from "../../src/lib/model/fallback.js";
 import { OpenAIChatClient } from "../../src/lib/model/openai-chat.js";
+import { RateLimitedClient } from "../../src/lib/model/rate-limit.js";
 
 const credential: TokenCredential = {
   getToken: async () => ({ token: "entra-token", expiresOnTimestamp: Date.now() + 3_600_000 }),
@@ -158,5 +159,28 @@ describe("modelClientFromEnv", () => {
       }),
     ).rejects.toBeInstanceOf(APIUserAbortError);
     expect(n).toBe(0);
+  });
+});
+
+describe("modelClientFromEnv pacing", () => {
+  const env = {
+    MODEL_PROVIDER: "azure-openai",
+    MODEL_ENDPOINT: "https://acct.openai.azure.com/",
+    MODEL_NAME: "gpt-5.4-mini",
+  };
+  const credential = { getToken: async () => null };
+  it("paces to MODEL_TPM when it's set, and not otherwise", () => {
+    expect(modelClientFromEnv({ ...env, MODEL_TPM: "250000" }, credential)).toBeInstanceOf(
+      RateLimitedClient,
+    );
+    expect(modelClientFromEnv(env, credential)).not.toBeInstanceOf(RateLimitedClient);
+    expect(modelClientFromEnv({ ...env, MODEL_TPM: "0" }, credential)).not.toBeInstanceOf(
+      RateLimitedClient,
+    );
+  });
+  it("rejects a MODEL_TPM that isn't a whole number", () => {
+    expect(() => modelClientFromEnv({ ...env, MODEL_TPM: "lots" }, credential)).toThrow(
+      'MODEL_TPM must be a whole number, got "lots"',
+    );
   });
 });

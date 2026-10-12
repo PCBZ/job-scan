@@ -6,14 +6,19 @@
 //   MODEL_API_KEY      openai-compatible only; Azure uses Entra ID
 //   MODEL_API_VERSION  azure-openai only (default below)
 //
-// The same keys prefixed MODEL_FALLBACK_ configure an optional fallback.
-// MODEL_MAX_RETRIES and MODEL_TIMEOUT_MS apply to both.
+//   MODEL_TPM          the deployment's tokens per minute; calls are paced to
+//                      it (rate-limit.ts). Unset or 0: no pacing.
+//
+// The same keys prefixed MODEL_FALLBACK_ configure an optional fallback, which
+// is paced to its own MODEL_FALLBACK_TPM. MODEL_MAX_RETRIES and
+// MODEL_TIMEOUT_MS apply to both.
 
 import { getBearerTokenProvider, type TokenCredential } from "@azure/identity";
 import OpenAI, { AzureOpenAI } from "openai";
 import { type AppError, appError } from "../errors.js";
 import { FallbackClient } from "./fallback.js";
 import { OpenAIChatClient } from "./openai-chat.js";
+import { RateLimitedClient } from "./rate-limit.js";
 import type { ModelClient } from "./types.js";
 
 export const DEFAULT_AZURE_API_VERSION = "2024-10-21";
@@ -39,8 +44,16 @@ function positiveInt(env: Env, key: string, fallback: number): number {
 export interface ModelClientOptions {
   /** Told why the fallback was used, for the run's warnings. */
   onFallback?: (err: AppError<"model_provider">) => void;
+  /** Told how long a call waited for the TPM budget, for the run's summary. */
+  onThrottle?: (ms: number) => void;
   /** For tests: the HTTP layer the SDK uses. */
   fetch?: typeof fetch;
+}
+
+/** The slot's client, paced to its TPM when one is set. */
+function paced(client: ModelClient, env: Env, prefix: string, options: ModelClientOptions) {
+  const tpm = positiveInt(env, `${prefix}_TPM`, 0);
+  return tpm > 0 ? new RateLimitedClient(client, tpm, options.onThrottle) : client;
 }
 
 function slot(
@@ -92,8 +105,13 @@ export function modelClientFromEnv(
   credential: TokenCredential,
   options: ModelClientOptions = {},
 ): ModelClient {
-  const primary = slot(env, "MODEL", "primary", credential, options);
+  const primary = paced(slot(env, "MODEL", "primary", credential, options), env, "MODEL", options);
   if (!env.MODEL_FALLBACK_PROVIDER?.trim()) return primary;
-  const fallback = slot(env, "MODEL_FALLBACK", "fallback", credential, options);
+  const fallback = paced(
+    slot(env, "MODEL_FALLBACK", "fallback", credential, options),
+    env,
+    "MODEL_FALLBACK",
+    options,
+  );
   return new FallbackClient(primary, fallback, options.onFallback);
 }

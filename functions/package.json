@@ -41,6 +41,7 @@
     "@unified-latex/unified-latex-util-parse": "1.8.4",
     "entities": "8.1.0",
     "imapflow": "2.2.5",
+    "limiter": "4.1.0",
     "mustache": "4.2.0",
     "nodemailer": "10.0.16",
     "openai": "7.28.0",

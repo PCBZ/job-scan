@@ -20,9 +20,11 @@ module "function_app" {
     "KEY_VAULT_SECRETS" = join(",", var.platform.secret_settings)
     # Model selection, read by functions/src/lib/model/config.ts. A fallback
     # would add the same keys prefixed MODEL_FALLBACK_.
-    "MODEL_PROVIDER"   = "azure-openai"
-    "MODEL_ENDPOINT"   = module.openai.endpoint
-    "MODEL_NAME"       = module.openai.deployment_name
+    "MODEL_PROVIDER" = "azure-openai"
+    "MODEL_ENDPOINT" = module.openai.endpoint
+    "MODEL_NAME"     = module.openai.deployment_name
+    # Calls are paced to the deployment's TPM (functions/src/lib/model/rate-limit.ts, #93).
+    "MODEL_TPM"        = tostring(module.openai.tokens_per_minute)
     "CONFIG_BLOB_URL"  = module.config_blob.url
     "RESUME_CACHE_URL" = module.storage.container_endpoints["resume-cache"]
     # seenmessages and seenjobs (#9, #15).

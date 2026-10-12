@@ -24,6 +24,13 @@ describe("runDaily", () => {
     expect(r.lines.at(-1)).toMatch(/^daily: done \{"outcome":"report","top":1,"warnings":0,/);
   });
 
+  it("reports how long model calls waited for the TPM budget", async () => {
+    const f = fakes();
+    const summary = await runDaily({ ...f, throttledMs: () => 1234.4 }, recorder().log);
+    expect(summary.throttledMs).toBe(1234);
+    expect((await runDaily(fakes(), recorder().log)).throttledMs).toBe(0);
+  });
+
   it("logs a failed run and rethrows, so the host records it and nothing is marked seen", async () => {
     const f = fakes({ deliverFails: true });
     const r = recorder();
