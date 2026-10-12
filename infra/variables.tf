@@ -31,9 +31,3 @@ variable "platform" {
     secret_settings     = list(string)
   })
 }
-
-variable "app_package" {
-  description = "Zip of the built Functions app to deploy. CD passes one per release; leave unset to keep the deployed code."
-  type        = string
-  default     = null
-}

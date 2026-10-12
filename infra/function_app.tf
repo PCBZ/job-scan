@@ -9,7 +9,6 @@ module "function_app" {
   deployment_container_endpoint = module.storage.container_endpoints["deployments"]
   identity_id                   = var.platform.app_identity_id
   identity_client_id            = var.platform.app_client_id
-  app_package                   = var.app_package
 
   application_insights_connection_string = module.monitoring.connection_string
 

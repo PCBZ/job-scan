@@ -56,12 +56,6 @@ variable "app_settings" {
   default = {}
 }
 
-variable "app_package" {
-  description = "Zip of the app to deploy; null keeps the deployed code."
-  type        = string
-  default     = null
-}
-
 variable "tags" {
   type    = map(string)
   default = {}
