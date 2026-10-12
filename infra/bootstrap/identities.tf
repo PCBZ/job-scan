@@ -75,6 +75,15 @@ resource "azurerm_role_assignment" "deployer_secrets" {
   principal_id         = module.github_oidc.principal_id
 }
 
+# data.azurerm_key_vault_secret reads the vault over ARM first, for its URL; the
+# data-plane role above doesn't cover that (#85). Reader on this vault only: its
+# properties, never a secret's value, and no writes.
+resource "azurerm_role_assignment" "deployer_vault_reader" {
+  scope                = module.key_vault.id
+  role_definition_name = "Reader"
+  principal_id         = module.github_oidc.principal_id
+}
+
 # The backend authenticates with Entra ID: read and write the state.
 resource "azurerm_role_assignment" "deployer_state" {
   scope                = azurerm_storage_container.tfstate.id
