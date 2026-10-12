@@ -90,10 +90,9 @@ jobs:
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
-      TF_VAR_operator_principal_id: ${{ vars.TF_VAR_operator_principal_id }}
-      TF_VAR_mail_credential_envs: ${{ vars.TF_VAR_mail_credential_envs }}
-      # The identity's rights stop at the resource group.
-      TF_VAR_register_resource_providers: "false"
+      # What infra/bootstrap built: the resource group, the vault, the app's
+      # identity. Identifiers only.
+      TF_VAR_platform: ${{ vars.TF_VAR_platform }}
     steps:
       - uses: actions/checkout@v5
 

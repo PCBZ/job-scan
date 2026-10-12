@@ -20,10 +20,6 @@ variable "subject_claims" {
   type        = list(object({ key = string, value = string }))
 }
 
-variable "key_vault_id" {
-  type = string
-}
-
 variable "tags" {
   type    = map(string)
   default = {}

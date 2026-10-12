@@ -30,6 +30,7 @@
     "@azure/data-tables": "13.3.2",
     "@azure/functions": "4.16.5",
     "@azure/identity": "4.13.3",
+    "@azure/keyvault-secrets": "4.11.2",
     "@azure/storage-blob": "12.34.0",
     "@langchain/core": "1.2.16",
     "@langchain/langgraph": "1.4.19",
