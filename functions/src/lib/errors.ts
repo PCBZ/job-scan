@@ -50,7 +50,8 @@ export function appError<C extends ErrorCode>(
 ): AppError<C> {
   const { cause, ...fields } = (extra ?? {}) as ErrorOptions & Record<string, unknown>;
   const err = new Error(message, extra && "cause" in extra ? { cause } : undefined);
-  return Object.assign(err, { name: code, code, ...fields }) as unknown as AppError<C>;
+  // The code is set last, so no field passed in can override it.
+  return Object.assign(err, { ...fields, name: code, code }) as unknown as AppError<C>;
 }
 
 /** Whether `err` is an AppError with this code; narrows to its fields. */

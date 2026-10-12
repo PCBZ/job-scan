@@ -18,6 +18,13 @@ describe("appError", () => {
       false,
     );
   });
+
+  it("keeps the code it was given, whatever fields come with it", () => {
+    const fields = { status: 503, code: "model_output", name: "model_output" };
+    const err = appError("model_provider", "chat: 503", fields);
+    expect(err).toMatchObject({ name: "model_provider", code: "model_provider", status: 503 });
+    expect(isAppError(err, "model_provider")).toBe(true);
+  });
 });
 
 describe("isAppError", () => {
