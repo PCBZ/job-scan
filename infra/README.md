@@ -120,8 +120,9 @@ All granted in `bootstrap/identities.tf`:
 - **CD** (`job-scan-github-deploy`), on the main resource group: Contributor,
   and Storage Blob Data Contributor for the config blob. On the vault: Key
   Vault Secrets User, for `config-toml`, and Reader, because Terraform looks
-  the vault up over ARM before reading the secret. On the state container:
-  Storage Blob Data Contributor.
+  the vault up over ARM before reading the secret. On the app's identity:
+  Managed Identity Operator, to attach it to the Function App. On the state
+  container: Storage Blob Data Contributor.
 - **You**, the operator who applies bootstrap: Key Vault Secrets Officer, and
   on the main resource group Storage Blob Data Contributor and Cognitive
   Services OpenAI User, for a local apply and the live evals.
