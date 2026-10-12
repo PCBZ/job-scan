@@ -2,7 +2,7 @@
 // files count as variants. Mirrors workspace.resume_config(), with the GitHub
 // repository standing in for the local `lib` directory.
 
-import { ConfigError } from "./error.js";
+import { appError } from "../errors.js";
 import type { RawResume } from "./schema.js";
 
 export interface ResumeConfig {
@@ -18,7 +18,8 @@ export interface ResumeConfig {
 export function resumeConfig(raw: RawResume | undefined, origin: string): ResumeConfig {
   const resume = raw ?? {};
   if (!resume.repo) {
-    throw new ConfigError(
+    throw appError(
+      "config",
       `[resume] repo is not set in ${origin}. The cloud run reads resumes from GitHub; ` +
         'set it to the repository that holds them, e.g. repo = "owner/name".',
     );

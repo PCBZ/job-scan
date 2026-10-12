@@ -3,12 +3,8 @@
 // each with its own earlier answers and problems.
 
 import type { ProfileConfig } from "../config/schema.js";
-import {
-  type ModelClient,
-  ModelOutputError,
-  type RepairTurn,
-  type TokenUsage,
-} from "../model/types.js";
+import { isAppError } from "../errors.js";
+import type { ModelClient, RepairTurn, TokenUsage } from "../model/types.js";
 import type { Posting } from "../postings/types.js";
 import type { ResumeVariant } from "../resume/load.js";
 import { mapWithLimit } from "../workflow/limit.js";
@@ -73,7 +69,7 @@ export function judgeStep(client: ModelClient, options: JudgeOptions = {}) {
         return [{ posting, asked, answer: r.value }];
       } catch (err) {
         // One unusable answer costs that posting, not the run.
-        if (!(err instanceof ModelOutputError)) throw err;
+        if (!isAppError(err, "model_output")) throw err;
         warnings.push(`judge: posting ${id}: ${err.message}`);
         return kept ? [kept] : [];
       }

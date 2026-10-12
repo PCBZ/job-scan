@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../../src/lib/config/load.js";
 import {
-  TelegramConfigError,
-  TelegramError,
   telegramMessage,
   telegramReport,
   telegramSettings,
@@ -23,7 +21,7 @@ describe("telegramSettings", () => {
       chatId: "123456789",
     });
     expect(() => telegramSettings(config({ telegram_chat_id: "@me" }), {})).toThrow(
-      TelegramConfigError,
+      expect.objectContaining({ code: "config" }),
     );
   });
 });
@@ -141,11 +139,11 @@ describe("telegramReport", () => {
       },
     });
     const err = await telegramReport(fetchFn, settings, SAMPLE).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(TelegramError);
+    expect(err).toMatchObject({ code: "telegram" });
     expect(err).toMatchObject({
       status: 429,
       retryAfter: 7,
-      message: "telegram: Too Many Requests: retry after 7",
+      message: "Too Many Requests: retry after 7",
     });
     expect(String((err as Error).message)).not.toContain("test-token");
   });

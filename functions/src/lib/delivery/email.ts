@@ -5,6 +5,7 @@
 
 import nodemailer, { type Transporter } from "nodemailer";
 import type { AppConfig } from "../config/load.js";
+import { appError } from "../errors.js";
 import { renderHtml } from "../report/html.js";
 import { NO_RESUMES } from "../report/source.js";
 import { renderText } from "../report/text.js";
@@ -18,10 +19,6 @@ type Env = Record<string, string | undefined>;
  */
 const GMAIL_SMTP = { host: "smtp.gmail.com", port: 465, secure: true } as const;
 
-export class EmailConfigError extends Error {
-  override name = "EmailConfigError";
-}
-
 export interface EmailSettings {
   user: string;
   password: string;
@@ -34,19 +31,19 @@ export function emailSettings(config: AppConfig, env: Env): EmailSettings | null
   if (!name) return null;
   const account = config.mail.accounts.find((a) => a.name === name);
   if (!account) {
-    throw new EmailConfigError(
-      `report.email_account "${name}" is not one of the [[account]] names`,
-    );
+    throw appError("config", `report.email_account "${name}" is not one of the [[account]] names`);
   }
   if (account.host !== "imap.gmail.com") {
-    throw new EmailConfigError(
+    throw appError(
+      "config",
       `report.email_account "${name}" must be a Gmail account, to send through Gmail SMTP`,
     );
   }
   const user = env[account.userEnv]?.trim();
   const password = env[account.passwordEnv]?.trim();
   if (!user || !password) {
-    throw new EmailConfigError(
+    throw appError(
+      "config",
       `${account.userEnv} and ${account.passwordEnv} must be set to send the report`,
     );
   }

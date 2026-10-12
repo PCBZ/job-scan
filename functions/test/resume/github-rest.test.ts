@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { GithubRestResumeSource } from "../../src/lib/resume/github-rest.js";
-import { ResumeNotFoundError } from "../../src/lib/resume/source.js";
 
 const REPO = { owner: "PCBZ", repo: "Resume", ref: "main" };
 
@@ -50,17 +49,17 @@ describe("GithubRestResumeSource", () => {
     expect(calls[0]?.headers.Accept).toBe("application/vnd.github.raw+json");
   });
 
-  it("raises ResumeNotFoundError for 404, with GitHub's message", async () => {
+  it("raises resume_not_found for 404, with GitHub's message", async () => {
     const { source } = fake(404, { message: "Not Found" });
     const err = await source.readFile("General/nope.tex").catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(ResumeNotFoundError);
+    expect(err).toMatchObject({ code: "resume_not_found" });
     expect((err as Error).message).toBe('GitHub contents 404 for "General/nope.tex": Not Found');
   });
 
   it("keeps other failures as ordinary errors", async () => {
     const { source } = fake(403, { message: "Resource not accessible by personal access token" });
     const err = await source.listDir("General").catch((e: unknown) => e);
-    expect(err).not.toBeInstanceOf(ResumeNotFoundError);
+    expect(err).not.toMatchObject({ code: "resume_not_found" });
     expect((err as Error).message).toContain("403");
   });
 

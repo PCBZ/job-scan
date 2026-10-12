@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { appError } from "../../src/lib/errors.js";
 import type { FetchedMessage } from "../../src/lib/mail/types.js";
-import {
-  type ModelClient,
-  ModelOutputError,
-  ModelProviderError,
-  type StructuredRequest,
-} from "../../src/lib/model/types.js";
+import type { ModelClient, StructuredRequest } from "../../src/lib/model/types.js";
 import { extractStep } from "../../src/lib/postings/extract.js";
 import { EXTRACT_SYSTEM } from "../../src/lib/postings/prompt.js";
 import type { ExtractedPosting, SuspiciousFlag } from "../../src/lib/postings/schema.js";
@@ -143,7 +139,7 @@ describe("extractStep", () => {
     let refuse = false;
     const c: ModelClient = {
       async structured<T>() {
-        if (refuse) throw new ModelOutputError("postings: cut off");
+        if (refuse) throw appError("model_output", "postings: cut off");
         return {
           value: { postings: [row()], suspicious: [] } as T,
           usage: { input: 1, output: 1 },
@@ -164,7 +160,8 @@ describe("extractStep", () => {
   it("an unusable answer costs that message's rows and is reported, not thrown", async () => {
     const c: ModelClient = {
       async structured<T>(req: StructuredRequest<T>) {
-        if (req.user.includes("<b@x>")) throw new ModelOutputError("postings: the model refused");
+        if (req.user.includes("<b@x>"))
+          throw appError("model_output", "postings: the model refused");
         return {
           value: { postings: [row()], suspicious: [] } as T,
           usage: { input: 1, output: 1 },
@@ -180,7 +177,7 @@ describe("extractStep", () => {
   it("a provider failure fails the step, so the mail is retried next run", async () => {
     const c: ModelClient = {
       async structured() {
-        throw new ModelProviderError("rate limited", 429);
+        throw appError("model_provider", "rate limited", { status: 429 });
       },
     };
     await expect(extractStep(c)({ messages: [message("<a@x>")] }, [])).rejects.toThrow(

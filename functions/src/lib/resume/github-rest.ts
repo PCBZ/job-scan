@@ -2,7 +2,8 @@
 // with read-only Contents on the resume repository, so it can read that
 // repository and nothing else.
 
-import { type DirEntry, ResumeNotFoundError, type ResumeSource } from "./source.js";
+import { appError } from "../errors.js";
+import type { DirEntry, ResumeSource } from "./source.js";
 
 export interface RepoRef {
   owner: string;
@@ -49,7 +50,7 @@ export class GithubRestResumeSource implements ResumeSource {
       const error = `GitHub contents ${res.status} for "${path || "/"}": ${message}`;
       // GitHub answers 404 both for a missing path and for a repository the
       // token can't see; discoverVariants tells the two apart.
-      if (res.status === 404) throw new ResumeNotFoundError(error);
+      if (res.status === 404) throw appError("resume_not_found", error);
       throw new Error(error);
     }
     return res;

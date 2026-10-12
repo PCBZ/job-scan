@@ -1,13 +1,7 @@
 import { APIUserAbortError } from "@typesafe-ai/sdk";
 import { describe, expect, it } from "vitest";
-import {
-  choice,
-  DecisionProviderError,
-  DecisionRequestError,
-  noul,
-  score,
-} from "../../src/lib/decision/client.js";
-import { DecisionConfigError, decisionClientFromEnv } from "../../src/lib/decision/config.js";
+import { choice, noul, score } from "../../src/lib/decision/client.js";
+import { decisionClientFromEnv } from "../../src/lib/decision/config.js";
 
 const ANSWERS = {
   remote: { type: "noul", noul: 0.92 },
@@ -113,8 +107,8 @@ describe("DecisionClient", () => {
     const { fetchFn, sent } = fakeFetch(status(code));
     const client = decisionClientFromEnv({ ...ENV, JEV_MAX_RETRIES: "2" }, { fetch: fetchFn });
     const err = await client.ask({ state: "x", questions: QUESTIONS }).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(DecisionRequestError);
-    expect((err as DecisionRequestError).status).toBe(code);
+    expect(err).toMatchObject({ code: "decision_request" });
+    expect((err as { status?: number }).status).toBe(code);
     expect(sent).toHaveLength(1);
   });
 
@@ -123,8 +117,8 @@ describe("DecisionClient", () => {
     const err = await decisionClientFromEnv(ENV, { fetch: fetchFn })
       .ask({ state: "x", questions: QUESTIONS })
       .catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(DecisionProviderError);
-    expect((err as DecisionProviderError).status).toBe(code);
+    expect(err).toMatchObject({ code: "decision_provider" });
+    expect((err as { status?: number }).status).toBe(code);
   });
 
   it("retries a rate limit, honouring retry-after", async () => {
@@ -139,7 +133,7 @@ describe("DecisionClient", () => {
     const down = fakeFetch(new TypeError("fetch failed"));
     await expect(
       decisionClientFromEnv(ENV, { fetch: down.fetchFn }).ask({ state: "x", questions: QUESTIONS }),
-    ).rejects.toBeInstanceOf(DecisionProviderError);
+    ).rejects.toMatchObject({ code: "decision_provider" });
 
     const slow = fakeFetch("hang");
     await expect(
@@ -166,7 +160,7 @@ describe("DecisionClient", () => {
     const { fetchFn, sent } = fakeFetch(ok());
     await expect(
       decisionClientFromEnv(ENV, { fetch: fetchFn }).ask({ state: "x", questions: {} }),
-    ).rejects.toBeInstanceOf(DecisionRequestError);
+    ).rejects.toMatchObject({ code: "decision_request" });
     expect(sent).toHaveLength(0);
   });
 });
@@ -216,7 +210,7 @@ describe("DecisionClient response checks", () => {
     const err = await decisionClientFromEnv(ENV, { fetch: fetchFn })
       .ask({ state: "x", questions: QUESTIONS })
       .catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(DecisionProviderError);
+    expect(err).toMatchObject({ code: "decision_provider" });
     expect((err as Error).message).toContain(`malformed response at ${where}:`);
   });
 
@@ -230,7 +224,7 @@ describe("DecisionClient response checks", () => {
 
 describe("decisionClientFromEnv", () => {
   it("needs the API key", () => {
-    expect(() => decisionClientFromEnv({})).toThrow(DecisionConfigError);
+    expect(() => decisionClientFromEnv({})).toThrow(expect.objectContaining({ code: "config" }));
     expect(() => decisionClientFromEnv({ TYPESAFE_API_KEY: "  " })).toThrow(
       "TYPESAFE_API_KEY is not set",
     );
@@ -242,6 +236,8 @@ describe("decisionClientFromEnv", () => {
     ["JEV_MAX_RETRIES", "-1"],
     ["JEV_MAX_RETRIES", "1.5"],
   ])("rejects %s=%s", (key, value) => {
-    expect(() => decisionClientFromEnv({ ...ENV, [key]: value })).toThrow(DecisionConfigError);
+    expect(() => decisionClientFromEnv({ ...ENV, [key]: value })).toThrow(
+      expect.objectContaining({ code: "config" }),
+    );
   });
 });

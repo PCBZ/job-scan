@@ -11,22 +11,19 @@
 
 import { getBearerTokenProvider, type TokenCredential } from "@azure/identity";
 import OpenAI, { AzureOpenAI } from "openai";
+import { type AppError, appError } from "../errors.js";
 import { FallbackClient } from "./fallback.js";
 import { OpenAIChatClient } from "./openai-chat.js";
-import type { ModelClient, ModelProviderError } from "./types.js";
+import type { ModelClient } from "./types.js";
 
 export const DEFAULT_AZURE_API_VERSION = "2024-10-21";
 const AZURE_SCOPE = "https://cognitiveservices.azure.com/.default";
 
 type Env = Record<string, string | undefined>;
 
-export class ModelConfigError extends Error {
-  override name = "ModelConfigError";
-}
-
 function required(env: Env, key: string): string {
   const value = env[key]?.trim();
-  if (!value) throw new ModelConfigError(`${key} is not set`);
+  if (!value) throw appError("config", `${key} is not set`);
   return value;
 }
 
@@ -35,13 +32,13 @@ function positiveInt(env: Env, key: string, fallback: number): number {
   if (!raw) return fallback;
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 0)
-    throw new ModelConfigError(`${key} must be a whole number, got "${raw}"`);
+    throw appError("config", `${key} must be a whole number, got "${raw}"`);
   return n;
 }
 
 export interface ModelClientOptions {
   /** Told why the fallback was used, for the run's warnings. */
-  onFallback?: (err: ModelProviderError) => void;
+  onFallback?: (err: AppError<"model_provider">) => void;
   /** For tests: the HTTP layer the SDK uses. */
   fetch?: typeof fetch;
 }
@@ -82,7 +79,8 @@ function slot(
       return new OpenAIChatClient(client.chat.completions, name, label);
     }
     default:
-      throw new ModelConfigError(
+      throw appError(
+        "config",
         `${prefix}_PROVIDER "${provider}" is not supported; use azure-openai or openai-compatible`,
       );
   }

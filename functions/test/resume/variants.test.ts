@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  type DirEntry,
-  ResumeNotFoundError,
-  type ResumeSource,
-} from "../../src/lib/resume/source.js";
+import { appError } from "../../src/lib/errors.js";
+import type { DirEntry, ResumeSource } from "../../src/lib/resume/source.js";
 import {
   discoverVariants,
   pickDefault,
@@ -21,7 +18,7 @@ function repo(paths: string[]): ResumeSource & { listed: string[] } {
       const prefix = dir ? `${dir}/` : "";
       // Like GitHub: a directory that doesn't exist is a 404.
       if (dir && !paths.some((x) => x.startsWith(prefix))) {
-        throw new ResumeNotFoundError(`GitHub contents 404 for "${dir}"`);
+        throw appError("resume_not_found", `GitHub contents 404 for "${dir}"`);
       }
       const entries = new Map<string, DirEntry>();
       for (const p of paths.filter((x) => x.startsWith(prefix))) {

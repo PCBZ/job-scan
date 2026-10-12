@@ -6,13 +6,11 @@
 import type { TokenCredential } from "@azure/identity";
 import { BlobClient, RestError } from "@azure/storage-blob";
 import { parse, TomlError } from "smol-toml";
+import { appError } from "../errors.js";
 import type { MailRunConfig } from "../mail/types.js";
-import { ConfigError } from "./error.js";
 import { mailConfig } from "./mail.js";
 import { type ResumeConfig, resumeConfig } from "./resume.js";
 import { type ProfileConfig, type ReportConfig, rawConfig } from "./schema.js";
-
-export { ConfigError } from "./error.js";
 
 export interface AppConfig {
   mail: MailRunConfig;
@@ -49,7 +47,7 @@ export function parseConfig(text: string, origin: string): AppConfig {
     data = parse(text);
   } catch (err) {
     if (err instanceof TomlError) {
-      throw new ConfigError(`${origin} is not valid TOML: ${err.message}`);
+      throw appError("config", `${origin} is not valid TOML: ${err.message}`);
     }
     throw err;
   }
@@ -62,7 +60,7 @@ export function parseConfig(text: string, origin: string): AppConfig {
         .replace(/^\./, "");
       return `  ${where || "(root)"}: ${issue.message}`;
     });
-    throw new ConfigError(`${origin} is invalid:\n${problems.join("\n")}`);
+    throw appError("config", `${origin} is invalid:\n${problems.join("\n")}`);
   }
   const raw = result.data;
   return {
@@ -76,7 +74,8 @@ export function parseConfig(text: string, origin: string): AppConfig {
 export async function loadConfig(source: ConfigSource): Promise<AppConfig> {
   const text = await source.read();
   if (text === null) {
-    throw new ConfigError(
+    throw appError(
+      "config",
       `${source.origin} not found. Refusing to run without a sender allowlist; ` +
         "that would fetch unrelated mail.",
     );

@@ -2,7 +2,6 @@ import nodemailer from "nodemailer";
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../../src/lib/config/load.js";
 import {
-  EmailConfigError,
   emailReport,
   emailSettings,
   gmailTransport,
@@ -75,7 +74,9 @@ describe("emailSettings", () => {
       "PERSONAL_USER and PERSONAL_PASSWORD must be set",
     ],
   ])("rejects %j", (report, env, message) => {
-    expect(() => emailSettings(config(report), env)).toThrow(EmailConfigError);
+    expect(() => emailSettings(config(report), env)).toThrow(
+      expect.objectContaining({ code: "config" }),
+    );
     expect(() => emailSettings(config(report), env)).toThrow(message);
   });
 });

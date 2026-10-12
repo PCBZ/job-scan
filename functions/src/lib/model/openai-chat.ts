@@ -9,14 +9,8 @@ import { ContentFilterFinishReasonError, LengthFinishReasonError } from "openai/
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { ZodError } from "zod";
-import {
-  type ModelClient,
-  ModelOutputError,
-  ModelProviderError,
-  type RepairTurn,
-  type StructuredRequest,
-  type StructuredResult,
-} from "./types.js";
+import { appError } from "../errors.js";
+import type { ModelClient, RepairTurn, StructuredRequest, StructuredResult } from "./types.js";
 
 /** The part of the OpenAI client this adapter uses, so tests can fake it. */
 export type ChatParser = Pick<OpenAI["chat"]["completions"], "parse">;
@@ -46,12 +40,13 @@ export class OpenAIChatClient implements ModelClient {
 
     const message = completion.choices[0]?.message;
     if (message?.refusal) {
-      throw new ModelOutputError(
+      throw appError(
+        "model_output",
         `${req.name}: the model refused: ${message.refusal.slice(0, 200)}`,
       );
     }
     if (message?.parsed === null || message?.parsed === undefined) {
-      throw new ModelOutputError(`${req.name}: the model returned no structured output`);
+      throw appError("model_output", `${req.name}: the model returned no structured output`);
     }
     return {
       value: message.parsed as T,
@@ -89,19 +84,22 @@ function classify(err: unknown, name: string): Error {
   // A cancelled run is not a provider failure: no fallback, no rewrapping.
   if (err instanceof APIUserAbortError) return err;
   if (err instanceof LengthFinishReasonError) {
-    return new ModelOutputError(`${name}: output was cut off at the token limit`, { cause: err });
+    return appError("model_output", `${name}: output was cut off at the token limit`, {
+      cause: err,
+    });
   }
   if (err instanceof ContentFilterFinishReasonError) {
-    return new ModelOutputError(`${name}: output was blocked by the content filter`, {
+    return appError("model_output", `${name}: output was blocked by the content filter`, {
       cause: err,
     });
   }
   if (err instanceof ZodError || err instanceof SyntaxError) {
-    return new ModelOutputError(`${name}: output did not match the schema`, { cause: err });
+    return appError("model_output", `${name}: output did not match the schema`, { cause: err });
   }
   if (err instanceof APIError) {
     // Includes connection errors and timeouts (no status), after the SDK's retries.
-    return new ModelProviderError(`${name}: ${err.message}`.slice(0, 300), err.status, {
+    return appError("model_provider", `${name}: ${err.message}`.slice(0, 300), {
+      status: err.status,
       cause: err,
     });
   }
