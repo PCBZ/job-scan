@@ -56,8 +56,11 @@ export async function loadSecrets(
   const out: Env = { ...env };
   const missing: string[] = [];
   for (const [setting, value] of read) {
-    if (value === undefined) missing.push(setting);
-    else out[setting] = value;
+    if (value === undefined) {
+      // A listed setting comes from the vault only: no value set elsewhere stands in.
+      missing.push(setting);
+      delete out[setting];
+    } else out[setting] = value;
   }
   return { env: out, missing };
 }

@@ -40,6 +40,15 @@ describe("loadSecrets", () => {
     expect(out.env.GMAIL_ALT_USER).toBeUndefined();
   });
 
+  it("unsets a listed setting whose secret is gone, whatever value it had", async () => {
+    const out = await loadSecrets(
+      { KEY_VAULT_SECRETS: "GMAIL_ALT_PASSWORD", GMAIL_ALT_PASSWORD: "stale" },
+      vault({}).client,
+    );
+    expect(out.missing).toEqual(["GMAIL_ALT_PASSWORD"]);
+    expect("GMAIL_ALT_PASSWORD" in out.env).toBe(false);
+  });
+
   it("fails the run on any other error, such as no access", async () => {
     const denied = Object.assign(new Error("Forbidden"), { statusCode: 403 });
     await expect(
