@@ -21,11 +21,11 @@ resource "azurerm_function_app_flex_consumption" "this" {
   storage_authentication_type       = "UserAssignedIdentity"
   storage_user_assigned_identity_id = var.identity_id
 
-  # The release's package, uploaded through Kudu with the site's publishing
-  # credentials, which the provider reads over ARM; that needs basic auth on.
-  # Only a new path redeploys, so CD names each package after its tag.
-  zip_deploy_file                                = var.app_package
-  webdeploy_publish_basic_authentication_enabled = true
+  # Code isn't deployed here: azurerm's zip_deploy_file uses Kudu's zipdeploy,
+  # which Flex Consumption doesn't support (hashicorp/terraform-provider-azurerm#29630).
+  # CD deploys it with Azure/functions-action (OneDeploy) over Entra ID, so no
+  # basic-auth publishing credentials are needed (#88).
+  webdeploy_publish_basic_authentication_enabled = false
 
   instance_memory_in_mb  = var.instance_memory_in_mb
   maximum_instance_count = var.maximum_instance_count

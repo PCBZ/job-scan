@@ -1,9 +1,9 @@
 # The deploy identity trusts this workflow by name: keep `name` in step with
-# infra's github_workflow.
+# infra/bootstrap's github_workflow.
 name: CD
 
 # A release is a v* tag on main: git tag vX.Y.Z && git push origin vX.Y.Z.
-# It applies infra/ as committed, with the tag's build as the app's code.
+# It applies infra/ as committed, then deploys the tag's build as the app's code.
 on:
   push:
     tags: ["v*"]
@@ -58,21 +58,20 @@ jobs:
         run: npm test
 
       # What the app reads at runtime: the compiled code, its prompts and
-      # report template, and production dependencies only. Named after the tag:
-      # Terraform redeploys only when the package path changes.
+      # report template, and production dependencies only.
       - name: Package
         run: |
           npm prune --omit=dev
-          zip -qr "../app-$GITHUB_REF_NAME.zip" dist prompts templates host.json package.json node_modules
+          zip -qr ../app.zip dist prompts templates host.json package.json node_modules
 
       - uses: actions/upload-artifact@v4
         with:
           name: app
-          path: app-${{ github.ref_name }}.zip
+          path: app.zip
           retention-days: 7
 
   deploy:
-    name: Terraform apply
+    name: Apply and deploy
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -116,4 +115,23 @@ jobs:
           -backend-config="use_azuread_auth=true"
 
       - name: Apply
-        run: terraform apply -auto-approve -var "app_package=$RUNNER_TEMP/app-$GITHUB_REF_NAME.zip"
+        run: terraform apply -auto-approve
+
+      - name: Function App name
+        id: app
+        run: echo "name=$(terraform output -raw function_app_name)" >> "$GITHUB_OUTPUT"
+
+      # The code goes out through OneDeploy, the only way Flex Consumption takes
+      # it: azurerm's zip_deploy_file can't (hashicorp/terraform-provider-azurerm#29630).
+      # Same CD identity and OIDC trust as Terraform; Contributor covers it.
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # https://github.com/Azure/functions-action
+      - uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ steps.app.outputs.name }}
+          package: ${{ runner.temp }}/app.zip

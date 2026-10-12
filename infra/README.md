@@ -95,9 +95,10 @@ before the next apply.
 ## Releasing
 
 A release is a `v*` tag on `main`. Pushing one runs `.github/workflows/cd.yml`:
-it checks and builds the tagged commit, then runs `terraform apply` on this
-directory as committed, with the tag's build as the app's code. There is no
-manual approval; the plan is printed in the log as it applies.
+it checks and builds the tagged commit, runs `terraform apply` on this
+directory as committed, then deploys the build as the app's code with
+`Azure/functions-action`. There is no manual approval; the plan is printed in
+the log as it applies.
 
 ```sh
 git checkout main && git pull
@@ -106,9 +107,13 @@ git push origin v0.1.0
 ```
 
 The workflow stops before applying if the tag isn't on `main` or if any check
-fails. The code goes out through `zip_deploy_file`, which redeploys only when
-the package path changes, so each package is named after its tag. A local
-apply leaves `app_package` unset and keeps the deployed code.
+fails. Terraform builds the infrastructure but not the code. Flex Consumption
+takes code only through OneDeploy, and azurerm's `zip_deploy_file` uses Kudu's
+zipdeploy instead
+([hashicorp/terraform-provider-azurerm#29630](https://github.com/hashicorp/terraform-provider-azurerm/issues/29630)).
+So the action deploys it, signed in as the same CD identity. Publishing
+credentials (basic auth) stay off. A local apply never touches the deployed
+code.
 
 ### What each identity can do
 
