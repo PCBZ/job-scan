@@ -3,7 +3,7 @@ locals {
 
   storage_roles = toset([
     "Storage Blob Data Owner",        # timer leases, deployment package, reports, caches
-    "Storage Table Data Contributor", # seen messages, seen jobs, application records
+    "Storage Table Data Contributor", # seen messages, seen jobs
     "Storage Queue Data Contributor", # used internally by identity-based host storage
   ])
 }

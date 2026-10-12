@@ -85,7 +85,7 @@ export interface DeterministicSteps {
 export interface Effects {
   /** Publish and send the report; the config names the recipients. */
   deliver(report: Report, config: AppConfig, signal?: AbortSignal): Promise<void>;
-  /** After delivery: record seen messages and pending application rows. */
+  /** After delivery: record the seen messages and the recommended postings. */
   markSeen(input: { mail: FetchPayload; top: Ranked[] }, signal?: AbortSignal): Promise<void>;
 }
 

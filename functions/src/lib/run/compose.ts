@@ -4,7 +4,7 @@
 //   CONFIG_BLOB_URL     config.toml in Blob (#10)
 //   RESUME_CACHE_URL    extracted resume texts (#12)
 //   REPORTS_URL         the private reports container (#19)
-//   TABLES_URL          seenmessages, seenjobs, applications
+//   TABLES_URL          seenmessages, seenjobs
 //   GITHUB_RESUME_PAT   read access to the resume repo (#11, from Key Vault via #47)
 //   MODEL_*             the model client (#13)
 //   <ACCOUNT>_USER / _PASSWORD, TELEGRAM_BOT_TOKEN  per config (#9, #20, #21)
@@ -21,7 +21,6 @@ import { runFetch } from "../mail/run.js";
 import { TableSeenStore } from "../mail/seen-store.js";
 import { modelClientFromEnv } from "../model/config.js";
 import type { ModelProviderError } from "../model/types.js";
-import { TableApplications } from "../postings/applications.js";
 import { dedupeStep } from "../postings/dedupe.js";
 import { extractStep } from "../postings/extract.js";
 import { hardGatesStep } from "../postings/gates.js";
@@ -118,7 +117,6 @@ export function composePipeline(
     publisher: reportPublisherFromUrl(setting("REPORTS_URL"), credential),
     seen,
     seenJobs,
-    applications: TableApplications.connect(tables, "applications", credential),
     fetch: fetchFn,
     now,
   });

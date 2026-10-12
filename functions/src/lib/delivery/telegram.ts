@@ -1,12 +1,8 @@
-// The daily Telegram summary (#21): the top picks in a few lines each, with
-// Approve / Skip buttons and a link to the full report. Sent with one Bot API
-// call; the buttons' callbacks are handled by the webhook (#24).
+// The daily Telegram summary (#21): the top picks in a few lines each, and a
+// button that opens the full report. Sent with one Bot API call.
 
 import type { AppConfig } from "../config/load.js";
-import { fp16 } from "../fingerprint.js";
 import type { Report, TopPick } from "../report/types.js";
-
-export { fp16 };
 
 type Env = Record<string, string | undefined>;
 
@@ -68,7 +64,7 @@ function pickLines(p: TopPick, n: number): string {
   return `${n}. <b>${esc(p.title)}</b> — ${esc(p.company)}\n   ${score}${where ? ` · ${esc(where)}` : ""} · send ${esc(send)}${gap}`;
 }
 
-type Button = { text: string; callback_data: string } | { text: string; url: string };
+type Button = { text: string; url: string };
 
 export interface TelegramMessage {
   text: string;
@@ -106,11 +102,7 @@ export function telegramMessage(r: Report, webUrl?: string): TelegramMessage {
   };
   while (shown > 0 && textFor(shown).length > MAX_TEXT) shown--;
 
-  const buttons: Button[][] = r.top.slice(0, shown).map((p, i) => [
-    { text: `✅ Approve ${i + 1}`, callback_data: `a:${fp16(p)}` },
-    { text: `⏭ Skip ${i + 1}`, callback_data: `s:${fp16(p)}` },
-  ]);
-  if (webUrl) buttons.push([{ text: "📄 Full report", url: webUrl }]);
+  const buttons: Button[][] = webUrl ? [[{ text: "📄 Full report", url: webUrl }]] : [];
   return { text: textFor(shown), buttons };
 }
 

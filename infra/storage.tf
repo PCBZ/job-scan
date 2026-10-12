@@ -15,6 +15,5 @@ module "storage" {
   tables = [
     "seenmessages", # Message-IDs already fetched, per account
     "seenjobs",     # posting fingerprints already recommended
-    "applications", # pending / approved / skipped / archived per posting
   ]
 }
