@@ -9,12 +9,9 @@
 
 import type { TokenCredential } from "@azure/identity";
 import { SecretClient } from "@azure/keyvault-secrets";
+import { appError } from "../errors.js";
 
 type Env = Record<string, string | undefined>;
-
-export class SecretsConfigError extends Error {
-  override name = "SecretsConfigError";
-}
 
 /** A setting's secret name: lowercase, "_" as "-" (Key Vault allows letters, digits and "-"). */
 export const secretName = (setting: string) => setting.toLowerCase().replaceAll("_", "-");
@@ -40,7 +37,7 @@ export async function loadSecrets(
     .map((s) => s.trim())
     .filter(Boolean);
   if (settings.length === 0) return { env, missing: [] };
-  if (!client) throw new SecretsConfigError("KEY_VAULT_SECRETS is set but KEY_VAULT_URI isn't");
+  if (!client) throw appError("config", "KEY_VAULT_SECRETS is set but KEY_VAULT_URI isn't");
 
   const read = await Promise.all(
     settings.map(async (setting) => {

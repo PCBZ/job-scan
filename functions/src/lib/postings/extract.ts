@@ -2,13 +2,9 @@
 // goes back only to the messages whose rows failed validation, each with its
 // own earlier answers and problems.
 
+import { isAppError } from "../errors.js";
 import type { FetchedMessage } from "../mail/types.js";
-import {
-  type ModelClient,
-  ModelOutputError,
-  type RepairTurn,
-  type TokenUsage,
-} from "../model/types.js";
+import type { ModelClient, RepairTurn, TokenUsage } from "../model/types.js";
 import { mapWithLimit } from "../workflow/limit.js";
 import type { ModelSteps } from "../workflow/types.js";
 import { EXTRACT_SYSTEM, extractUser } from "./prompt.js";
@@ -62,7 +58,7 @@ export function extractStep(
       } catch (err) {
         // One unusable answer costs that message's rows, not the run. A
         // provider failure still fails the run, so the mail is retried tomorrow.
-        if (!(err instanceof ModelOutputError)) throw err;
+        if (!isAppError(err, "model_output")) throw err;
         warnings.push(`extract_postings: message ${m.message_id}: ${err.message}`);
         return kept;
       }

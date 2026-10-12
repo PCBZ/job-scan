@@ -7,7 +7,6 @@ import {
   OpenAIChatClient,
   repairPrompt,
 } from "../../src/lib/model/openai-chat.js";
-import { ModelOutputError, ModelProviderError } from "../../src/lib/model/types.js";
 
 const Posting = z.object({ title: z.string(), company: z.string() });
 const REQ = { name: "posting", system: "Extract.", user: "Engineer at Northwind", schema: Posting };
@@ -63,7 +62,7 @@ describe("OpenAIChatClient", () => {
         parser(completion({ refusal: "I can't help with that." })),
         "m",
       ).structured(REQ),
-    ).rejects.toBeInstanceOf(ModelOutputError);
+    ).rejects.toMatchObject({ code: "model_output" });
     await expect(
       new OpenAIChatClient(parser(completion({ parsed: null })), "m").structured(REQ),
     ).rejects.toThrow("returned no structured output");
@@ -72,7 +71,7 @@ describe("OpenAIChatClient", () => {
   it("classifies truncation as an output error and API failures as provider errors", async () => {
     await expect(
       new OpenAIChatClient(parser(new LengthFinishReasonError()), "m").structured(REQ),
-    ).rejects.toBeInstanceOf(ModelOutputError);
+    ).rejects.toMatchObject({ code: "model_output" });
     const limited = new RateLimitError(
       429,
       { message: "slow down" },
@@ -82,8 +81,8 @@ describe("OpenAIChatClient", () => {
     const err = await new OpenAIChatClient(parser(limited), "m")
       .structured(REQ)
       .catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(ModelProviderError);
-    expect((err as ModelProviderError).status).toBe(429);
+    expect(err).toMatchObject({ code: "model_provider" });
+    expect((err as { status?: number }).status).toBe(429);
   });
 
   it("appends each repair turn as the previous answer plus its problems, oldest first", async () => {
@@ -129,6 +128,6 @@ describe("OpenAIChatClient", () => {
       .structured(REQ)
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(APIUserAbortError);
-    expect(err).not.toBeInstanceOf(ModelProviderError);
+    expect(err).not.toMatchObject({ code: "model_provider" });
   });
 });

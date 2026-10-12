@@ -17,6 +17,7 @@ import {
   TypeSafeError,
 } from "@typesafe-ai/sdk";
 import { z } from "zod";
+import { appError } from "../errors.js";
 import type { TokenUsage } from "../model/types.js";
 
 export { choice, noul, score } from "@typesafe-ai/sdk";
@@ -39,36 +40,6 @@ export interface DecisionResult<Q extends Questions> {
 /** Statuses the SDK retries; still failing after that is the provider's problem. */
 const TRANSIENT = (status: number) => status === 408 || status === 429 || status >= 500;
 
-/**
- * The provider failed after the SDK's retries: rate limit, overload, 5xx,
- * timeout or network. A later run may succeed.
- */
-export class DecisionProviderError extends Error {
-  override name = "DecisionProviderError";
-  constructor(
-    message: string,
-    readonly status: number | undefined,
-    options?: ErrorOptions,
-  ) {
-    super(message, options);
-  }
-}
-
-/**
- * The request itself is wrong: a bad key, a malformed question, a validation
- * error. Retrying won't help; the code or the configuration must change.
- */
-export class DecisionRequestError extends Error {
-  override name = "DecisionRequestError";
-  constructor(
-    message: string,
-    readonly status: number | undefined,
-    options?: ErrorOptions,
-  ) {
-    super(message, options);
-  }
-}
-
 export class DecisionClient {
   constructor(private readonly client: Pick<TypeSafeClient, "systemOne">) {}
 
@@ -88,9 +59,12 @@ export class DecisionClient {
     if (!checked.success) {
       const issue = checked.error.issues[0];
       const where = issue?.path.join(".") || "body";
-      throw new DecisionProviderError(
+      throw appError(
+        "decision_provider",
         `jev: malformed response at ${where}: ${issue?.message}`,
-        undefined,
+        {
+          status: undefined,
+        },
       );
     }
     return {
@@ -151,16 +125,16 @@ function classify(err: unknown): unknown {
   if (err instanceof APIError) {
     const message = `jev: ${err.message}`.slice(0, 300);
     return TRANSIENT(err.status)
-      ? new DecisionProviderError(message, err.status, { cause: err })
-      : new DecisionRequestError(message, err.status, { cause: err });
+      ? appError("decision_provider", message, { status: err.status, cause: err })
+      : appError("decision_request", message, { status: err.status, cause: err });
   }
   // Includes timeouts, which the SDK reports as connection errors.
   if (err instanceof APIConnectionError) {
-    return new DecisionProviderError(`jev: ${err.message}`, undefined, { cause: err });
+    return appError("decision_provider", `jev: ${err.message}`, { status: undefined, cause: err });
   }
   // The SDK's own checks before sending, e.g. empty questions.
   if (err instanceof TypeSafeError) {
-    return new DecisionRequestError(`jev: ${err.message}`, undefined, { cause: err });
+    return appError("decision_request", `jev: ${err.message}`, { status: undefined, cause: err });
   }
   return err;
 }

@@ -3,9 +3,9 @@
 // whether a key is set. Credentials are not here; an account names the
 // environment variables that hold them.
 
+import { appError } from "../errors.js";
 import { SEEN_MESSAGE_DAYS } from "../mail/seen-store.js";
 import type { MailAccount, MailRunConfig } from "../mail/types.js";
-import { ConfigError } from "./error.js";
 import type { RawConfig } from "./schema.js";
 
 /** Saves repeating host strings. */
@@ -45,7 +45,8 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
 
   const entries = raw.account ?? [];
   if (entries.length === 0) {
-    throw new ConfigError(
+    throw appError(
+      "config",
       `no [[account]] block in ${origin}. Define at least one mailbox; see config.example.toml.`,
     );
   }
@@ -56,7 +57,8 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
   entries.forEach((entry, index) => {
     const name = entry.name ?? `account${index + 1}`;
     if (seenNames.has(name.toLowerCase())) {
-      throw new ConfigError(
+      throw appError(
+        "config",
         `duplicate account name "${name}" in ${origin}; names key the dedupe state, so they must be unique.`,
       );
     }
@@ -70,7 +72,8 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
     const provider = (entry.provider ?? "").trim().toLowerCase();
     // hasOwn, not `in`: "constructor" or "__proto__" must not pass as a provider.
     if (provider && !Object.hasOwn(PROVIDERS, provider)) {
-      throw new ConfigError(
+      throw appError(
+        "config",
         `account "${name}" has unknown provider "${provider}" in ${origin}. ` +
           `Known: ${Object.keys(PROVIDERS).sort().join(", ")}; or set host directly.`,
       );
@@ -78,7 +81,8 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
     const preset = provider ? PROVIDERS[provider] : undefined;
     const host = entry.host ?? preset?.host;
     if (!host) {
-      throw new ConfigError(
+      throw appError(
+        "config",
         `account "${name}" in ${origin} sets neither provider nor host. ` +
           "Guessing a mail server is how you end up connecting to the wrong one.",
       );
@@ -101,7 +105,8 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
     // With neither filter the IMAP search is bare SINCE and matches every
     // recent message, which would pull ordinary personal mail in.
     if (account.senders.length === 0 && account.subjectKeywords.length === 0) {
-      throw new ConfigError(
+      throw appError(
+        "config",
         `account "${name}" in ${origin} has neither senders nor subject_keywords. ` +
           "Set at least one filter, under [mail] or on the account.",
       );
@@ -112,7 +117,8 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
     const envKey = `${account.userEnv}\u0000${account.passwordEnv}`;
     const other = seenEnv.get(envKey);
     if (other !== undefined) {
-      throw new ConfigError(
+      throw appError(
+        "config",
         `accounts "${other}" and "${name}" both resolve to ${account.userEnv} / ${account.passwordEnv} in ${origin}. ` +
           "Set user_env and password_env explicitly on at least one of them.",
       );
@@ -125,7 +131,8 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
   // would bring forgotten mail back as new.
   const days = mail.days ?? DEFAULT_LOOKBACK_DAYS;
   if (days >= SEEN_MESSAGE_DAYS) {
-    throw new ConfigError(
+    throw appError(
+      "config",
       `[mail] days = ${days} in ${origin} reaches past the ${SEEN_MESSAGE_DAYS}-day seen-message retention. ` +
         `Use fewer than ${SEEN_MESSAGE_DAYS}.`,
     );

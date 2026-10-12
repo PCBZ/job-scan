@@ -2,6 +2,7 @@
 // button that opens the full report. Sent with one Bot API call.
 
 import type { AppConfig } from "../config/load.js";
+import { appError } from "../errors.js";
 import type { Report, TopPick } from "../report/types.js";
 
 type Env = Record<string, string | undefined>;
@@ -16,22 +17,6 @@ const TELEGRAM_API = "https://api.telegram.org";
  */
 const MAX_TEXT = 4096;
 
-export class TelegramConfigError extends Error {
-  override name = "TelegramConfigError";
-}
-
-export class TelegramError extends Error {
-  override name = "TelegramError";
-  constructor(
-    message: string,
-    readonly status: number,
-    /** Seconds to wait, when Telegram rate-limits the bot. */
-    readonly retryAfter: number | undefined,
-  ) {
-    super(message);
-  }
-}
-
 export interface TelegramSettings {
   token: string;
   chatId: string;
@@ -42,7 +27,7 @@ export function telegramSettings(config: AppConfig, env: Env): TelegramSettings 
   const chat = config.report.telegram_chat_id;
   if (chat === undefined) return null;
   const token = env.TELEGRAM_BOT_TOKEN?.trim();
-  if (!token) throw new TelegramConfigError("TELEGRAM_BOT_TOKEN must be set to send the summary");
+  if (!token) throw appError("config", "TELEGRAM_BOT_TOKEN must be set to send the summary");
   return { token, chatId: String(chat) };
 }
 
@@ -134,10 +119,10 @@ export async function telegramReport(
   };
   if (!res.ok || body.ok !== true) {
     // The token is in the URL, so never put the URL in the message.
-    throw new TelegramError(
-      `telegram: ${body.description ?? `HTTP ${res.status}`}`,
-      res.status,
-      body.parameters?.retry_after,
-    );
+    // The code names the source, so the message is Telegram's reason alone.
+    throw appError("telegram", body.description ?? `HTTP ${res.status}`, {
+      status: res.status,
+      retryAfter: body.parameters?.retry_after,
+    });
   }
 }

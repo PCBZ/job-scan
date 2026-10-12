@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadSecrets, SecretsConfigError, secretName } from "../../src/lib/run/secrets.js";
+import { loadSecrets, secretName } from "../../src/lib/run/secrets.js";
 
 /** A fake of the SDK client's one method the loader uses. */
 function vault(secrets: Record<string, string>, fail?: Error) {
@@ -59,9 +59,9 @@ describe("loadSecrets", () => {
   it("needs the vault only when there is something to read", async () => {
     const env = { CONFIG_BLOB_URL: "x" };
     expect(await loadSecrets(env, null)).toEqual({ env, missing: [] });
-    await expect(loadSecrets({ KEY_VAULT_SECRETS: "A" }, null)).rejects.toBeInstanceOf(
-      SecretsConfigError,
-    );
+    await expect(loadSecrets({ KEY_VAULT_SECRETS: "A" }, null)).rejects.toMatchObject({
+      code: "config",
+    });
   });
 
   it("doesn't change the env it was given", async () => {

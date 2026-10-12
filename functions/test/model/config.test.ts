@@ -2,7 +2,7 @@ import type { TokenCredential } from "@azure/identity";
 import { APIUserAbortError } from "openai";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { ModelConfigError, modelClientFromEnv } from "../../src/lib/model/config.js";
+import { modelClientFromEnv } from "../../src/lib/model/config.js";
 import { FallbackClient } from "../../src/lib/model/fallback.js";
 import { OpenAIChatClient } from "../../src/lib/model/openai-chat.js";
 
@@ -67,7 +67,7 @@ describe("modelClientFromEnv", () => {
     [{ ...AZURE, MODEL_FALLBACK_PROVIDER: "openai-compatible" }, "MODEL_FALLBACK_NAME is not set"],
   ])("rejects %j", (env, message) => {
     expect(() => modelClientFromEnv(env as Record<string, string>, credential)).toThrow(
-      ModelConfigError,
+      expect.objectContaining({ code: "config" }),
     );
     expect(() => modelClientFromEnv(env as Record<string, string>, credential)).toThrow(message);
   });
@@ -130,7 +130,7 @@ describe("modelClientFromEnv", () => {
         user: "u",
         schema: z.object({ ok: z.boolean() }),
       }),
-    ).rejects.toMatchObject({ name: "ModelProviderError", status: 503 });
+    ).rejects.toMatchObject({ code: "model_provider", status: 503 });
     expect(n).toBe(2);
   });
 

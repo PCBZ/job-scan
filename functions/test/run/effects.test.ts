@@ -1,7 +1,6 @@
 import nodemailer from "nodemailer";
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../../src/lib/config/load.js";
-import { TelegramConfigError } from "../../src/lib/delivery/telegram.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
 import { productionEffects } from "../../src/lib/run/effects.js";
 import { judgement, rankedOf } from "../judge/helpers.js";
@@ -112,7 +111,7 @@ describe("productionEffects.deliver", () => {
     const { effects, calls } = harness({ env: noToken });
     await expect(
       effects.deliver(SAMPLE, config({ email_account: "gmail-main", telegram_chat_id: 42 })),
-    ).rejects.toThrow(TelegramConfigError);
+    ).rejects.toMatchObject({ code: "config" });
     expect(calls).toEqual(["publish 2026-10-08 true", "email me@example.test true"]);
   });
 
@@ -124,7 +123,7 @@ describe("productionEffects.deliver", () => {
     expect(err).toBeInstanceOf(AggregateError);
     expect((err as AggregateError).errors.map(String)).toEqual([
       "Error: smtp down",
-      "TelegramError: telegram: chat not found",
+      "telegram: chat not found",
     ]);
   });
 });

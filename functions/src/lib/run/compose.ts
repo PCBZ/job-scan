@@ -11,6 +11,7 @@
 
 import type { TokenCredential } from "@azure/identity";
 import { blobConfigSource, loadConfig } from "../config/load.js";
+import { type AppError, appError } from "../errors.js";
 import { explainStep } from "../explain/explain.js";
 import { verifyExplanations } from "../explain/verify.js";
 import { judgeStep } from "../judge/judge.js";
@@ -20,7 +21,6 @@ import { type ConnectMailbox, connectImap } from "../mail/mailbox.js";
 import { runFetch } from "../mail/run.js";
 import { TableSeenStore } from "../mail/seen-store.js";
 import { modelClientFromEnv } from "../model/config.js";
-import type { ModelProviderError } from "../model/types.js";
 import { dedupeStep } from "../postings/dedupe.js";
 import { extractStep } from "../postings/extract.js";
 import { hardGatesStep } from "../postings/gates.js";
@@ -45,16 +45,12 @@ const REQUIRED = [
   "GITHUB_RESUME_PAT",
 ] as const;
 
-export class RunConfigError extends Error {
-  override name = "RunConfigError";
-}
-
 export interface ComposeOptions {
   fetch?: typeof fetch;
   connect?: ConnectMailbox;
   now?: () => Date;
   /** Told when the model falls back, for the run's warnings. */
-  onFallback?: (err: ModelProviderError) => void;
+  onFallback?: (err: AppError<"model_provider">) => void;
 }
 
 /** Everything buildWorkflow runs: the code steps, the model steps and the side effects. */
@@ -70,7 +66,7 @@ export function composePipeline(
   o: ComposeOptions = {},
 ): Pipeline {
   const missing = REQUIRED.filter((key) => !env[key]?.trim());
-  if (missing.length) throw new RunConfigError(`missing app settings: ${missing.join(", ")}`);
+  if (missing.length) throw appError("config", `missing app settings: ${missing.join(", ")}`);
   const setting = (key: (typeof REQUIRED)[number]) => (env[key] as string).trim();
   const fetchFn = o.fetch ?? fetch;
   const now = o.now ?? (() => new Date());

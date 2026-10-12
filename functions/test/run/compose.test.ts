@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composePipeline, RunConfigError } from "../../src/lib/run/compose.js";
+import { composePipeline } from "../../src/lib/run/compose.js";
 
 const credential = { getToken: async () => null };
 const ENV = {
@@ -17,7 +17,7 @@ describe("composePipeline", () => {
   it("names every missing app setting at once", () => {
     expect(() =>
       composePipeline({ ...ENV, TABLES_URL: " ", GITHUB_RESUME_PAT: undefined }, credential),
-    ).toThrow(new RunConfigError("missing app settings: TABLES_URL, GITHUB_RESUME_PAT"));
+    ).toThrow("missing app settings: TABLES_URL, GITHUB_RESUME_PAT");
   });
 
   it("builds every node and effect without connecting to anything", () => {

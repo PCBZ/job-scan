@@ -1,11 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import {
-  ConfigError,
-  type ConfigSource,
-  loadConfig,
-  parseConfig,
-} from "../../src/lib/config/load.js";
+import { type ConfigSource, loadConfig, parseConfig } from "../../src/lib/config/load.js";
 
 const EXAMPLE = readFileSync(new URL("../../../config.example.toml", import.meta.url), "utf8");
 
@@ -31,10 +26,10 @@ function errorOf(text: string): string {
   try {
     parseConfig(text, "config.toml");
   } catch (err) {
-    expect(err).toBeInstanceOf(ConfigError);
+    expect(err).toMatchObject({ code: "config" });
     return (err as Error).message;
   }
-  throw new Error("expected a ConfigError");
+  throw new Error("expected a config error");
 }
 
 describe("parseConfig on config.example.toml", () => {

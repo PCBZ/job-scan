@@ -39,27 +39,3 @@ export interface StructuredResult<T> {
 export interface ModelClient {
   structured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>>;
 }
-
-/**
- * The provider failed after its own retries (rate limit, 5xx, timeout,
- * network, auth). Another provider might succeed, so a fallback may take it.
- */
-export class ModelProviderError extends Error {
-  override name = "ModelProviderError";
-  constructor(
-    message: string,
-    readonly status: number | undefined,
-    options?: ErrorOptions,
-  ) {
-    super(message, options);
-  }
-}
-
-/**
- * The model answered, but not usably: a refusal, truncation, a content
- * filter, or output that fails the schema. Asking another provider would hide
- * a prompt or schema problem, so these are never passed to a fallback.
- */
-export class ModelOutputError extends Error {
-  override name = "ModelOutputError";
-}

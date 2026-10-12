@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { appError } from "../../src/lib/errors.js";
 import { FallbackClient } from "../../src/lib/model/fallback.js";
-import {
-  type ModelClient,
-  ModelOutputError,
-  ModelProviderError,
-} from "../../src/lib/model/types.js";
+import type { ModelClient } from "../../src/lib/model/types.js";
 
 const REQ = { name: "x", system: "s", user: "u", schema: z.object({ ok: z.boolean() }) };
 
@@ -34,7 +31,7 @@ describe("FallbackClient", () => {
     const calls: string[] = [];
     const reasons: string[] = [];
     const out = await new FallbackClient(
-      client("primary", new ModelProviderError("503 overloaded", 503), calls),
+      client("primary", appError("model_provider", "503 overloaded", { status: 503 }), calls),
       client("fallback", null, calls),
       (e) => reasons.push(e.message),
     ).structured(REQ);
@@ -47,10 +44,10 @@ describe("FallbackClient", () => {
     const calls: string[] = [];
     await expect(
       new FallbackClient(
-        client("primary", new ModelOutputError("output did not match the schema"), calls),
+        client("primary", appError("model_output", "output did not match the schema"), calls),
         client("fallback", null, calls),
       ).structured(REQ),
-    ).rejects.toBeInstanceOf(ModelOutputError);
+    ).rejects.toMatchObject({ code: "model_output" });
     expect(calls).toEqual(["primary"]);
   });
 

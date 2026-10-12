@@ -1,14 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { appError } from "../../src/lib/errors.js";
 import { judgeStep } from "../../src/lib/judge/judge.js";
 import { JUDGE_SYSTEM } from "../../src/lib/judge/prompt.js";
 import type { JudgeAnswer } from "../../src/lib/judge/schema.js";
 import { postingId, problemAbout } from "../../src/lib/judge/verify.js";
-import {
-  type ModelClient,
-  ModelOutputError,
-  ModelProviderError,
-  type StructuredRequest,
-} from "../../src/lib/model/types.js";
+import type { ModelClient, StructuredRequest } from "../../src/lib/model/types.js";
 import type { ResumeVariant } from "../../src/lib/resume/load.js";
 import { posting } from "../postings/helpers.js";
 import { answer } from "./helpers.js";
@@ -102,7 +98,8 @@ describe("judgeStep", () => {
   it("an unusable answer costs that posting and is reported; a provider failure fails the run", async () => {
     const refusing: ModelClient = {
       async structured<T>(req: StructuredRequest<T>) {
-        if (req.user.includes("Data Engineer")) throw new ModelOutputError("judgement: refused");
+        if (req.user.includes("Data Engineer"))
+          throw appError("model_output", "judgement: refused");
         return { value: answer() as T, usage: { input: 1, output: 1 }, served_by: "primary" };
       },
     };
@@ -115,7 +112,7 @@ describe("judgeStep", () => {
 
     const down: ModelClient = {
       async structured() {
-        throw new ModelProviderError("rate limited", 429);
+        throw appError("model_provider", "rate limited", { status: 429 });
       },
     };
     await expect(
@@ -127,7 +124,7 @@ describe("judgeStep", () => {
     let refuse = false;
     const c: ModelClient = {
       async structured<T>() {
-        if (refuse) throw new ModelOutputError("judgement: cut off");
+        if (refuse) throw appError("model_output", "judgement: cut off");
         return { value: answer() as T, usage: { input: 1, output: 1 }, served_by: "primary" };
       },
     };

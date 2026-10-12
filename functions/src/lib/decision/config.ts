@@ -7,22 +7,19 @@
 //   JEV_MAX_RETRIES   after the first attempt (default 2, the SDK's)
 
 import { TypeSafeClient } from "@typesafe-ai/sdk";
+import { appError } from "../errors.js";
 import { DecisionClient } from "./client.js";
 
 export const DEFAULT_JEV_MODEL = "jev-1.13.0";
 
 type Env = Record<string, string | undefined>;
 
-export class DecisionConfigError extends Error {
-  override name = "DecisionConfigError";
-}
-
 function wholeNumber(env: Env, key: string, fallback: number, min: number): number {
   const raw = env[key]?.trim();
   if (!raw) return fallback;
   const n = Number(raw);
   if (!Number.isInteger(n) || n < min) {
-    throw new DecisionConfigError(`${key} must be a whole number of at least ${min}, got "${raw}"`);
+    throw appError("config", `${key} must be a whole number of at least ${min}, got "${raw}"`);
   }
   return n;
 }
@@ -37,7 +34,7 @@ export function decisionClientFromEnv(
   options: DecisionClientOptions = {},
 ): DecisionClient {
   const apiKey = env.TYPESAFE_API_KEY?.trim();
-  if (!apiKey) throw new DecisionConfigError("TYPESAFE_API_KEY is not set");
+  if (!apiKey) throw appError("config", "TYPESAFE_API_KEY is not set");
   // Every setting is passed explicitly, so the SDK's own TYPESAFE_* lookups
   // and defaults never decide which model answers.
   return new DecisionClient(

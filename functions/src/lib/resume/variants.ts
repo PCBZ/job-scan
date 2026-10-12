@@ -3,7 +3,8 @@
 // Variants come back sorted by path: a repository has no file mtimes, so the
 // local skill's newest-first order isn't available.
 
-import { type DirEntry, ResumeNotFoundError, type ResumeSource } from "./source.js";
+import { isAppError } from "../errors.js";
+import type { DirEntry, ResumeSource } from "./source.js";
 
 export const SUPPORTED = [".tex", ".pdf", ".md", ".markdown", ".txt"];
 
@@ -50,7 +51,7 @@ async function entriesOf(source: ResumeSource, dir: string): Promise<DirEntry[]>
   try {
     return await source.listDir(dir);
   } catch (err) {
-    if (err instanceof ResumeNotFoundError) return [];
+    if (isAppError(err, "resume_not_found")) return [];
     throw err;
   }
 }
