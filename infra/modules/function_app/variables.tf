@@ -27,10 +27,6 @@ variable "maximum_instance_count" {
   default = 1
 }
 
-variable "storage_account_id" {
-  type = string
-}
-
 variable "storage_account_name" {
   type = string
 }
@@ -40,8 +36,14 @@ variable "deployment_container_endpoint" {
   type        = string
 }
 
-variable "key_vault_id" {
-  type = string
+variable "identity_id" {
+  description = "Resource ID of the app's user-assigned identity."
+  type        = string
+}
+
+variable "identity_client_id" {
+  description = "Client ID of that identity, for host storage and DefaultAzureCredential."
+  type        = string
 }
 
 variable "application_insights_connection_string" {

@@ -7,8 +7,3 @@ variable "content" {
   type        = string
   sensitive   = true
 }
-
-variable "writer_principal_ids" {
-  description = "Who uploads the blob: every principal that runs Terraform."
-  type        = map(string)
-}

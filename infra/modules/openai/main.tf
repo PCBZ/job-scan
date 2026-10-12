@@ -30,10 +30,3 @@ resource "azurerm_cognitive_deployment" "this" {
   # Stay on the pinned version until it is retired.
   version_upgrade_option = "OnceCurrentVersionExpired"
 }
-
-resource "azurerm_role_assignment" "user" {
-  for_each             = var.user_principal_ids
-  scope                = azurerm_cognitive_account.this.id
-  role_definition_name = "Cognitive Services OpenAI User"
-  principal_id         = each.value
-}

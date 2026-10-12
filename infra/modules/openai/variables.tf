@@ -24,11 +24,6 @@ variable "capacity_k_tpm" {
   type        = number
 }
 
-variable "user_principal_ids" {
-  description = "Principals granted Cognitive Services OpenAI User, keyed by a static label."
-  type        = map(string)
-}
-
 variable "tags" {
   type    = map(string)
   default = {}

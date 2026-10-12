@@ -1,9 +1,11 @@
-# One-time setup of the remote state backend for infra/. Run once, by hand:
+# What must exist before CD can run, or outlive the app: the state backend, the
+# resource groups, the Key Vault, both identities and every role assignment.
+# Applied by hand, by the operator, rarely:
 #
 #   terraform init && terraform apply
 #
-# Its own state stays local (gitignored). It holds three resources and can be
-# re-imported if lost.
+# Its own state stays local (gitignored). The main stack (infra/) holds no role
+# assignments, so CD, with only Contributor, can build the app from zero.
 
 data "azurerm_client_config" "current" {}
 

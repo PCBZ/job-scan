@@ -2,13 +2,20 @@ import { app, type InvocationContext, type Timer } from "@azure/functions";
 import { DefaultAzureCredential } from "@azure/identity";
 import { composePipeline } from "../lib/run/compose.js";
 import { runDaily } from "../lib/run/daily.js";
+import { loadSecrets, secretClientFromEnv } from "../lib/run/secrets.js";
 
-// The morning run (#22): every dependency from app settings, then the workflow.
-// The managed identity signs every Azure call; secrets come from Key Vault
-// references in the app settings.
+// The morning run (#22): secrets from Key Vault, every dependency from app
+// settings, then the workflow. The app's user-assigned identity (AZURE_CLIENT_ID)
+// signs every Azure call.
 export async function daily(timer: Timer, context: InvocationContext): Promise<void> {
   context.log(`daily: triggered (past due: ${timer.isPastDue})`);
-  await runDaily(composePipeline(process.env, new DefaultAzureCredential()), context);
+  const credential = new DefaultAzureCredential();
+  const { env, missing } = await loadSecrets(
+    process.env,
+    secretClientFromEnv(process.env, credential),
+  );
+  if (missing.length) context.warn(`daily: not in Key Vault, so unset: ${missing.join(", ")}`);
+  await runDaily(composePipeline(env, credential), context);
 }
 
 app.timer("daily", {

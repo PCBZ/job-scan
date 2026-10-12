@@ -16,9 +16,10 @@ resource "azurerm_function_app_flex_consumption" "this" {
   runtime_name    = "node"
   runtime_version = var.node_version
 
-  storage_container_type      = "blobContainer"
-  storage_container_endpoint  = var.deployment_container_endpoint
-  storage_authentication_type = "SystemAssignedIdentity"
+  storage_container_type            = "blobContainer"
+  storage_container_endpoint        = var.deployment_container_endpoint
+  storage_authentication_type       = "UserAssignedIdentity"
+  storage_user_assigned_identity_id = var.identity_id
 
   # The release's package, uploaded through Kudu with the site's publishing
   # credentials, which the provider reads over ARM; that needs basic auth on.
@@ -30,22 +31,30 @@ resource "azurerm_function_app_flex_consumption" "this" {
   maximum_instance_count = var.maximum_instance_count
   https_only             = true
 
+  # User-assigned, from infra/bootstrap, which also grants its roles: this
+  # stack can't, and they must exist before the app starts.
   identity {
-    type = "SystemAssigned"
+    type         = "UserAssigned"
+    identity_ids = [var.identity_id]
   }
 
   site_config {
     application_insights_connection_string = var.application_insights_connection_string
   }
 
-  # Host storage over managed identity. azurerm always writes
+  # Host storage over the user-assigned identity. azurerm always writes
   # AzureWebJobsStorage as a connection string, with an empty AccountKey under
   # identity auth; the host would prefer it and fail. Blanking it (user values
-  # override the provider's) makes the host use __accountName instead.
+  # override the provider's) makes the host use the __ settings instead:
+  # https://learn.microsoft.com/azure/azure-functions/functions-reference#connecting-to-host-storage-with-an-identity
+  # AZURE_CLIENT_ID makes the app's DefaultAzureCredential pick the same identity.
   app_settings = merge(
     {
       "AzureWebJobsStorage"              = ""
       "AzureWebJobsStorage__accountName" = var.storage_account_name
+      "AzureWebJobsStorage__credential"  = "managedidentity"
+      "AzureWebJobsStorage__clientId"    = var.identity_client_id
+      "AZURE_CLIENT_ID"                  = var.identity_client_id
     },
     var.app_settings,
   )
