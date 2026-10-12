@@ -20,14 +20,11 @@ module "function_app" {
     "KEY_VAULT_SECRETS" = join(",", var.platform.secret_settings)
     # Model selection, read by functions/src/lib/model/config.ts. A fallback
     # would add the same keys prefixed MODEL_FALLBACK_.
-    "MODEL_PROVIDER" = "azure-openai"
-    "MODEL_ENDPOINT" = module.openai.endpoint
-    "MODEL_NAME"     = module.openai.deployment_name
-    # The SDK waits out retry-after on a 429 between tries; six rides out a
-    # spike instead of failing the run (#91). The default is three.
-    "MODEL_MAX_RETRIES" = "6"
-    "CONFIG_BLOB_URL"   = module.config_blob.url
-    "RESUME_CACHE_URL"  = module.storage.container_endpoints["resume-cache"]
+    "MODEL_PROVIDER"   = "azure-openai"
+    "MODEL_ENDPOINT"   = module.openai.endpoint
+    "MODEL_NAME"       = module.openai.deployment_name
+    "CONFIG_BLOB_URL"  = module.config_blob.url
+    "RESUME_CACHE_URL" = module.storage.container_endpoints["resume-cache"]
     # seenmessages and seenjobs (#9, #15).
     "TABLES_URL" = module.storage.table_endpoint
     # Private; reports are read through user delegation SAS links (#19).
