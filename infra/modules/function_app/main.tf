@@ -42,10 +42,14 @@ resource "azurerm_function_app_flex_consumption" "this" {
     application_insights_connection_string = var.application_insights_connection_string
   }
 
-  # Host storage over the user-assigned identity. azurerm always writes
+  # Host storage over the user-assigned identity. azurerm writes
   # AzureWebJobsStorage as a connection string, with an empty AccountKey under
-  # identity auth; the host would prefer it and fail. Blanking it (user values
-  # override the provider's) makes the host use the __ settings instead:
+  # identity auth, on every update; the host would prefer it and fail. Blanking
+  # it (user values override the provider's) makes the host use the __ settings
+  # instead. Azure drops the empty value, so every plan shows it being added
+  # back: that diff is the override working. Ignoring it stops Terraform
+  # sending the blank, and the next update leaves the keyless string in place
+  # (#59, v0.1.3: storage 403s, host unhealthy):
   # https://learn.microsoft.com/azure/azure-functions/functions-reference#connecting-to-host-storage-with-an-identity
   # AZURE_CLIENT_ID makes the app's DefaultAzureCredential pick the same identity.
   app_settings = merge(
@@ -60,11 +64,4 @@ resource "azurerm_function_app_flex_consumption" "this" {
   )
 
   tags = var.tags
-
-  # Azure drops an app setting whose value is empty, so the blank above never
-  # sticks and every plan would add it back (#59). It's still written on
-  # create; only its drift is ignored, and every other setting is compared.
-  lifecycle {
-    ignore_changes = [app_settings["AzureWebJobsStorage"]]
-  }
 }
