@@ -1,3 +1,5 @@
+// Registers OpenTelemetry before anything it traces loads (#101).
+import "../telemetry.js";
 import { app, type InvocationContext, type Timer } from "@azure/functions";
 import { DefaultAzureCredential } from "@azure/identity";
 import { composePipeline } from "../lib/run/compose.js";

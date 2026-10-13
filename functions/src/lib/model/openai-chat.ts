@@ -39,12 +39,9 @@ export class OpenAIChatClient implements ModelClient {
     }
 
     const message = completion.choices[0]?.message;
-    if (message?.refusal) {
-      throw appError(
-        "model_output",
-        `${req.name}: the model refused: ${message.refusal.slice(0, 200)}`,
-      );
-    }
+    // The refusal's own text stays out of the error: it can quote the prompt,
+    // and errors reach the logs and the run's spans (#101).
+    if (message?.refusal) throw appError("model_output", `${req.name}: the model refused`);
     if (message?.parsed === null || message?.parsed === undefined) {
       throw appError("model_output", `${req.name}: the model returned no structured output`);
     }

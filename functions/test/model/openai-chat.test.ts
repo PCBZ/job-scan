@@ -57,12 +57,13 @@ describe("OpenAIChatClient", () => {
   });
 
   it("treats a refusal or missing output as an output error", async () => {
-    await expect(
-      new OpenAIChatClient(
-        parser(completion({ refusal: "I can't help with that." })),
-        "m",
-      ).structured(REQ),
-    ).rejects.toMatchObject({ code: "model_output" });
+    const refused = new OpenAIChatClient(
+      parser(completion({ refusal: "I can't help with Northwind Labs' posting." })),
+      "m",
+    ).structured(REQ);
+    await expect(refused).rejects.toMatchObject({ code: "model_output" });
+    // The refusal's text can quote the prompt: it never reaches the message.
+    await expect(refused).rejects.toThrow(/the model refused$/);
     await expect(
       new OpenAIChatClient(parser(completion({ parsed: null })), "m").structured(REQ),
     ).rejects.toThrow("returned no structured output");

@@ -5,6 +5,7 @@
 // not a failed run, since the report is already out.
 
 import type { Source } from "../postings/types.js";
+import { inSpan } from "../telemetry/tracing.js";
 import { buildWorkflow, type State } from "../workflow/graph.js";
 import type { Loop } from "../workflow/state.js";
 import type { NodeEvent } from "../workflow/types.js";
@@ -70,7 +71,8 @@ export async function runDaily(
     { onNode },
   );
   try {
-    const state = await workflow.invoke({}, { signal });
+    // One span over the whole graph; the nodes' spans nest under it (#101).
+    const state = await inSpan("daily run", {}, () => workflow.invoke({}, { signal }));
     const summary: RunSummary = {
       outcome: state.outcome,
       top: state.top.length,
