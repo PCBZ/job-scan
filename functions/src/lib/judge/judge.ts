@@ -11,7 +11,7 @@ import { mapWithLimit } from "../workflow/limit.js";
 import type { LlmResult } from "../workflow/types.js";
 import { gatesFor } from "./gates.js";
 import { JUDGE_SYSTEM, judgeUser } from "./prompt.js";
-import { judgeAnswer } from "./schema.js";
+import { type JudgeAnswer, judgeAnswer } from "./schema.js";
 import { type Judgement, postingId, problemsAbout } from "./verify.js";
 
 export interface JudgeInput {
@@ -36,6 +36,25 @@ function historyOf(repairs: RepairTurn[], id: string): RepairTurn[] {
       problems: problemsAbout(t.problems, id),
     }))
     .filter((t) => t.problems.length > 0);
+}
+
+/**
+ * A gap quotes one of the posting's requirements. Most alerts list none, and
+ * then the model fills the gap from the title or invents one; repairing that
+ * only resent whole prompts (#112: 230 of a run's 289 first-pass problems).
+ * With nothing to quote, every gap is "".
+ */
+export function withoutUnstatedGaps(posting: Posting, answer: JudgeAnswer): JudgeAnswer {
+  if (posting.requirements.length > 0) return answer;
+  return {
+    ...answer,
+    variants: answer.variants.map((v) => ({
+      ...v,
+      skills: { ...v.skills, gap: "" },
+      domain: { ...v.domain, gap: "" },
+      seniority: { ...v.seniority, gap: "" },
+    })),
+  };
 }
 
 export function judgeStep(client: ModelClient, options: JudgeOptions = {}) {
@@ -66,7 +85,7 @@ export function judgeStep(client: ModelClient, options: JudgeOptions = {}) {
         });
         usage.input += r.usage.input;
         usage.output += r.usage.output;
-        return [{ posting, asked, answer: r.value }];
+        return [{ posting, asked, answer: withoutUnstatedGaps(posting, r.value) }];
       } catch (err) {
         // One unusable answer costs that posting, not the run.
         if (!isAppError(err, "model_output")) throw err;
