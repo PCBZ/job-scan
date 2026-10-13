@@ -31,6 +31,10 @@ module "function_app" {
     "TABLES_URL" = module.storage.table_endpoint
     # Private; reports are read through user delegation SAS links (#19).
     "REPORTS_URL" = module.storage.container_endpoints["reports"]
+    # Private; one JSONL file per run, for offline evaluation (#97).
+    "RUN_RECORDS_URL" = module.storage.container_endpoints["run-records"]
+    # The release CD deployed, written into each run record.
+    "APP_VERSION" = var.app_version
     # Jev, read by functions/src/lib/decision/config.ts. The model is pinned:
     # confidence thresholds are tuned against one version.
     "JEV_MODEL" = "jev-1.13.0"

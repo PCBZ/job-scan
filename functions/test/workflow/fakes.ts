@@ -1,6 +1,7 @@
 import type { AppConfig } from "../../src/lib/config/load.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
 import type { ResumeSet } from "../../src/lib/resume/load.js";
+import type { RunRecordStore } from "../../src/lib/run/records.js";
 import type {
   DeterministicSteps,
   Effects,
@@ -181,5 +182,18 @@ export function fakes(o: FakeOptions = {}) {
     },
   };
 
-  return { deterministicSteps, modelSteps, effects, log, llmInputs, counters, reported };
+  /** Run records go nowhere unless a test brings its own store. */
+  const records: RunRecordStore = { write: async () => "fake.jsonl" };
+
+  return {
+    deterministicSteps,
+    modelSteps,
+    effects,
+    records,
+    version: "test",
+    log,
+    llmInputs,
+    counters,
+    reported,
+  };
 }

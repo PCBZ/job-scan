@@ -10,6 +10,12 @@ variable "name" {
   default     = "job-scan"
 }
 
+variable "app_version" {
+  description = "The release being deployed; CD passes the tag."
+  type        = string
+  default     = "local"
+}
+
 variable "tags" {
   description = "Tags applied to every resource."
   type        = map(string)

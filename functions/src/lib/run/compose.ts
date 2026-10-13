@@ -4,6 +4,8 @@
 //   CONFIG_BLOB_URL     config.toml in Blob (#10)
 //   RESUME_CACHE_URL    extracted resume texts (#12)
 //   REPORTS_URL         the private reports container (#19)
+//   RUN_RECORDS_URL     the private run-records container (#97)
+//   APP_VERSION         the deployed release, for the run records; "local" if unset
 //   TABLES_URL          seenmessages, seenjobs
 //   GITHUB_RESUME_PAT   read access to the resume repo (#11, from Key Vault via #47)
 //   MODEL_*             the model client (#13)
@@ -33,6 +35,7 @@ import { loadResumes } from "../resume/load.js";
 import { blobTextStore } from "../resume/store.js";
 import type { DeterministicSteps, Effects, ModelSteps } from "../workflow/types.js";
 import { productionEffects } from "./effects.js";
+import { type RunRecordStore, runRecordStoreFromUrl } from "./records.js";
 
 type Env = Record<string, string | undefined>;
 
@@ -41,6 +44,7 @@ const REQUIRED = [
   "CONFIG_BLOB_URL",
   "RESUME_CACHE_URL",
   "REPORTS_URL",
+  "RUN_RECORDS_URL",
   "TABLES_URL",
   "GITHUB_RESUME_PAT",
 ] as const;
@@ -60,6 +64,10 @@ export interface Pipeline {
   effects: Effects;
   /** How long model calls have waited for the TPM budget so far, for the run's summary. */
   throttledMs?: () => number;
+  /** Where the run's records go (#97). */
+  records: RunRecordStore;
+  /** The deployed release, for the run records. */
+  version: string;
 }
 
 export function composePipeline(
@@ -121,5 +129,12 @@ export function composePipeline(
     now,
   });
 
-  return { deterministicSteps, modelSteps, effects, throttledMs: () => throttledMs };
+  return {
+    deterministicSteps,
+    modelSteps,
+    effects,
+    throttledMs: () => throttledMs,
+    records: runRecordStoreFromUrl(setting("RUN_RECORDS_URL"), credential),
+    version: env.APP_VERSION?.trim() || "local",
+  };
 }

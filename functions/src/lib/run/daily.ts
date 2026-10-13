@@ -1,10 +1,13 @@
 // One morning run: the workflow over the composed pipeline, logged node by
 // node. A failure is rethrown so the invocation fails and the host records it;
-// mark_seen then never ran, so tomorrow sees the same mail.
+// mark_seen then never ran, so tomorrow sees the same mail. After a run, its
+// records are written for offline evaluation (#97); a failed write is logged,
+// not a failed run, since the report is already out.
 
 import { buildWorkflow } from "../workflow/graph.js";
 import type { NodeEvent } from "../workflow/types.js";
 import type { Pipeline } from "./compose.js";
+import { runRecords } from "./records.js";
 
 /** Under host.json's functionTimeout of 30 minutes, so the run stops cleanly first. */
 export const RUN_TIMEOUT_MS = 25 * 60 * 1000;
@@ -28,10 +31,14 @@ export async function runDaily(
   log: RunLog,
   signal: AbortSignal = AbortSignal.timeout(RUN_TIMEOUT_MS),
 ) {
-  const onNode = (e: NodeEvent) =>
+  const startedAt = new Date();
+  const nodeMs: Record<string, number> = {};
+  const onNode = (e: NodeEvent) => {
+    nodeMs[e.node] = (nodeMs[e.node] ?? 0) + Math.round(e.ms);
     log.log(
       `node ${e.node} ${e.ok ? "ok" : "failed"} ${Math.round(e.ms)}ms${e.usage ? ` tokens ${e.usage.input}/${e.usage.output}` : ""}`,
     );
+  };
   const workflow = buildWorkflow(
     pipeline.deterministicSteps,
     pipeline.modelSteps,
@@ -48,11 +55,24 @@ export async function runDaily(
       throttledMs: Math.round(pipeline.throttledMs?.() ?? 0),
     };
     log.log(`daily: done ${JSON.stringify(summary)}`);
+    try {
+      const records = runRecords(state, {
+        started_at: startedAt.toISOString(),
+        version: pipeline.version,
+        node_ms: nodeMs,
+        throttled_ms: summary.throttledMs,
+      });
+      const name = await pipeline.records.write(records, startedAt);
+      log.log(`daily: run records ${name} (${records.length})`);
+    } catch (err) {
+      log.error(`daily: run records not written: ${errorText(err)}`);
+    }
     return summary;
   } catch (err) {
-    log.error(
-      `daily: failed: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`,
-    );
+    log.error(`daily: failed: ${errorText(err)}`);
     throw err;
   }
 }
+
+const errorText = (err: unknown) =>
+  err instanceof Error ? `${err.name}: ${err.message}` : String(err);

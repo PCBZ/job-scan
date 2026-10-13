@@ -24,3 +24,26 @@ resource "azurerm_storage_table" "this" {
   name               = each.key
   storage_account_id = azurerm_storage_account.this.id
 }
+
+# One policy per account; a rule per expiring container.
+resource "azurerm_storage_management_policy" "this" {
+  count              = length(var.expire_after_days) > 0 ? 1 : 0
+  storage_account_id = azurerm_storage_account.this.id
+
+  dynamic "rule" {
+    for_each = var.expire_after_days
+    content {
+      name    = "expire-${rule.key}"
+      enabled = true
+      filters {
+        blob_types   = ["blockBlob"]
+        prefix_match = ["${azurerm_storage_container.this[rule.key].name}/"]
+      }
+      actions {
+        base_blob {
+          delete_after_days_since_modification_greater_than = rule.value
+        }
+      }
+    }
+  }
+}

@@ -6,6 +6,7 @@ const ENV = {
   CONFIG_BLOB_URL: "https://acct.blob.core.windows.net/config/config.toml",
   RESUME_CACHE_URL: "https://acct.blob.core.windows.net/resume-cache",
   REPORTS_URL: "https://acct.blob.core.windows.net/reports",
+  RUN_RECORDS_URL: "https://acct.blob.core.windows.net/run-records",
   TABLES_URL: "https://acct.table.core.windows.net/",
   GITHUB_RESUME_PAT: "test-pat",
   MODEL_PROVIDER: "azure-openai",
