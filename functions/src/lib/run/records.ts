@@ -15,6 +15,14 @@ import type { TokenUsage } from "../model/types.js";
 import type { Source } from "../postings/types.js";
 import type { Loop, State } from "../workflow/state.js";
 import type { Explanation, Filtered, Outcome, Posting, Ranked } from "../workflow/types.js";
+import {
+  type Check,
+  duplicates,
+  filterReason,
+  linkMatchesTitle,
+  type VerbatimField,
+  verbatimFields,
+} from "./checks.js";
 
 /** The message a posting came from; written once, on its first posting. */
 export interface MessageText {
@@ -29,6 +37,8 @@ export interface PostingRecord {
   kind: "posting";
   posting: Posting;
   message?: MessageText;
+  /** #98: fields copied verbatim, and the chosen link naming the posting. */
+  checks: { verbatim: Record<VerbatimField, Check>; link_title: Check };
 }
 
 export interface FilteredRecord {
@@ -36,6 +46,8 @@ export interface FilteredRecord {
   posting: Posting;
   gate: Filtered["gate"];
   reason: string;
+  /** #98: the reason says something, and a model gate's quotes the posting. */
+  checks: { reason: boolean };
 }
 
 export interface PickRecord {
@@ -62,6 +74,21 @@ export interface LoopRecord {
   unresolved: string[];
 }
 
+/** Counts of a check over the run; failed is out of checked. */
+export interface CheckTotal {
+  checked: number;
+  failed: number;
+}
+
+/** #98's checks over the whole run. */
+export interface RunChecks {
+  verbatim: CheckTotal;
+  link_title: CheckTotal & { no_link: number };
+  /** Fingerprints that repeat among the judged postings, i.e. past dedupe. */
+  duplicates: { count: number; fingerprints: string[] };
+  filter_reason: CheckTotal;
+}
+
 export interface RunMeta {
   started_at: string;
   /** The deployed release (APP_VERSION), "local" outside CD. */
@@ -81,11 +108,13 @@ export interface RunStatsRecord extends RunMeta {
   filtered: number;
   top: number;
   repeats: number;
+  /** Repeats within this batch, which dedupe removed. */
   duplicates: number;
   dropped: Partial<Record<Source, number>>;
   loops: Record<Loop, LoopRecord>;
   warnings: number;
   usage: Record<string, TokenUsage>;
+  checks: RunChecks;
 }
 
 export type RunRecord = PostingRecord | FilteredRecord | PickRecord | RunStatsRecord;
@@ -100,6 +129,25 @@ function loopRecord(l: State["loops"][Loop]): LoopRecord {
   };
 }
 
+function runChecks(
+  postings: PostingRecord[],
+  filtered: FilteredRecord[],
+  judged: Posting[],
+): RunChecks {
+  const total = (results: Check[]): CheckTotal => ({
+    checked: results.filter((r) => r !== null).length,
+    failed: results.filter((r) => r === false).length,
+  });
+  const links = postings.map((p) => p.checks.link_title);
+  const repeated = duplicates(judged);
+  return {
+    verbatim: total(postings.flatMap((p) => Object.values(p.checks.verbatim))),
+    link_title: { ...total(links), no_link: links.filter((r) => r === null).length },
+    duplicates: { count: repeated.length, fingerprints: repeated },
+    filter_reason: total(filtered.map((f) => f.checks.reason)),
+  };
+}
+
 /** Every record of one run, the run's own last. */
 export function runRecords(state: State, meta: RunMeta): RunRecord[] {
   const messages =
@@ -111,12 +159,17 @@ export function runRecords(state: State, meta: RunMeta): RunRecord[] {
   const postings: PostingRecord[] = state.extracted.map((posting) => {
     const key = messageKey(posting.account, posting.message_id);
     const m = messages.get(key);
-    if (!m || written.has(key)) return { kind: "posting", posting };
+    const checks = {
+      verbatim: verbatimFields(posting, m),
+      link_title: linkMatchesTitle(posting, m),
+    };
+    if (!m || written.has(key)) return { kind: "posting", posting, checks };
     written.add(key);
     return {
       kind: "posting",
       posting,
       message: { subject: m.subject, from: m.from, date: m.date, body: m.body, links: m.links },
+      checks,
     };
   });
 
@@ -125,6 +178,7 @@ export function runRecords(state: State, meta: RunMeta): RunRecord[] {
     posting: f.posting,
     gate: f.gate,
     reason: f.reason,
+    checks: { reason: filterReason(f) },
   }));
 
   const explanations = new Map(state.explanations.map((e) => [e.id, e]));
@@ -165,6 +219,11 @@ export function runRecords(state: State, meta: RunMeta): RunRecord[] {
     },
     warnings: state.warnings.length,
     usage: state.usage,
+    checks: runChecks(
+      postings,
+      filtered,
+      state.judged.map((j) => j.posting),
+    ),
   };
 
   return [...postings, ...filtered, ...picks, run];
