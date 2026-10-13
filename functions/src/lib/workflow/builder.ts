@@ -4,6 +4,7 @@
 
 import { END, START, StateGraph } from "@langchain/langgraph";
 import type { TokenUsage } from "../model/types.js";
+import { inSpan } from "../telemetry/tracing.js";
 import { type Loop, type State, type Update, WorkflowState } from "./state.js";
 import type { NodeEvent } from "./types.js";
 
@@ -41,26 +42,37 @@ export class WorkflowBuilder {
     this.maxRepairs = options.maxRepairs ?? 2;
   }
 
-  /** A node; its token use (under `usage[name]`) and time go to onNode. */
+  /**
+   * A node, in its own span (#101) so its model calls nest under it; its token
+   * use (under `usage[name]`) and time go to onNode.
+   */
   node(name: string, fn: NodeFn): this {
     const { onNode } = this.options;
-    this.graph.addNode(name, async (s: State, config?: { signal?: AbortSignal }) => {
-      const started = performance.now();
-      try {
-        const update = await fn(s, config?.signal);
-        const usage = (update.usage as Record<string, TokenUsage> | undefined)?.[name];
-        onNode?.({
-          node: name,
-          ms: performance.now() - started,
-          ok: true,
-          ...(usage ? { usage } : {}),
-        });
-        return update;
-      } catch (err) {
-        onNode?.({ node: name, ms: performance.now() - started, ok: false });
-        throw err;
-      }
-    });
+    this.graph.addNode(name, (s: State, config?: { signal?: AbortSignal }) =>
+      inSpan(`node ${name}`, { "job_scan.node": name }, async (span) => {
+        const started = performance.now();
+        try {
+          const update = await fn(s, config?.signal);
+          const usage = (update.usage as Record<string, TokenUsage> | undefined)?.[name];
+          if (usage) {
+            span.setAttributes({
+              "gen_ai.usage.input_tokens": usage.input,
+              "gen_ai.usage.output_tokens": usage.output,
+            });
+          }
+          onNode?.({
+            node: name,
+            ms: performance.now() - started,
+            ok: true,
+            ...(usage ? { usage } : {}),
+          });
+          return update;
+        } catch (err) {
+          onNode?.({ node: name, ms: performance.now() - started, ok: false });
+          throw err;
+        }
+      }),
+    );
     return this;
   }
 
