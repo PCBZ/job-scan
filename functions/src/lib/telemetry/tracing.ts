@@ -1,7 +1,8 @@
-// Hand-written spans (#101): the run, each graph node and each model call,
-// with timings, tokens and status only. No prompt or answer goes into a span:
-// they hold real mail and resume text, and the run records (#97) keep the
-// content. Without a registered provider (tests, local runs) these are no-ops.
+// Our own spans (#101): the run and each graph node, with timings, tokens and
+// status only; model calls come from OpenInference (instrument.ts) and nest
+// under their node. No prompt or answer goes into a span: they hold real mail
+// and resume text, and the run records (#97) keep the content. Without a
+// registered provider (tests, local runs) these are no-ops.
 
 import { type Attributes, type Span, SpanStatusCode, trace } from "@opentelemetry/api";
 

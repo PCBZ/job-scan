@@ -3,10 +3,9 @@ import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-tr
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { TracedClient } from "../../src/lib/model/traced.js";
-import type { ModelClient } from "../../src/lib/model/types.js";
+import { modelClientFromEnv } from "../../src/lib/model/config.js";
 import { runDaily } from "../../src/lib/run/daily.js";
-import { inSpan } from "../../src/lib/telemetry/tracing.js";
+import { instrumentOpenAI } from "../../src/lib/telemetry/instrument.js";
 import { fakes } from "../workflow/fakes.js";
 
 // A real provider over an in-memory exporter: the spans the app would export.
@@ -15,6 +14,7 @@ const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcess
 
 beforeAll(() => {
   provider.register();
+  instrumentOpenAI(provider);
 });
 afterAll(async () => {
   await provider.shutdown();
@@ -24,6 +24,40 @@ afterAll(async () => {
 beforeEach(() => exporter.reset());
 
 const quiet = { log: () => {}, error: () => {} };
+
+// The real SDK over a fake HTTP layer, so the instrumented create() runs.
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json", "retry-after-ms": "1" },
+  });
+const ok = (async () =>
+  json(200, {
+    id: "c1",
+    object: "chat.completion",
+    created: 0,
+    model: "gpt-5.4-mini",
+    choices: [
+      {
+        index: 0,
+        finish_reason: "stop",
+        message: { role: "assistant", content: '{"ok":true}', refusal: null },
+      },
+    ],
+    usage: { prompt_tokens: 50, completion_tokens: 10, total_tokens: 60 },
+  })) as typeof fetch;
+const busy = (async () => json(503, { error: { message: "overloaded" } })) as typeof fetch;
+const model = (fetch: typeof globalThis.fetch) =>
+  modelClientFromEnv(
+    {
+      MODEL_PROVIDER: "azure-openai",
+      MODEL_ENDPOINT: "https://example.openai.azure.com/",
+      MODEL_NAME: "gpt-5.4-mini",
+      MODEL_MAX_RETRIES: "1",
+    },
+    { getToken: async () => ({ token: "t", expiresOnTimestamp: Date.now() + 3_600_000 }) },
+    { fetch },
+  );
 const spans = () => exporter.getFinishedSpans();
 const named = (name: string) => spans().find((s) => s.name === name);
 
@@ -55,52 +89,45 @@ describe("tracing", () => {
     expect(named("daily run")?.status.code).toBe(SpanStatusCode.ERROR);
   });
 
-  it("records a model call under its node: deployment, tokens and repair round, never the prompt", async () => {
-    const inner: ModelClient = {
-      async structured<T>() {
-        return {
-          value: { ok: true } as T,
-          usage: { input: 120, output: 30 },
-          served_by: "primary",
-        };
-      },
-    };
-    const client = new TracedClient(inner, "az.ai.openai", "gpt-5.4-mini", "primary");
-    const prompt = "Resume text: Go and Postgres at Northwind Labs";
-    await inSpan("node judge", {}, () =>
-      client.structured({
+  it("nests each model call under its node, with tokens but never the prompt or answer", async () => {
+    const f = fakes();
+    const judge = f.modelSteps.judge;
+    f.modelSteps.judge = async (...args) => {
+      await model(ok).structured({
         name: "judgement",
         system: "Judge the posting.",
-        user: prompt,
+        user: "Resume text: Go and Postgres at Northwind Labs",
         schema: z.object({ ok: z.boolean() }),
-        repairs: [{ previous: {}, problems: ["quote not found"] }],
-      }),
-    );
-    const call = named("chat gpt-5.4-mini");
+      });
+      return judge(...args);
+    };
+    await runDaily(f, quiet);
+    const call = named("OpenAI Chat Completions");
     expect(call?.parentSpanContext?.spanId).toBe(named("node judge")?.spanContext().spanId);
-    expect(call?.attributes).toEqual({
-      "gen_ai.operation.name": "chat",
-      "gen_ai.system": "az.ai.openai",
-      "gen_ai.request.model": "gpt-5.4-mini",
-      "job_scan.schema": "judgement",
-      "job_scan.slot": "primary",
-      "job_scan.repair_round": 1,
-      "gen_ai.usage.input_tokens": 120,
-      "gen_ai.usage.output_tokens": 30,
+    expect(call?.attributes).toMatchObject({
+      "llm.provider": "azure",
+      "llm.token_count.prompt": 50,
+      "llm.token_count.completion": 10,
+      "input.value": "__REDACTED__",
+      "output.value": "__REDACTED__",
     });
-    expect(JSON.stringify(spans().map((s) => s.attributes))).not.toContain("Postgres");
+    const all = JSON.stringify(spans().map((s) => s.attributes));
+    expect(all).not.toContain("Postgres");
+    expect(all).not.toContain("Judge the posting");
   });
 
-  it("marks a failed model call", async () => {
-    const failing: ModelClient = {
-      async structured() {
-        throw new Error("429 after retries");
-      },
+  // OpenInference ends a call's span only on success (4.2.7 to 4.4.1): a
+  // rejected create() leaves it open, never exported. The node's span carries
+  // the failure instead.
+  it("shows a failed model call as its node's error", async () => {
+    const f = fakes();
+    f.modelSteps.judge = async () => {
+      await model(busy).structured({ name: "x", system: "s", user: "u", schema: z.object({}) });
+      throw new Error("unreachable");
     };
-    const client = new TracedClient(failing, "az.ai.openai", "gpt-5.4-mini", "primary");
-    await expect(
-      client.structured({ name: "x", system: "s", user: "u", schema: z.object({}) }),
-    ).rejects.toThrow("429 after retries");
-    expect(named("chat gpt-5.4-mini")?.status.code).toBe(SpanStatusCode.ERROR);
+    await expect(runDaily(f, quiet)).rejects.toMatchObject({ code: "model_provider" });
+    expect(named("node judge")?.status).toMatchObject({ code: SpanStatusCode.ERROR });
+    expect(named("node judge")?.status.message).toContain("503");
+    expect(spans().filter((s) => s.name === "OpenAI Chat Completions")).toEqual([]);
   });
 });

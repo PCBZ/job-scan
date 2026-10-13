@@ -4,7 +4,8 @@
 //
 // Exports to APPLICATIONINSIGHTS_CONNECTION_STRING, which Terraform sets; with
 // none (tests, local runs) nothing is registered and spans are no-ops.
-// No auto-instrumentation: the spans worth having are written by hand.
+// No auto-instrumentation: model calls come from OpenInference, patched
+// directly (lib/telemetry/instrument.ts), and graph nodes from the builder.
 // https://learn.microsoft.com/azure/azure-functions/opentelemetry-howto
 
 import { AzureFunctionsInstrumentation } from "@azure/functions-opentelemetry-instrumentation";
@@ -15,6 +16,7 @@ import {
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { NodeTracerProvider, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-node";
+import { instrumentOpenAI } from "./lib/telemetry/instrument.js";
 
 if (process.env.APPLICATIONINSIGHTS_CONNECTION_STRING) {
   const tracerProvider = new NodeTracerProvider({
@@ -31,4 +33,5 @@ if (process.env.APPLICATIONINSIGHTS_CONNECTION_STRING) {
     loggerProvider,
     instrumentations: [new AzureFunctionsInstrumentation()],
   });
+  instrumentOpenAI(tracerProvider);
 }

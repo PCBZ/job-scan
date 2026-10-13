@@ -27,6 +27,7 @@
     "start": "func start"
   },
   "dependencies": {
+    "@arizeai/openinference-instrumentation-openai": "4.2.7",
     "@azure/data-tables": "13.3.2",
     "@azure/functions": "4.16.5",
     "@azure/functions-opentelemetry-instrumentation": "0.3.0",

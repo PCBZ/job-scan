@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { modelClientFromEnv } from "../../src/lib/model/config.js";
 import { FallbackClient } from "../../src/lib/model/fallback.js";
+import { OpenAIChatClient } from "../../src/lib/model/openai-chat.js";
 import { RateLimitedClient } from "../../src/lib/model/rate-limit.js";
-import { TracedClient } from "../../src/lib/model/traced.js";
 
 const credential: TokenCredential = {
   getToken: async () => ({ token: "entra-token", expiresOnTimestamp: Date.now() + 3_600_000 }),
@@ -40,9 +40,9 @@ function okBody(content: unknown) {
 }
 
 describe("modelClientFromEnv", () => {
-  it("builds the configured provider, traced, with a fallback only when one is set", () => {
-    expect(modelClientFromEnv(AZURE, credential)).toBeInstanceOf(TracedClient);
-    expect(modelClientFromEnv(COMPATIBLE, credential)).toBeInstanceOf(TracedClient);
+  it("builds the configured provider, with a fallback only when one is set", () => {
+    expect(modelClientFromEnv(AZURE, credential)).toBeInstanceOf(OpenAIChatClient);
+    expect(modelClientFromEnv(COMPATIBLE, credential)).toBeInstanceOf(OpenAIChatClient);
     const both = modelClientFromEnv(
       {
         ...AZURE,

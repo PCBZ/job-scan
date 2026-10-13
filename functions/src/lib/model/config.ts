@@ -19,7 +19,6 @@ import { type AppError, appError } from "../errors.js";
 import { FallbackClient } from "./fallback.js";
 import { OpenAIChatClient } from "./openai-chat.js";
 import { RateLimitedClient } from "./rate-limit.js";
-import { TracedClient } from "./traced.js";
 import type { ModelClient } from "./types.js";
 
 export const DEFAULT_AZURE_API_VERSION = "2024-10-21";
@@ -98,8 +97,7 @@ function slot(
         timeout,
         ...(http ? { fetch: http } : {}),
       });
-      const chat = new OpenAIChatClient(client.chat.completions, name, label);
-      return new TracedClient(chat, "az.ai.openai", name, label);
+      return new OpenAIChatClient(client.chat.completions, name, label);
     }
     case "openai-compatible": {
       const client = new OpenAI({
@@ -109,8 +107,7 @@ function slot(
         timeout,
         ...(http ? { fetch: http } : {}),
       });
-      const chat = new OpenAIChatClient(client.chat.completions, name, label);
-      return new TracedClient(chat, "openai", name, label);
+      return new OpenAIChatClient(client.chat.completions, name, label);
     }
     default:
       throw appError(
