@@ -8,7 +8,8 @@
 // directly (lib/telemetry/instrument.ts), and graph nodes from the builder.
 // https://learn.microsoft.com/azure/azure-functions/opentelemetry-howto
 
-import { AzureFunctionsInstrumentation } from "@azure/functions-opentelemetry-instrumentation";
+import * as azFunc from "@azure/functions";
+import { AzureFunctionsInstrumentationESM } from "@azure/functions-opentelemetry-instrumentation";
 import {
   AzureMonitorLogExporter,
   AzureMonitorTraceExporter,
@@ -28,10 +29,12 @@ if (process.env.APPLICATIONINSIGHTS_CONNECTION_STRING) {
     processors: [new SimpleLogRecordProcessor({ exporter: new AzureMonitorLogExporter() })],
   });
 
-  registerInstrumentations({
-    tracerProvider,
-    loggerProvider,
-    instrumentations: [new AzureFunctionsInstrumentation()],
-  });
+  // The app is ESM, so the require hook that would patch @azure/functions
+  // never fires: register it by hand. That binds each handler to the host's
+  // invocation trace, sends context.log through the log exporter, and tells
+  // the host the worker exports its own logs, so they aren't sent twice.
+  const functions = new AzureFunctionsInstrumentationESM();
+  registerInstrumentations({ tracerProvider, loggerProvider, instrumentations: [functions] });
+  functions.registerAzFunc(azFunc);
   instrumentOpenAI(tracerProvider);
 }

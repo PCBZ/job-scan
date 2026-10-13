@@ -18,11 +18,10 @@ export async function inSpan<T>(
     try {
       return await fn(span);
     } catch (err) {
-      span.recordException(err instanceof Error ? err : String(err));
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: err instanceof Error ? err.message : String(err),
-      });
+      // Anything can be thrown; ours and the SDKs' are Errors, a stray value isn't.
+      const message = err instanceof Error ? err.message : String(err);
+      span.recordException(err instanceof Error ? err : message);
+      span.setStatus({ code: SpanStatusCode.ERROR, message });
       throw err;
     } finally {
       span.end();
