@@ -101,10 +101,11 @@ resource "azurerm_role_assignment" "deployer_state" {
 }
 
 # The operator: a local apply writes the config blob, the live evals call the
-# model, and Foundry evaluations run in the project (Azure AI User, #96). The
-# vault's Secrets Officer comes with the key_vault module.
+# model, and Foundry evaluations run in the project (Foundry User, formerly
+# Azure AI User; #96). The vault's Secrets Officer comes with the key_vault
+# module.
 resource "azurerm_role_assignment" "operator" {
-  for_each             = toset(["Storage Blob Data Contributor", "Cognitive Services OpenAI User", "Azure AI User"])
+  for_each             = toset(["Storage Blob Data Contributor", "Cognitive Services OpenAI User", "Foundry User"])
   scope                = azurerm_resource_group.main.id
   role_definition_name = each.key
   principal_id         = local.operator
