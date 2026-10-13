@@ -7,6 +7,7 @@ import {
   runRecordStore,
   runRecords,
   toJsonl,
+  WRITE_TIMEOUT_MS,
 } from "../../src/lib/run/records.js";
 import type { State } from "../../src/lib/workflow/state.js";
 import { judgement, rankedOf } from "../judge/helpers.js";
@@ -197,19 +198,26 @@ describe("toJsonl", () => {
 
 describe("runRecordStore", () => {
   function fakeContainer() {
-    const uploads: { name: string; body: string; length: number; contentType?: string }[] = [];
+    const uploads: {
+      name: string;
+      body: string;
+      length: number;
+      contentType: string | undefined;
+      signal: AbortSignal | undefined;
+    }[] = [];
     const container = {
       getBlockBlobClient: (name: string) => ({
         upload: async (
           body: Buffer,
           length: number,
-          options: { blobHTTPHeaders?: { blobContentType?: string } },
+          options: { blobHTTPHeaders?: { blobContentType?: string }; abortSignal?: AbortSignal },
         ) => {
           uploads.push({
             name,
             body: body.toString("utf8"),
             length,
             contentType: options.blobHTTPHeaders?.blobContentType,
+            signal: options.abortSignal,
           });
           return {};
         },
@@ -223,15 +231,32 @@ describe("runRecordStore", () => {
     const records = runRecords(state({ outcome: "no_mail" }), META);
     // 05:00 UTC is still the previous day in Vancouver.
     const name = await runRecordStore(container).write(records, new Date("2026-10-14T05:00:00Z"));
-    expect(name).toBe("2026-10-13/2026-10-14T05:00:00.000Z.jsonl");
+    expect(name).toMatch(/^2026-10-13\/2026-10-14T05:00:00\.000Z-[0-9a-f]{8}\.jsonl$/);
     expect(uploads).toEqual([
       {
         name,
         body: toJsonl(records),
         length: Buffer.byteLength(toJsonl(records)),
         contentType: "application/x-ndjson; charset=utf-8",
+        signal: expect.any(AbortSignal),
       },
     ]);
+  });
+
+  it("gives the upload a deadline, so a stuck Blob ends as a failed write", async () => {
+    const { container, uploads } = fakeContainer();
+    await runRecordStore(container).write([], new Date("2026-10-13T15:00:00Z"));
+    expect(uploads[0]?.signal?.aborted).toBe(false);
+    expect(WRITE_TIMEOUT_MS).toBe(60_000);
+  });
+
+  it("keeps two runs started in the same millisecond apart", async () => {
+    const { container, uploads } = fakeContainer();
+    const store = runRecordStore(container);
+    const at = new Date("2026-10-13T15:00:00Z");
+    const [a, b] = await Promise.all([store.write([], at), store.write([], at)]);
+    expect(a).not.toBe(b);
+    expect(new Set(uploads.map((u) => u.name)).size).toBe(2);
   });
 
   it("gives a rerun on the same day its own blob", async () => {

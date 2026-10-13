@@ -22,7 +22,7 @@ describe("runDaily", () => {
     expect(summary.usage.judge).toEqual({ input: 10, output: 2 });
     expect(r.lines).toContainEqual(expect.stringMatching(/^node judge ok \d+ms tokens 10\/2$/));
     expect(r.lines.some((l) => l.startsWith("node mark_seen ok"))).toBe(true);
-    expect(r.lines.at(-1)).toMatch(/^daily: done \{"outcome":"report","top":1,"warnings":0,/);
+    expect(r.lines.at(-2)).toMatch(/^daily: done \{"outcome":"report","top":1,"warnings":0,/);
   });
 
   it("reports how long model calls waited for the TPM budget", async () => {

@@ -5,6 +5,7 @@
 // Records hold real mail and resume text: they go to the private run-records
 // container and never into the repo or a log.
 
+import { randomBytes } from "node:crypto";
 import type { TokenCredential } from "@azure/identity";
 import { ContainerClient } from "@azure/storage-blob";
 import { runDay } from "../day.js";
@@ -180,17 +181,23 @@ export interface RunRecordStore {
 
 type Container = Pick<ContainerClient, "getBlockBlobClient">;
 
+/** A stuck upload ends as a failed write, not a run held to the host's timeout. */
+export const WRITE_TIMEOUT_MS = 60_000;
+
 /**
- * `<day>/<started-at>.jsonl`: a rerun on the same day keeps both runs, which
- * version comparison and stability need.
+ * `<day>/<started-at>-<random>.jsonl`: a rerun on the same day keeps both runs,
+ * which version comparison and stability need, and the suffix keeps two runs
+ * started together (a double-clicked Run) from overwriting each other.
  */
 export function runRecordStore(container: Container): RunRecordStore {
   return {
     async write(records, startedAt) {
-      const name = `${runDay(startedAt)}/${startedAt.toISOString()}.jsonl`;
+      const suffix = randomBytes(4).toString("hex");
+      const name = `${runDay(startedAt)}/${startedAt.toISOString()}-${suffix}.jsonl`;
       const body = Buffer.from(toJsonl(records), "utf8");
       await container.getBlockBlobClient(name).upload(body, body.length, {
         blobHTTPHeaders: { blobContentType: "application/x-ndjson; charset=utf-8" },
+        abortSignal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
       });
       return name;
     },

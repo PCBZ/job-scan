@@ -55,19 +55,17 @@ export async function runDaily(
       throttledMs: Math.round(pipeline.throttledMs?.() ?? 0),
     };
     log.log(`daily: done ${JSON.stringify(summary)}`);
-    if (pipeline.records) {
-      try {
-        const records = runRecords(state, {
-          started_at: startedAt.toISOString(),
-          version: pipeline.version ?? "local",
-          node_ms: nodeMs,
-          throttled_ms: summary.throttledMs,
-        });
-        const name = await pipeline.records.write(records, startedAt);
-        log.log(`daily: run records ${name} (${records.length})`);
-      } catch (err) {
-        log.error(`daily: run records not written: ${errorText(err)}`);
-      }
+    try {
+      const records = runRecords(state, {
+        started_at: startedAt.toISOString(),
+        version: pipeline.version,
+        node_ms: nodeMs,
+        throttled_ms: summary.throttledMs,
+      });
+      const name = await pipeline.records.write(records, startedAt);
+      log.log(`daily: run records ${name} (${records.length})`);
+    } catch (err) {
+      log.error(`daily: run records not written: ${errorText(err)}`);
     }
     return summary;
   } catch (err) {

@@ -64,10 +64,10 @@ export interface Pipeline {
   effects: Effects;
   /** How long model calls have waited for the TPM budget so far, for the run's summary. */
   throttledMs?: () => number;
-  /** Where the run's records go (#97); without one, none are written. */
-  records?: RunRecordStore;
+  /** Where the run's records go (#97). */
+  records: RunRecordStore;
   /** The deployed release, for the run records. */
-  version?: string;
+  version: string;
 }
 
 export function composePipeline(
