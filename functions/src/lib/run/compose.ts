@@ -64,6 +64,8 @@ export interface Pipeline {
   effects: Effects;
   /** How long model calls have waited for the TPM budget so far, for the run's summary. */
   throttledMs?: () => number;
+  /** 429s the provider has answered so far, retries included. */
+  rateLimited?: () => number;
   /** Where the run's records go (#97). */
   records: RunRecordStore;
   /** The deployed release, for the run records. */
@@ -87,10 +89,14 @@ export function composePipeline(
   const configSource = blobConfigSource(setting("CONFIG_BLOB_URL"), credential);
   const resumeStore = blobTextStore(setting("RESUME_CACHE_URL"), credential);
   let throttledMs = 0;
+  let rateLimited = 0;
   const client = modelClientFromEnv(env, credential, {
     ...(o.onFallback ? { onFallback: o.onFallback } : {}),
     onThrottle: (ms) => {
       throttledMs += ms;
+    },
+    onRateLimited: () => {
+      rateLimited++;
     },
   });
 
@@ -134,6 +140,7 @@ export function composePipeline(
     modelSteps,
     effects,
     throttledMs: () => throttledMs,
+    rateLimited: () => rateLimited,
     records: runRecordStoreFromUrl(setting("RUN_RECORDS_URL"), credential),
     version: env.APP_VERSION?.trim() || "local",
   };

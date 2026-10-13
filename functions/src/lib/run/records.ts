@@ -69,6 +69,8 @@ export interface RunMeta {
   /** Milliseconds per node, summed over its runs. */
   node_ms: Record<string, number>;
   throttled_ms: number;
+  /** 429s the provider answered, retries included. */
+  rate_limited: number;
 }
 
 export interface RunStatsRecord extends RunMeta {
@@ -92,7 +94,7 @@ export type RunRecord = PostingRecord | FilteredRecord | PickRecord | RunStatsRe
 
 const messageKey = (account: string, id: string) => `${account}\n${id}`;
 
-function loopRecord(l: State["loops"][Loop]): LoopRecord {
+export function loopRecord(l: State["loops"][Loop]): LoopRecord {
   return {
     repairs: l.turns.length,
     first_pass: l.turns[0]?.problems ?? l.problems,

@@ -4,10 +4,12 @@
 // records are written for offline evaluation (#97); a failed write is logged,
 // not a failed run, since the report is already out.
 
-import { buildWorkflow } from "../workflow/graph.js";
+import type { Source } from "../postings/types.js";
+import { buildWorkflow, type State } from "../workflow/graph.js";
+import type { Loop } from "../workflow/state.js";
 import type { NodeEvent } from "../workflow/types.js";
 import type { Pipeline } from "./compose.js";
-import { runRecords } from "./records.js";
+import { loopRecord, runRecords } from "./records.js";
 
 /** Under host.json's functionTimeout of 30 minutes, so the run stops cleanly first. */
 export const RUN_TIMEOUT_MS = 25 * 60 * 1000;
@@ -24,6 +26,28 @@ export interface RunSummary {
   usage: Record<string, { input: number; output: number }>;
   /** Time model calls spent waiting for the TPM budget. */
   throttledMs: number;
+  /** 429s the provider answered, the SDK's retries included (#99). */
+  rateLimited: number;
+  /** Rows extracted per job board, so dropped can be read as a rate. */
+  extracted: Partial<Record<Source, number>>;
+  /** Rows dropped as misaligned after the last repair, per job board. */
+  dropped: Partial<Record<Source, number>>;
+  /** Per loop: repairs sent, problems the first check found, problems left. */
+  loops: Record<Loop, { repairs: number; firstPass: number; unresolved: number }>;
+}
+
+function loopCounts(state: State): RunSummary["loops"] {
+  const counts = (loop: Loop) => {
+    const r = loopRecord(state.loops[loop]);
+    return { repairs: r.repairs, firstPass: r.first_pass.length, unresolved: r.unresolved.length };
+  };
+  return { extract: counts("extract"), judge: counts("judge"), explain: counts("explain") };
+}
+
+function perSource(state: State): Partial<Record<Source, number>> {
+  const out: Partial<Record<Source, number>> = {};
+  for (const p of state.extracted) out[p.source] = (out[p.source] ?? 0) + 1;
+  return out;
 }
 
 export async function runDaily(
@@ -53,6 +77,10 @@ export async function runDaily(
       warnings: state.warnings.length,
       usage: state.usage,
       throttledMs: Math.round(pipeline.throttledMs?.() ?? 0),
+      rateLimited: pipeline.rateLimited?.() ?? 0,
+      extracted: perSource(state),
+      dropped: state.dropped,
+      loops: loopCounts(state),
     };
     log.log(`daily: done ${JSON.stringify(summary)}`);
     try {
@@ -61,6 +89,7 @@ export async function runDaily(
         version: pipeline.version,
         node_ms: nodeMs,
         throttled_ms: summary.throttledMs,
+        rate_limited: summary.rateLimited,
       });
       const name = await pipeline.records.write(records, startedAt);
       log.log(`daily: run records ${name} (${records.length})`);

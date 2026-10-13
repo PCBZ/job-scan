@@ -32,6 +32,31 @@ describe("runDaily", () => {
     expect((await runDaily(fakes(), recorder().log)).throttledMs).toBe(0);
   });
 
+  it("logs the runtime checks' counts: extracted and dropped per board, and per loop", async () => {
+    // validate finds a problem on the first attempt, then none after the repair.
+    const f = fakes({ extractProblems: [['message "<m0@x>" row 0: title is empty'], []] });
+    const summary = await runDaily({ ...f, rateLimited: () => 3 }, recorder().log);
+    expect(summary).toMatchObject({
+      rateLimited: 3,
+      extracted: { indeed: 1 },
+      dropped: {},
+      loops: {
+        extract: { repairs: 1, firstPass: 1, unresolved: 0 },
+        judge: { repairs: 0, firstPass: 0, unresolved: 0 },
+        explain: { repairs: 0, firstPass: 0, unresolved: 0 },
+      },
+    });
+  });
+
+  it("counts problems no repair fixed as unresolved", async () => {
+    const stuck = ['posting "x": quote not found'];
+    const f = fakes({ judgeProblems: [stuck, stuck, stuck, stuck] });
+    const { loops } = await runDaily(f, recorder().log);
+    expect(loops.judge.unresolved).toBe(1);
+    expect(loops.judge.firstPass).toBe(1);
+    expect(loops.judge.repairs).toBeGreaterThan(0);
+  });
+
   it("logs a failed run and rethrows, so the host records it and nothing is marked seen", async () => {
     const f = fakes({ deliverFails: true });
     const r = recorder();
