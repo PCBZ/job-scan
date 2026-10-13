@@ -4,6 +4,7 @@ module "openai" {
   resource_group_name = data.azurerm_resource_group.main.name
   location            = data.azurerm_resource_group.main.location
   tags                = var.tags
+  project_name        = "${var.name}-eval"
 
   # Option A from the plan (#1). gpt-5.4-mini is on Global Standard in Canada Central.
   model_name    = "gpt-5.4-mini"

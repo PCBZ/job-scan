@@ -21,3 +21,7 @@ output "openai_endpoint" {
 output "openai_deployment" {
   value = module.openai.deployment_name
 }
+
+output "foundry_project_endpoints" {
+  value = module.openai.project_endpoints
+}
