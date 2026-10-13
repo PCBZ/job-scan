@@ -112,6 +112,35 @@ describe("modelClientFromEnv", () => {
     expect(seen[0]?.auth).toBe("Bearer entra-token");
   });
 
+  it("counts every 429, the SDK's own retries included", async () => {
+    let n = 0;
+    const busyTwice = (async () => {
+      n++;
+      if (n <= 2) {
+        return new Response(JSON.stringify({ error: { message: "slow down" } }), {
+          status: 429,
+          headers: { "content-type": "application/json", "retry-after-ms": "1" },
+        });
+      }
+      return new Response(okBody({ title: "Engineer" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    let limited = 0;
+    const model = modelClientFromEnv({ ...AZURE, MODEL_MAX_RETRIES: "3" }, credential, {
+      fetch: busyTwice,
+      onRateLimited: () => limited++,
+    });
+    await model.structured({
+      name: "posting",
+      system: "Extract.",
+      user: "Engineer",
+      schema: z.object({ title: z.string() }),
+    });
+    expect(limited).toBe(2);
+  });
+
   it("gives up after MODEL_MAX_RETRIES and reports a provider error", async () => {
     let n = 0;
     const alwaysBusy = (async () => {

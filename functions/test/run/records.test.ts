@@ -18,6 +18,7 @@ const META: RunMeta = {
   version: "v0.1.6",
   node_ms: { judge: 1200 },
   throttled_ms: 50,
+  rate_limited: 2,
 };
 
 function message(id: string): FetchedMessage {

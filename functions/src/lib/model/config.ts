@@ -46,8 +46,25 @@ export interface ModelClientOptions {
   onFallback?: (err: AppError<"model_provider">) => void;
   /** Told how long a call waited for the TPM budget, for the run's summary. */
   onThrottle?: (ms: number) => void;
+  /**
+   * Told of every 429 the provider answers, the SDK's own retries included:
+   * pacing should keep this at zero (#99).
+   */
+  onRateLimited?: () => void;
   /** For tests: the HTTP layer the SDK uses. */
   fetch?: typeof fetch;
+}
+
+/** The SDK's HTTP layer, counting 429s when asked to. */
+function httpLayer(options: ModelClientOptions): typeof fetch | undefined {
+  const { onRateLimited } = options;
+  if (!onRateLimited) return options.fetch;
+  const base = options.fetch ?? globalThis.fetch;
+  return (async (...args: Parameters<typeof fetch>) => {
+    const response = await base(...args);
+    if (response.status === 429) onRateLimited();
+    return response;
+  }) as typeof fetch;
 }
 
 /** The slot's client, paced to its TPM when one is set. */
@@ -67,6 +84,7 @@ function slot(
   const maxRetries = positiveInt(env, "MODEL_MAX_RETRIES", 3);
   const timeout = positiveInt(env, "MODEL_TIMEOUT_MS", 60_000);
   const name = required(env, `${prefix}_NAME`);
+  const http = httpLayer(options);
   switch (provider) {
     case "azure-openai": {
       const bearer = getBearerTokenProvider(credential, AZURE_SCOPE);
@@ -77,7 +95,7 @@ function slot(
         azureADTokenProvider: bearer,
         maxRetries,
         timeout,
-        ...(options.fetch ? { fetch: options.fetch } : {}),
+        ...(http ? { fetch: http } : {}),
       });
       return new OpenAIChatClient(client.chat.completions, name, label);
     }
@@ -87,7 +105,7 @@ function slot(
         apiKey: required(env, `${prefix}_API_KEY`),
         maxRetries,
         timeout,
-        ...(options.fetch ? { fetch: options.fetch } : {}),
+        ...(http ? { fetch: http } : {}),
       });
       return new OpenAIChatClient(client.chat.completions, name, label);
     }
