@@ -3,7 +3,7 @@ import { appError } from "../../src/lib/errors.js";
 import { judgeStep } from "../../src/lib/judge/judge.js";
 import { JUDGE_SYSTEM } from "../../src/lib/judge/prompt.js";
 import type { JudgeAnswer } from "../../src/lib/judge/schema.js";
-import { postingId, problemAbout } from "../../src/lib/judge/verify.js";
+import { postingId, problemAbout, verifyJudgements } from "../../src/lib/judge/verify.js";
 import type { ModelClient, StructuredRequest } from "../../src/lib/model/types.js";
 import type { ResumeVariant } from "../../src/lib/resume/load.js";
 import { posting } from "../postings/helpers.js";
@@ -18,8 +18,20 @@ const PROFILE = {
   seniority: "mid" as const,
   needs_sponsorship: false,
 };
-const a = posting({ title: "Backend Engineer", message_id: "<m@x>", row: 0 });
-const b = posting({ title: "Data Engineer", message_id: "<m@x>", row: 1 });
+// With a requirement, so the answers' gaps stand (#112 clears them otherwise).
+const REQUIREMENTS = ["8+ years required"];
+const a = posting({
+  title: "Backend Engineer",
+  message_id: "<m@x>",
+  row: 0,
+  requirements: REQUIREMENTS,
+});
+const b = posting({
+  title: "Data Engineer",
+  message_id: "<m@x>",
+  row: 1,
+  requirements: REQUIREMENTS,
+});
 
 /** Answers every call with `reply(user)`, recording each request. */
 function client(reply: (user: string) => JudgeAnswer = () => answer()) {
@@ -59,6 +71,49 @@ describe("judgeStep", () => {
     ]);
     expect(out.usage).toEqual({ input: 2000, output: 200 });
     expect(out.warnings).toEqual([]);
+  });
+
+  it("clears the gaps of a posting that lists no requirements, so nothing is repaired for them", async () => {
+    // The model took a gap from the title: there was no requirement to quote.
+    const { c } = client(() =>
+      answer({
+        variants: RESUMES.map((r) => ({
+          variant: r.name,
+          skills: { level: "partial", evidence: r.text, gap: "Backend Engineer" },
+          domain: { level: "partial", evidence: r.text, gap: "payments" },
+          seniority: { level: "weak", evidence: r.text, gap: "Senior" },
+        })),
+      }),
+    );
+    const bare = posting({ title: "Senior Backend Engineer", requirements: [] });
+    const listed = posting({ title: "Backend Engineer", requirements: ["Senior"], row: 1 });
+    const out = await judgeStep(c)(
+      { postings: [bare, listed], resumes: RESUMES, profile: PROFILE },
+      [],
+    );
+    const gaps = (j: (typeof out.value)[number] | undefined) =>
+      j?.answer.variants.flatMap((v) => [v.skills.gap, v.domain.gap, v.seniority.gap]);
+
+    expect(gaps(out.value[0])).toEqual(["", "", "", "", "", ""]);
+    // Evidence and levels stay as answered.
+    expect(out.value[0]?.answer.variants[0]?.skills).toEqual({
+      level: "partial",
+      evidence: "Built payment services in Go",
+      gap: "",
+    });
+    // A posting with requirements keeps its gaps, for verify_judgements to check.
+    expect(gaps(out.value[1])).toContain("Senior");
+    const problems = verifyJudgements(out.value, {
+      variants: RESUMES,
+      defaultPath: "Backend.tex",
+      warnings: [],
+      stale: false,
+      extracted: 0,
+    });
+    const aboutGaps = (id: string) => problems.filter((p) => p.includes(id) && p.includes(" gap "));
+    expect(aboutGaps(postingId(bare))).toEqual([]);
+    // The listed posting's title-taken gaps are still caught.
+    expect(aboutGaps(postingId(listed))).not.toEqual([]);
   });
 
   it("on a repair, re-asks only the flagged posting, with its own history", async () => {
