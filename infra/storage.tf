@@ -10,7 +10,13 @@ module "storage" {
     "reports",      # HTML reports, read through user delegation SAS links
     "resume-cache", # extracted resume text, keyed by content hash
     "config",       # config.toml for the cloud run
+    "run-records",  # each run's postings, filters, picks and metrics (#97)
   ]
+
+  # Run records hold real mail and resume text: keep them 90 days only.
+  expire_after_days = {
+    "run-records" = 90
+  }
 
   tables = [
     "seenmessages", # Message-IDs already fetched, per account

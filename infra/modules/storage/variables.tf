@@ -25,3 +25,9 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "expire_after_days" {
+  description = "Containers whose blobs are deleted this many days after their last change."
+  type        = map(number)
+  default     = {}
+}

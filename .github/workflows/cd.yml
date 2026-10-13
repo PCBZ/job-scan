@@ -92,6 +92,8 @@ jobs:
       # What infra/bootstrap built: the resource group, the vault, the app's
       # identity. Identifiers only.
       TF_VAR_platform: ${{ vars.TF_VAR_platform }}
+      # The tag, written into each run record (#97).
+      TF_VAR_app_version: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v5
 
