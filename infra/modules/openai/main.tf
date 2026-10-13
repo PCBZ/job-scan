@@ -1,13 +1,37 @@
 # Entra ID only: no API keys exist to leak.
+#
+# A Foundry resource (AIServices) rather than plain OpenAI, so it can hold a
+# project for evaluations (#96). azurerm changes kind between OpenAI and
+# AIServices in place: the deployment, endpoint and roles stay.
 resource "azurerm_cognitive_account" "this" {
-  name                  = var.name
-  resource_group_name   = var.resource_group_name
-  location              = var.location
-  kind                  = "OpenAI"
-  sku_name              = "S0"
-  custom_subdomain_name = var.name # required for Entra ID auth
-  local_auth_enabled    = false
-  tags                  = var.tags
+  name                       = var.name
+  resource_group_name        = var.resource_group_name
+  location                   = var.location
+  kind                       = "AIServices"
+  sku_name                   = "S0"
+  custom_subdomain_name      = var.name # required for Entra ID auth
+  local_auth_enabled         = false
+  project_management_enabled = true
+  tags                       = var.tags
+
+  # Required with project_management_enabled.
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+# Evaluations live in a project: evaluators, eval runs and their results.
+# Free itself; runs bill per use.
+resource "azurerm_cognitive_account_project" "eval" {
+  name                 = var.project_name
+  cognitive_account_id = azurerm_cognitive_account.this.id
+  location             = var.location
+  description          = "Offline evaluation of the daily run"
+  tags                 = var.tags
+
+  identity {
+    type = "SystemAssigned"
+  }
 }
 
 resource "azurerm_cognitive_deployment" "this" {

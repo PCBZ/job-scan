@@ -11,6 +11,11 @@ variable "location" {
   type = string
 }
 
+variable "project_name" {
+  description = "The Foundry project that holds evaluations."
+  type        = string
+}
+
 variable "model_name" {
   type = string
 }
