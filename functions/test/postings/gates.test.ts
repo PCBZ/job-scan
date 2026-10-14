@@ -56,7 +56,7 @@ describe("location gate", () => {
     ]);
   });
 
-  it.each(["United States", "USA", "California"])(
+  it.each(["United States", "USA", "California", "Vancouver, United States", "Burnaby, USA"])(
     "filters a country or region with no listed place in it (#120): %s",
     async (location) => {
       const out = await gate(onsite(location));

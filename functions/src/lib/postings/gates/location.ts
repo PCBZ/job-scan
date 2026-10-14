@@ -90,8 +90,10 @@ export const LOCATION: readonly Rule<LocationFacts>[] = [
   ],
   [(f) => f.places.length === 0, { fail: "not remote, and no locations are listed" }],
   [(f) => f.where === "", (f) => ({ ask: `Can this role be worked from ${f.places.join(", ")}?` })],
-  [(f) => f.listed, PASS],
+  // Before the listed-city pass: "Vancouver, United States" names a listed
+  // city, in a country no listed place is in.
   [(f) => f.elsewhere, (f) => ({ fail: `outside locations: ${f.location}` })],
+  [(f) => f.listed, PASS],
   [(f) => f.placed && !f.near, (f) => ({ fail: `outside locations: ${f.location}` })],
   [
     () => true,
