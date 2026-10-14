@@ -4,6 +4,7 @@
 // records are written for offline evaluation (#97); a failed write is logged,
 // not a failed run, since the report is already out.
 
+import { isSpanContextValid } from "@opentelemetry/api";
 import type { Source } from "../postings/types.js";
 import { inSpan } from "../telemetry/tracing.js";
 import { buildWorkflow, type State } from "../workflow/graph.js";
@@ -72,7 +73,13 @@ export async function runDaily(
   );
   try {
     // One span over the whole graph; the nodes' spans nest under it (#101).
-    const state = await inSpan("daily run", {}, () => workflow.invoke({}, { signal }));
+    let traceId: string | undefined;
+    const state = await inSpan("daily run", {}, (span) => {
+      const context = span.spanContext();
+      // Untraced (no provider registered), the context is all zeros.
+      if (isSpanContextValid(context)) traceId = context.traceId;
+      return workflow.invoke({}, { signal });
+    });
     const summary: RunSummary = {
       outcome: state.outcome,
       top: state.top.length,
@@ -95,6 +102,17 @@ export async function runDaily(
       });
       const name = await pipeline.records.write(records, startedAt);
       log.log(`daily: run records ${name} (${records.length})`);
+      // The evaluation report reads this record, so it's queued only once written (#128).
+      try {
+        await pipeline.evalQueue.send({
+          record: name,
+          ...(traceId ? { traceId } : {}),
+          startedAt: startedAt.toISOString(),
+        });
+        log.log(`daily: evaluation report queued for ${name}`);
+      } catch (err) {
+        log.error(`daily: evaluation report not queued: ${errorText(err)}`);
+      }
     } catch (err) {
       log.error(`daily: run records not written: ${errorText(err)}`);
     }

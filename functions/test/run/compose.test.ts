@@ -7,6 +7,7 @@ const ENV = {
   RESUME_CACHE_URL: "https://acct.blob.core.windows.net/resume-cache",
   REPORTS_URL: "https://acct.blob.core.windows.net/reports",
   RUN_RECORDS_URL: "https://acct.blob.core.windows.net/run-records",
+  EVAL_QUEUE_URL: "https://acct.queue.core.windows.net/eval-reports",
   TABLES_URL: "https://acct.table.core.windows.net/",
   GITHUB_RESUME_PAT: "test-pat",
   MODEL_PROVIDER: "azure-openai",

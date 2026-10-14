@@ -23,3 +23,8 @@ output "table_endpoint" {
   value      = azurerm_storage_account.this.primary_table_endpoint
   depends_on = [azurerm_storage_table.this]
 }
+
+# Built from the queue resources, so consumers wait for the queues.
+output "queue_urls" {
+  value = { for key, q in azurerm_storage_queue.this : key => q.url }
+}

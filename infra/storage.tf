@@ -18,6 +18,10 @@ module "storage" {
     "run-records" = 90
   }
 
+  queues = [
+    "eval-reports", # one message per run, for its evaluation report (#127)
+  ]
+
   tables = [
     "seenmessages", # Message-IDs already fetched, per account
     "seenjobs",     # posting fingerprints already recommended
