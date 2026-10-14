@@ -104,44 +104,12 @@ describe("rank", () => {
     expect(rank([judgement()], config()).top[0]?.confidence).toBe("high");
   });
 
-  it("filters a failed model gate with its reason and quote, and notes a sentinel one", () => {
-    const failed = judgement({
-      asked: [{ gate: "sponsorship", mode: "filter", rule: "x" }],
-      answer: {
-        gates: [
-          {
-            gate: "sponsorship",
-            fails: true,
-            reason: "Requires citizenship",
-            quote: "US citizens only",
-          },
-        ],
-      },
+  it("carries screen's notes on a pick (#121)", () => {
+    const j = judgement({
+      posting: { gate_notes: ['Possibly seniority far from "mid" (Jev 0.65)'] },
     });
-    const noted = judgement({
-      posting: { title: "Other" },
-      asked: [{ gate: "sponsorship", mode: "note", rule: "x" }],
-      answer: {
-        gates: [
-          {
-            gate: "sponsorship",
-            fails: true,
-            reason: "Requires citizenship",
-            quote: "US citizens only",
-          },
-        ],
-      },
-    });
-    const out = rank([failed, noted], config());
-    expect(out.filtered).toEqual([
-      {
-        posting: failed.posting,
-        gate: "sponsorship",
-        reason: 'Requires citizenship ("US citizens only")',
-      },
-    ]);
-    expect(out.top.map((r) => [r.posting.title, r.noted])).toEqual([
-      ["Other", ['Requires citizenship ("US citizens only")']],
+    expect(rank([j], config()).top[0]?.noted).toEqual([
+      'Possibly seniority far from "mid" (Jev 0.65)',
     ]);
   });
 

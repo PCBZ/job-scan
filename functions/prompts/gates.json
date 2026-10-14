@@ -1,0 +1,8 @@
+{
+  "sponsorship": "Does the posting require citizenship or a security clearance, or say it will not sponsor a work visa?",
+  "seniority": "Is this role two or more steps away from \"{{seniority}}\", in either direction, on the scale new-grad, junior, mid, senior, staff?{{#years}} The candidate has {{years}} years of experience.{{/years}}",
+  "keyword": "Does the posting describe any of these, even in other words: {{keywords}}?",
+  "commute": "Is \"{{location}}\" within commuting distance of {{places}}?",
+  "remote": "Is this remote role open to someone working from {{scopes}}?",
+  "unlocated": "Can this role be worked from {{places}}?"
+}

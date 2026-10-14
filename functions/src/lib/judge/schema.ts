@@ -1,5 +1,5 @@
-// What the model returns for one posting. Every outcome carries its reason:
-// a gate quotes the posting, a rubric level quotes the resume and names a gap.
+// What the model returns for one posting. Every outcome carries its reason: a
+// rubric level quotes the resume and names a gap. Gates are screen's (#121).
 
 import { z } from "zod";
 
@@ -7,10 +7,6 @@ import { z } from "zod";
 export const LEVELS = ["none", "weak", "partial", "strong", "exact"] as const;
 export type Level = (typeof LEVELS)[number];
 const level = z.enum(LEVELS);
-
-/** Gates the model judges, after the code gates (#16) have run. */
-export const MODEL_GATES = ["sponsorship", "seniority", "keyword", "location"] as const;
-export type ModelGate = (typeof MODEL_GATES)[number];
 
 const fit = z.object({
   level,
@@ -21,16 +17,6 @@ const fit = z.object({
 });
 
 export const judgeAnswer = z.object({
-  /** One per gate asked, in the order asked. */
-  gates: z.array(
-    z.object({
-      gate: z.enum(MODEL_GATES),
-      fails: z.boolean(),
-      reason: z.string(),
-      /** The posting's own words that decide it; "" when the posting is silent. */
-      quote: z.string(),
-    }),
-  ),
   /** One per resume variant, in the order given. */
   variants: z.array(z.object({ variant: z.string(), skills: fit, domain: fit, seniority: fit })),
   location: z.object({ level, reason: z.string() }),

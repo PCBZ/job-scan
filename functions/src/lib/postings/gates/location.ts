@@ -3,6 +3,7 @@
 // questions, never failures.
 
 import type { ProfileConfig } from "../../config/schema.js";
+import { question } from "../../judge/questions.js";
 import { countryOf, regionCode } from "../places.js";
 import type { Posting } from "../types.js";
 import { PASS, type Rule } from "./rules.js";
@@ -28,6 +29,11 @@ interface LocationFacts {
   placed: boolean;
   /** The city's name contains a listed city: "North Vancouver". */
   near: boolean;
+  /**
+   * The location names a country none of the listed places is in, e.g. just
+   * "United States" for a Vancouver profile (#120).
+   */
+  elsewhere: boolean;
 }
 
 const words = (s: string) => s.replace(/[^\p{L}\p{N}]+/gu, " ");
@@ -50,6 +56,9 @@ export function locationFacts(p: Posting, profile: ProfileConfig): LocationFacts
   const where = p.location.replace(/\([^)]*\)/g, "").trim();
   const [city = "", ...rest] = where.split(",").map((s) => s.trim());
   const code = rest[0] === undefined ? undefined : regionCode(rest[0]);
+  const country = countryOf(where);
+  // Areas like "Metro Vancouver" name no country; the ones that do decide.
+  const listedCountries = new Set(places.flatMap((place) => countryOf(place)?.code ?? []));
   // Listed cities whose region, where both sides state one, agrees.
   const cities = places
     .map((place) => place.split(",").map((s) => s.trim()))
@@ -69,6 +78,8 @@ export function locationFacts(p: Posting, profile: ProfileConfig): LocationFacts
     listed: cities.some((c) => norm(c) === norm(city)),
     placed: code !== undefined || countryOf(rest.join(",")) !== undefined,
     near: cities.some((c) => wordIn(city, c)),
+    elsewhere:
+      country !== undefined && listedCountries.size > 0 && !listedCountries.has(country.code),
   };
 }
 
@@ -76,16 +87,19 @@ export const LOCATION: readonly Rule<LocationFacts>[] = [
   [(f) => f.remote && f.openToRemote && f.inScope, PASS],
   [
     (f) => f.remote && f.openToRemote,
-    (f) => ({ ask: `Is this remote role open to someone working from ${f.scopes.join(" or ")}?` }),
+    (f) => ({ ask: question("remote", { scopes: f.scopes.join(" or ") }) }),
   ],
   [(f) => f.places.length === 0, { fail: "not remote, and no locations are listed" }],
-  [(f) => f.where === "", (f) => ({ ask: `Can this role be worked from ${f.places.join(", ")}?` })],
+  [(f) => f.where === "", (f) => ({ ask: question("unlocated", { places: f.places.join(", ") }) })],
+  // Before the listed-city pass: "Vancouver, United States" names a listed
+  // city, in a country no listed place is in.
+  [(f) => f.elsewhere, (f) => ({ fail: `outside locations: ${f.location}` })],
   [(f) => f.listed, PASS],
   [(f) => f.placed && !f.near, (f) => ({ fail: `outside locations: ${f.location}` })],
   [
     () => true,
     (f) => ({
-      ask: `Is "${f.location}" within commuting distance of ${f.places.join(", ")}?`,
+      ask: question("commute", { location: f.location, places: f.places.join(", ") }),
     }),
   ],
 ];

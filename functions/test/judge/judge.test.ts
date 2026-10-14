@@ -59,16 +59,14 @@ describe("judgeStep", () => {
     const user = JSON.parse(calls[0]?.user ?? "{}");
     expect(user.posting.title).toBe("Backend Engineer");
     expect(user.candidate).toMatchObject({ seniority: "mid", locations: ["Vancouver, BC"] });
-    expect(user.gates.map((g: { gate: string }) => g.gate)).toEqual(["seniority"]);
+    // Gates are screen's (#121): the judge isn't asked them.
+    expect(user.gates).toBeUndefined();
     expect(user.resumes).toEqual([
       { variant: "Backend", text: "Built payment services in Go" },
       { variant: "Data", text: "Built Spark pipelines" },
     ]);
 
-    expect(out.value.map((j) => [j.posting.title, j.asked.map((g) => g.gate)])).toEqual([
-      ["Backend Engineer", ["seniority"]],
-      ["Data Engineer", ["seniority"]],
-    ]);
+    expect(out.value.map((j) => j.posting.title)).toEqual(["Backend Engineer", "Data Engineer"]);
     expect(out.usage).toEqual({ input: 2000, output: 200 });
     expect(out.warnings).toEqual([]);
   });
