@@ -51,15 +51,15 @@ describe("gatesFor", () => {
   it("frames seniority against the profile's level, with years when known", () => {
     const [gate] = gatesFor(posting(), { seniority: "mid", years_experience: 4 });
     expect(gate).toMatchObject({ gate: "seniority", mode: "filter" });
-    expect(gate?.rule).toContain('outside "mid"');
-    expect(gate?.rule).toContain("4 years of experience");
-    expect(gatesFor(posting(), { seniority: "mid" })[0]?.rule).not.toContain("years");
+    expect(gate?.question).toContain('two or more steps away from "mid"');
+    expect(gate?.question).toContain("4 years of experience");
+    expect(gatesFor(posting(), { seniority: "mid" })[0]?.question).not.toContain("years");
   });
 
   it("asks exclude_keywords by meaning, ignoring blanks", () => {
     const [gate] = gatesFor(posting(), { exclude_keywords: ["unpaid", " ", "commission only"] });
-    expect(gate?.rule).toBe(
-      'Fails if the posting describes any of these, even in other words: "unpaid", "commission only".',
+    expect(gate?.question).toBe(
+      'Does the posting describe any of these, even in other words: "unpaid", "commission only"?',
     );
   });
 
@@ -67,9 +67,9 @@ describe("gatesFor", () => {
     const p = posting({
       gate_questions: ['Is "Lower Mainland" within commuting distance?', "Q2?"],
     });
-    expect(gatesFor(p, {}).map((g) => g.rule)).toEqual([
-      'Fails if the answer is no: Is "Lower Mainland" within commuting distance?',
-      "Fails if the answer is no: Q2?",
+    expect(gatesFor(p, {}).map((g) => [g.question, g.failsOn])).toEqual([
+      ['Is "Lower Mainland" within commuting distance?', "no"],
+      ["Q2?", "no"],
     ]);
   });
 });

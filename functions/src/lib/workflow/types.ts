@@ -80,7 +80,7 @@ export interface DeterministicSteps {
     config: AppConfig,
   ): Promise<{ kept: Posting[]; filtered: Filtered[]; notes: string[] }>;
   verifyJudgements(judged: Judgement[], resumes: ResumeSet): string[];
-  /** Top N past the floor, the rest, model-gate failures and notes. */
+  /** Top N past the floor, the rest and notes. */
   rank(judged: Judgement[], config: AppConfig): RankResult;
   verifyExplanations(explained: Explanation[], top: Ranked[], resumes: ResumeSet): string[];
   renderReport(input: ReportInput): Report;

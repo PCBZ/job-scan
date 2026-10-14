@@ -136,8 +136,8 @@ export function buildWorkflow(
         run: (s) => ({ problems: steps.verifyJudgements(s.judged, resumes(s)) }),
       })
       .node("rank", (s) => {
-        const { top, rest, filtered, notes } = steps.rank(s.judged, config(s));
-        return { top, rest, filtered, notes };
+        const { top, rest, notes } = steps.rank(s.judged, config(s));
+        return { top, rest, notes };
       })
       .edge("rank", "explain")
       .node("explain", async (s, signal) => {

@@ -69,13 +69,6 @@ const BACKEND = posting({
   workplace: "hybrid",
   requirements: ["Go", "Postgres", "Kafka", "3+ years building payment systems"],
 });
-const CITIZENS = posting({
-  row: 1,
-  title: "Software Engineer",
-  company: "Saltmarsh Defense",
-  location: "Seattle, WA",
-  requirements: ["Go", "Must be a US citizen with an active security clearance", "Kubernetes"],
-});
 const DATA = posting({
   row: 2,
   title: "Data Engineer",
@@ -85,11 +78,12 @@ const DATA = posting({
 });
 
 describe.skipIf(process.env.EVAL_LIVE !== "1")("judging and explaining, live", () => {
-  it("judges, ranks and explains three postings", { timeout: 300_000 }, async () => {
+  // The gates are Jev's (#121): see screen in jev.live.test.ts.
+  it("judges, ranks and explains two postings", { timeout: 300_000 }, async () => {
     const client = modelClientFromEnv(process.env, new DefaultAzureCredential());
     const judge = judgeStep(client);
     const input = {
-      postings: [BACKEND, CITIZENS, DATA],
+      postings: [BACKEND, DATA],
       resumes: RESUMES.variants,
       profile: CONFIG.profile,
     };
@@ -117,8 +111,6 @@ describe.skipIf(process.env.EVAL_LIVE !== "1")("judging and explaining, live", (
         `  gaps: ${[v?.skills.gap, v?.domain.gap, v?.seniority.gap].filter(Boolean).join("; ")}`,
       );
     }
-    for (const f of ranked.filtered)
-      console.log(`filtered ${f.posting.title}: ${f.gate}: ${f.reason}`);
 
     // explain ⇄ verify_explanations, as in the graph.
     const explain = explainStep(client);
@@ -144,9 +136,6 @@ describe.skipIf(process.env.EVAL_LIVE !== "1")("judging and explaining, live", (
     expect(problems).toEqual([]);
     expect(explainProblems).toEqual([]);
     expect(explained).toHaveLength(ranked.top.length);
-    expect(ranked.filtered.map((f) => [f.posting.title, f.gate])).toEqual([
-      ["Software Engineer", "sponsorship"],
-    ]);
     const best = Object.fromEntries(ranked.top.map((r) => [r.posting.title, r.variant]));
     expect(best).toEqual({ "Backend Engineer, Payments": "Backend", "Data Engineer": "Data" });
   });
