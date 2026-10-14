@@ -111,9 +111,6 @@ export function fakes(o: FakeOptions = {}) {
       return {
         top: judged.map((j) => rankedOf(j)),
         rest: [],
-        filtered: [
-          { posting: posting({ title: "citizens only" }), gate: "sponsorship", reason: "y" },
-        ],
         notes: ["needs_sponsorship wasn't applied"],
       };
     },
@@ -151,7 +148,13 @@ export function fakes(o: FakeOptions = {}) {
               gate: "location" as const,
               reason: "location doesn't fit: Montreal (Jev 0.97)",
             }))
-          : [],
+          : [
+              {
+                posting: posting({ title: "citizens only" }),
+                gate: "sponsorship" as const,
+                reason: "y",
+              },
+            ],
         usage: { input: 3, output: 1 },
         warnings: o.screenWarnings ?? [],
       };

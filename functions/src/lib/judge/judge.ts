@@ -9,7 +9,6 @@ import type { Posting } from "../postings/types.js";
 import type { ResumeVariant } from "../resume/load.js";
 import { mapWithLimit } from "../workflow/limit.js";
 import type { LlmResult } from "../workflow/types.js";
-import { gatesFor } from "./gates.js";
 import { JUDGE_SYSTEM, judgeUser } from "./prompt.js";
 import { type JudgeAnswer, judgeAnswer } from "./schema.js";
 import { type Judgement, postingId, problemsAbout } from "./verify.js";
@@ -73,18 +72,17 @@ export function judgeStep(client: ModelClient, options: JudgeOptions = {}) {
       const kept = judgementOf(last?.previous, id);
       // On a repair, a posting whose judgement passed keeps it as it is.
       if (last && problemsAbout(last.problems, id).length === 0) return kept ? [kept] : [];
-      const asked = gatesFor(posting, profile);
       try {
         const r = await client.structured({
           name: "judgement",
           system: JUDGE_SYSTEM,
-          user: judgeUser(posting, profile, asked, resumes),
+          user: judgeUser(posting, profile, resumes),
           schema: judgeAnswer,
           repairs: historyOf(repairs, id),
           ...(signal ? { signal } : {}),
         });
         usage = addUsage(usage, r.usage);
-        return [{ posting, asked, answer: withoutUnstatedGaps(posting, r.value) }];
+        return [{ posting, answer: withoutUnstatedGaps(posting, r.value) }];
       } catch (err) {
         // One unusable answer costs that posting, not the run.
         if (!isAppError(err, "model_output")) throw err;

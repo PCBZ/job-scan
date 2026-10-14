@@ -2,10 +2,9 @@
 // 35/25/20/10/10 into 0–100 and capped at 70 when the posting is thin or the
 // variant has no stated gap. The best one is named (or "either" when two are
 // within 5 points), and the floor and top N apply.
-// Failed model gates leave with their reasons; noted ones stay, flagged.
+// Model gates are screen's (#121): a pick carries screen's notes.
 
 import type { AppConfig } from "../config/load.js";
-import type { Filtered } from "../postings/gates.js";
 import type { Posting } from "../postings/types.js";
 import { sponsorshipApplies } from "./gates.js";
 import type { Level } from "./schema.js";
@@ -47,7 +46,6 @@ export interface RankResult {
   top: Ranked[];
   /** Scored postings that didn't make the top, best first: near misses and more. */
   rest: Ranked[];
-  filtered: Filtered[];
   notes: string[];
 }
 
@@ -65,20 +63,9 @@ function scoreOf(j: Judgement, variant: Judgement["answer"]["variants"][number])
 export function rank(judged: Judgement[], config: AppConfig): RankResult {
   const floor = config.report.min_score_to_recommend ?? 60;
   const topN = config.report.max_top_picks ?? 5;
-  const filtered: Filtered[] = [];
   const scored: Ranked[] = [];
 
   for (const j of judged) {
-    const outcomes = j.answer.gates.map((g, i) => ({ ...g, mode: j.asked[i]?.mode ?? "filter" }));
-    const failed = outcomes.find((g) => g.fails && g.mode === "filter");
-    if (failed) {
-      filtered.push({
-        posting: j.posting,
-        gate: failed.gate,
-        reason: `${failed.reason} ("${failed.quote}")`,
-      });
-      continue;
-    }
     const thin = j.posting.requirements.length < THIN_BELOW;
     const variants = j.answer.variants.map((v) => {
       const caps = [
@@ -101,12 +88,7 @@ export function rank(judged: Judgement[], config: AppConfig): RankResult {
       scores: Object.fromEntries(variants.map((v) => [v.name, v.raw])),
       caps: best.caps,
       confidence: best.caps.length ? "low" : j.answer.unknowns.length > 0 ? "medium" : "high",
-      noted: [
-        ...outcomes
-          .filter((g) => g.fails && g.mode === "note")
-          .map((g) => `Would have been filtered: ${g.reason} ("${g.quote}")`),
-        ...(j.posting.gate_notes ?? []),
-      ],
+      noted: j.posting.gate_notes ?? [],
     });
   }
 
@@ -120,5 +102,5 @@ export function rank(judged: Judgement[], config: AppConfig): RankResult {
           "needs_sponsorship is about US work visas and no listed location is in the US, so it wasn't applied",
         ]
       : [];
-  return { top, rest, filtered, notes };
+  return { top, rest, notes };
 }

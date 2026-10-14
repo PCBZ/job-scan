@@ -1,18 +1,14 @@
 // The verify_judgements node: a judgement's reasons must be real. Resume quotes
-// must be in that resume, and a failed gate and every gap must quote the
-// posting. A variant may have no gap; rank caps it rather than have the model
+// must be in that resume, and every gap must quote the posting. A variant may have no gap; rank caps it rather than have the model
 // invent one. Problems name their posting, so a repair goes back to it only.
 
 import type { Posting } from "../postings/types.js";
 import type { ResumeSet } from "../resume/load.js";
 import { postingFields } from "./fields.js";
-import type { AskedGate } from "./gates.js";
 import type { JudgeAnswer } from "./schema.js";
 
 export interface Judgement {
   posting: Posting;
-  /** The gates asked, in order; the answer's gates must match them. */
-  asked: AskedGate[];
   answer: JudgeAnswer;
 }
 
@@ -46,18 +42,8 @@ export function verifyJudgements(judged: Judgement[], resumes: ResumeSet): strin
   const texts = new Map(resumes.variants.map((v) => [v.name, v.text]));
   const names = resumes.variants.map((v) => v.name);
   const problems: string[] = [];
-  for (const { posting, asked, answer } of judged) {
+  for (const { posting, answer } of judged) {
     const say = (problem: string) => problems.push(problemAbout(postingId(posting), problem));
-
-    const askedGates = asked.map((g) => g.gate);
-    if (answer.gates.map((g) => g.gate).join() !== askedGates.join()) {
-      say(`answer exactly these gates, in this order: ${askedGates.join(", ") || "none"}`);
-    }
-    for (const g of answer.gates) {
-      if (g.fails && !quotes(postingText(posting), g.quote)) {
-        say(`gate ${g.gate} fails, but its quote "${g.quote}" is not in the posting`);
-      }
-    }
 
     if (answer.variants.map((v) => v.variant).join() !== names.join()) {
       say(`answer one entry per resume, in this order: ${names.join(", ")}`);
