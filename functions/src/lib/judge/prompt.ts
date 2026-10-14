@@ -14,7 +14,12 @@ export const JUDGE_SYSTEM = readFileSync(
   "utf8",
 ).trimEnd();
 
-/** The posting, the profile fields the judgement uses, the gates and the resumes, as JSON. */
+/**
+ * The profile fields the judgement uses, the resumes, the gates and the
+ * posting, as JSON. What every call shares comes first and the posting last,
+ * so Azure's prompt cache serves the shared prefix (#115): a cache hit needs
+ * the prompt's start to match exactly, and the posting is ~1% of the prompt.
+ */
 export function judgeUser(
   p: Posting,
   profile: ProfileConfig,
@@ -25,7 +30,6 @@ export function judgeUser(
     profile;
   return JSON.stringify(
     {
-      posting: postingFields(p),
       candidate: {
         target_titles,
         seniority,
@@ -34,8 +38,9 @@ export function judgeUser(
         open_to_remote,
         core_skills,
       },
-      gates: gates.map(({ gate, rule }) => ({ gate, rule })),
       resumes: resumes.map((r) => ({ variant: r.name, text: r.text })),
+      gates: gates.map(({ gate, rule }) => ({ gate, rule })),
+      posting: postingFields(p),
     },
     null,
     2,

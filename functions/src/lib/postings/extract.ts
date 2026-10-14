@@ -4,7 +4,7 @@
 
 import { isAppError } from "../errors.js";
 import type { FetchedMessage } from "../mail/types.js";
-import type { ModelClient, RepairTurn, TokenUsage } from "../model/types.js";
+import { addUsage, type ModelClient, type RepairTurn, type TokenUsage } from "../model/types.js";
 import { mapWithLimit } from "../workflow/limit.js";
 import type { ModelSteps } from "../workflow/types.js";
 import { EXTRACT_SYSTEM, extractUser } from "./prompt.js";
@@ -31,7 +31,7 @@ export function extractStep(
   const concurrency = options.concurrency ?? 4;
   return async ({ messages }, repairs, signal) => {
     const last = repairs.at(-1);
-    const usage: TokenUsage = { input: 0, output: 0 };
+    let usage: TokenUsage = { input: 0, output: 0 };
     const warnings: string[] = [];
     // Only the messages asked this time: a message kept from an earlier
     // attempt keeps its flags in the state too.
@@ -51,8 +51,7 @@ export function extractStep(
           repairs: historyOf(repairs, m.message_id),
           ...(signal ? { signal } : {}),
         });
-        usage.input += r.usage.input;
-        usage.output += r.usage.output;
+        usage = addUsage(usage, r.usage);
         suspicious[m.message_id] = verifiedFlags(r.value.suspicious, user, m.message_id, warnings);
         return r.value.postings.map((e, row) => toPosting(e, m, row));
       } catch (err) {

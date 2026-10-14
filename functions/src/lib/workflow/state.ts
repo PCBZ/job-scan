@@ -3,7 +3,7 @@
 import { Annotation } from "@langchain/langgraph";
 import type { AppConfig } from "../config/load.js";
 import type { AllAccountsFailed, FetchPayload } from "../mail/types.js";
-import type { RepairTurn, TokenUsage } from "../model/types.js";
+import { addUsage, type RepairTurn, type TokenUsage } from "../model/types.js";
 import type { Filtered } from "../postings/gates.js";
 import type { Source } from "../postings/types.js";
 import type { ResumeSet } from "../resume/load.js";
@@ -83,8 +83,7 @@ export const WorkflowState = Annotation.Root({
     reducer: (old, next) => {
       const out = { ...old };
       for (const [node, u] of Object.entries(next)) {
-        const prev = out[node] ?? { input: 0, output: 0 };
-        out[node] = { input: prev.input + u.input, output: prev.output + u.output };
+        out[node] = addUsage(out[node] ?? { input: 0, output: 0 }, u);
       }
       return out;
     },

@@ -58,6 +58,9 @@ export class WorkflowBuilder {
             span.setAttributes({
               "gen_ai.usage.input_tokens": usage.input,
               "gen_ai.usage.output_tokens": usage.output,
+              ...(usage.cached !== undefined
+                ? { "gen_ai.usage.cache_read.input_tokens": usage.cached }
+                : {}),
             });
           }
           onNode?.({

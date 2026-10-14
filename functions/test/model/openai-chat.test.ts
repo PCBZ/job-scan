@@ -34,6 +34,26 @@ function completion(message: Record<string, unknown>) {
 }
 
 describe("OpenAIChatClient", () => {
+  it("reports the input tokens Azure served from its prompt cache", async () => {
+    const cachedCompletion = {
+      ...completion({ parsed: { title: "Engineer", company: "Northwind" } }),
+      usage: {
+        prompt_tokens: 6000,
+        completion_tokens: 30,
+        total_tokens: 6030,
+        prompt_tokens_details: { cached_tokens: 5632 },
+      },
+    };
+    const out = await new OpenAIChatClient(parser(cachedCompletion), "m").structured(REQ);
+    expect(out.usage).toEqual({ input: 6000, output: 30, cached: 5632 });
+    // Without the detail, cached stays absent rather than a guessed 0.
+    const plain = await new OpenAIChatClient(
+      parser(completion({ parsed: { title: "Engineer", company: "Northwind" } })),
+      "m",
+    ).structured(REQ);
+    expect(plain.usage).toEqual({ input: 120, output: 30 });
+  });
+
   it("sends system and user messages with a strict json_schema response format", async () => {
     const p = parser(completion({ parsed: { title: "Engineer", company: "Northwind" } }));
     const out = await new OpenAIChatClient(p, "gpt-5.4-mini").structured(REQ);

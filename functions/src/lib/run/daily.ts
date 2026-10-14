@@ -61,7 +61,7 @@ export async function runDaily(
   const onNode = (e: NodeEvent) => {
     nodeMs[e.node] = (nodeMs[e.node] ?? 0) + Math.round(e.ms);
     log.log(
-      `node ${e.node} ${e.ok ? "ok" : "failed"} ${Math.round(e.ms)}ms${e.usage ? ` tokens ${e.usage.input}/${e.usage.output}` : ""}`,
+      `node ${e.node} ${e.ok ? "ok" : "failed"} ${Math.round(e.ms)}ms${e.usage ? ` tokens ${e.usage.input}/${e.usage.output}${e.usage.cached !== undefined ? ` cached ${e.usage.cached}` : ""}` : ""}`,
     );
   };
   const workflow = buildWorkflow(
