@@ -7,6 +7,7 @@
 import type { ProfileConfig } from "../config/schema.js";
 import { countryOf } from "../postings/places.js";
 import type { Posting } from "../postings/types.js";
+import { question } from "./questions.js";
 import type { ModelGate } from "./schema.js";
 
 export interface AskedGate {
@@ -15,7 +16,7 @@ export interface AskedGate {
   mode: "filter" | "note";
   /** The rule as the judge reads it. */
   rule: string;
-  /** A yes/no question about the posting, asked of Jev (#121). */
+  /** A yes/no question about the posting, asked of Jev (#121), from prompts/gates.json. */
   question: string;
   /** The answer that fails the gate: questions are asked as plainly as they read. */
   failsOn: "yes" | "no";
@@ -27,8 +28,7 @@ const SPONSORSHIP =
   "Fails if the posting requires citizenship or a security clearance, or says it will not sponsor a work visa.";
 const SPONSORSHIP_GATE = {
   rule: SPONSORSHIP,
-  question:
-    "Does the posting require citizenship or a security clearance, or say it will not sponsor a work visa?",
+  question: question("sponsorship"),
   failsOn: "yes" as const,
   failure: "requires citizenship or a clearance, or won't sponsor a visa",
 };
@@ -62,9 +62,12 @@ export function gatesFor(p: Posting, profile: ProfileConfig): AskedGate[] {
       rule:
         `Fails if the role is materially outside "${seniority}" in either direction: two or ` +
         `more steps away on the scale new-grad, junior, mid, senior, staff.${years}`,
-      question:
-        `Is this role two or more steps away from "${seniority}", in either direction, on the ` +
-        `scale new-grad, junior, mid, senior, staff?${years}`,
+      question: question("seniority", {
+        seniority,
+        ...(typeof profile.years_experience === "number"
+          ? { years: String(profile.years_experience) }
+          : {}),
+      }),
       failsOn: "yes",
       failure: `seniority far from "${seniority}"`,
     });
@@ -77,7 +80,7 @@ export function gatesFor(p: Posting, profile: ProfileConfig): AskedGate[] {
       gate: "keyword",
       mode: "filter",
       rule: `Fails if the posting describes any of these, even in other words: ${list}.`,
-      question: `Does the posting describe any of these, even in other words: ${list}?`,
+      question: question("keyword", { keywords: list }),
       failsOn: "yes",
       failure: "describes an excluded keyword",
     });
