@@ -15,7 +15,7 @@ export function renderText(r: Report, webUrl?: string): string {
       ? [`   Gap: ${p.gap.requirement ? `${p.gap.requirement}. ` : ""}${p.gap.advice}`]
       : []),
     ...(p.unknown ? [`   Unknown from the email: ${p.unknown}`] : []),
-    ...p.noted.map((n) => `   Would have been filtered: ${n}`),
+    ...p.noted.map((n) => `   ${n}`),
     ...(p.url ? [`   ${p.url}`] : []),
     "",
   ]);

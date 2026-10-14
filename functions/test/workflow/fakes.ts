@@ -44,6 +44,10 @@ export interface FakeOptions {
   extractWarnings?: string[];
   /** Flags each extraction attempt returns, until the list runs out. */
   extractSuspicious?: SuspiciousByMessage[];
+  /** Jev screens every posting out (#118). */
+  screenAll?: boolean;
+  /** screen's warnings, e.g. Jev unavailable. */
+  screenWarnings?: string[];
 }
 
 /** Nodes that record every call, in order, with their arguments. */
@@ -107,9 +111,6 @@ export function fakes(o: FakeOptions = {}) {
       return {
         top: judged.map((j) => rankedOf(j)),
         rest: [],
-        filtered: [
-          { posting: posting({ title: "citizens only" }), gate: "sponsorship", reason: "y" },
-        ],
         notes: ["needs_sponsorship wasn't applied"],
       };
     },
@@ -137,6 +138,32 @@ export function fakes(o: FakeOptions = {}) {
   };
 
   const modelSteps: ModelSteps = {
+    async screen({ postings }) {
+      log.push("screen");
+      return o.screenAll
+        ? {
+            kept: [],
+            filtered: postings.map((p) => ({
+              posting: p,
+              gate: "location" as const,
+              reason: "location doesn't fit: Montreal (Jev 0.97)",
+            })),
+            usage: { input: 3, output: 1 },
+            warnings: [],
+          }
+        : {
+            kept: postings,
+            filtered: [
+              {
+                posting: posting({ title: "citizens only" }),
+                gate: "sponsorship" as const,
+                reason: "y",
+              },
+            ],
+            usage: { input: 3, output: 1 },
+            warnings: o.screenWarnings ?? [],
+          };
+    },
     async extractPostings(...args) {
       counters.extract++;
       llmCall("extract_postings", args);

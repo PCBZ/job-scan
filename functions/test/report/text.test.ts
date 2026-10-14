@@ -18,7 +18,7 @@ describe("renderText", () => {
       "Unknown from the email: team size",
       "2. Data Engineer — Quillfeather · 70/100 · confidence: low (capped: no stated gap)",
       "send Data or Backend",
-      "Would have been filtered: Requires citizenship",
+      "Would have been filtered: requires citizenship or a clearance, or won't sponsor a visa (Jev 0.91)",
       "## Also worth a look",
       "- Platform Engineer — Saltmarsh Robotics",
       "## Filtered out",

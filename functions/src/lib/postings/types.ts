@@ -16,8 +16,10 @@ export interface Provenance {
   message_subject: string;
   /** Position of this row in the model's answer for its message. */
   row: number;
-  /** Gate questions code couldn't settle, for Jev in judge (#17). */
+  /** Location questions code couldn't settle, for Jev in screen (#16, #118). */
   gate_questions?: string[];
+  /** What screen noted but didn't filter on: a sentinel gate, or Jev unsure (#118). */
+  gate_notes?: string[];
 }
 
 export type Posting = ExtractedPosting & Provenance;

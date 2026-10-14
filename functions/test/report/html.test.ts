@@ -24,7 +24,7 @@ describe("renderHtml", () => {
       "<b>Gap:</b> Experience with Kafka Streams. Lead with",
       "<b>Gap:</b> The requirements the alert lists are all met.",
       "<b>Unknown from the email:</b> team size",
-      "<b>Would have been filtered:</b> Requires citizenship",
+      "Would have been filtered: requires citizenship or a clearance, or won&#39;t sponsor a visa (Jev 0.91)",
       "Also worth a look",
       "5+ years of Kubernetes",
       "location (1)",

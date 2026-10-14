@@ -1,10 +1,10 @@
 // The daily run as a LangGraph state graph (plan §3, #55).
 //
-//   load_config ─┬─ fetch_mail ─ extract_postings ⇄ validate ─ dedupe ─ hard_gates ─ await_resumes ─┐
-//                └─ load_resumes ──────────────────────────────────────────────────────────────────┴─ check_resumes ─ judge ⇄ verify_judgements
+//   load_config ─┬─ fetch_mail ─ extract_postings ⇄ validate ─ dedupe ─ hard_gates ─ screen ─ await_resumes ─┐
+//                └─ load_resumes ───────────────────────────────────────────────────────────────────────────┴─ check_resumes ─ judge ⇄ verify_judgements
 //   ─ rank ─ explain ⇄ verify_explanations ─ render_report ─ deliver ─ mark_seen
 //
-// No new mail, nothing past the hard gates, or no resumes to judge against
+// No new mail, nothing past the gates, or no resumes to judge against
 // skips straight to render_report. Without resumes, nothing is marked seen, so
 // the next run judges the same mail.
 // Keyword insights (#28) add their nodes when they land.
@@ -89,6 +89,20 @@ export function buildWorkflow(
         return { postings: kept, filtered, notes };
       })
       .branch("hard_gates", (s) => (s.postings.length > 0 ? "continue" : "nothing_left"), {
+        continue: "screen",
+        nothing_left: "short_nothing_left",
+      })
+      // The model gates, by Jev (#118): what fails never costs a judge call.
+      .node("screen", async (s, signal) => {
+        const r = await model.screen({ postings: s.postings, profile: config(s).profile }, signal);
+        return {
+          postings: r.kept,
+          filtered: r.filtered,
+          usage: { screen: r.usage },
+          ...(r.warnings.length ? { warnings: r.warnings } : {}),
+        };
+      })
+      .branch("screen", (s) => (s.postings.length > 0 ? "continue" : "nothing_left"), {
         continue: "await_resumes",
         nothing_left: "short_nothing_left",
       })
@@ -122,8 +136,8 @@ export function buildWorkflow(
         run: (s) => ({ problems: steps.verifyJudgements(s.judged, resumes(s)) }),
       })
       .node("rank", (s) => {
-        const { top, rest, filtered, notes } = steps.rank(s.judged, config(s));
-        return { top, rest, filtered, notes };
+        const { top, rest, notes } = steps.rank(s.judged, config(s));
+        return { top, rest, notes };
       })
       .edge("rank", "explain")
       .node("explain", async (s, signal) => {

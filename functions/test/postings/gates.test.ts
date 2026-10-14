@@ -56,6 +56,16 @@ describe("location gate", () => {
     ]);
   });
 
+  it.each(["United States", "USA", "California"])(
+    "filters a country or region with no listed place in it (#118): %s",
+    async (location) => {
+      const out = await gate(onsite(location));
+      expect(out.filtered).toEqual([
+        { posting: onsite(location), gate: "location", reason: `outside locations: ${location}` },
+      ]);
+    },
+  );
+
   it.each([
     "Lower Mainland",
     "Greater Vancouver Area",

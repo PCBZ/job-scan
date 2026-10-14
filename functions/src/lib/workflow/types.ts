@@ -35,6 +35,11 @@ export interface LlmResult<T> {
 
 /** Steps that call the model. Inputs are plain data. */
 export interface ModelSteps {
+  /** The model gates, decided by Jev before judge (#118). */
+  screen(
+    input: { postings: Posting[]; profile: AppConfig["profile"] },
+    signal?: AbortSignal,
+  ): Promise<{ kept: Posting[]; filtered: Filtered[]; usage: TokenUsage; warnings: string[] }>;
   /** Also flags suspicious content, per message asked this time (#66). */
   extractPostings(
     input: { messages: FetchedMessage[] },
@@ -75,7 +80,7 @@ export interface DeterministicSteps {
     config: AppConfig,
   ): Promise<{ kept: Posting[]; filtered: Filtered[]; notes: string[] }>;
   verifyJudgements(judged: Judgement[], resumes: ResumeSet): string[];
-  /** Top N past the floor, the rest, model-gate failures and notes. */
+  /** Top N past the floor, the rest and notes. */
   rank(judged: Judgement[], config: AppConfig): RankResult;
   verifyExplanations(explained: Explanation[], top: Ranked[], resumes: ResumeSet): string[];
   renderReport(input: ReportInput): Report;

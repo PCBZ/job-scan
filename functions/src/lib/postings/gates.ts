@@ -4,7 +4,7 @@
 
 import type { AppConfig } from "../config/load.js";
 import type { ProfileConfig } from "../config/schema.js";
-import type { ModelGate } from "../judge/schema.js";
+import type { ModelGate } from "../judge/gates.js";
 import type { DeterministicSteps } from "../workflow/types.js";
 import { KEYWORD, keywordFacts } from "./gates/keyword.js";
 import { LOCATION, locationFacts } from "./gates/location.js";

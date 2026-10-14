@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { AskedGate } from "../../src/lib/judge/gates.js";
 import { judgeUser } from "../../src/lib/judge/prompt.js";
 import type { ResumeVariant } from "../../src/lib/resume/load.js";
 import { posting } from "../postings/helpers.js";
@@ -13,7 +12,6 @@ const PROFILE = {
   seniority: "mid" as const,
   needs_sponsorship: false,
 };
-const SENIORITY: AskedGate[] = [{ gate: "seniority", rule: "Not above mid level", mode: "filter" }];
 
 /** The length of the longest common prefix. */
 function sharedPrefix(a: string, b: string): number {
@@ -24,17 +22,16 @@ function sharedPrefix(a: string, b: string): number {
 
 describe("judgeUser", () => {
   it("puts what every call shares first and the posting last, so the prompt cache can serve it", () => {
-    const user = judgeUser(posting(), PROFILE, SENIORITY, RESUMES);
-    expect(Object.keys(JSON.parse(user))).toEqual(["candidate", "resumes", "gates", "posting"]);
+    const user = judgeUser(posting(), PROFILE, RESUMES);
+    expect(Object.keys(JSON.parse(user))).toEqual(["candidate", "resumes", "posting"]);
   });
 
-  it("gives two postings the same prompt up to their gates", () => {
-    const a = judgeUser(posting({ title: "Backend Engineer" }), PROFILE, SENIORITY, RESUMES);
-    const b = judgeUser(posting({ title: "Data Engineer", row: 1 }), PROFILE, [], RESUMES);
+  it("gives two postings the same prompt up to the posting", () => {
+    const a = judgeUser(posting({ title: "Backend Engineer" }), PROFILE, RESUMES);
+    const b = judgeUser(posting({ title: "Data Engineer", row: 1 }), PROFILE, RESUMES);
     const shared = sharedPrefix(a, b);
-    // Everything through the resumes is identical; they diverge at the gates.
-    expect(shared).toBeGreaterThanOrEqual(a.indexOf('"gates"'));
+    // Everything through the resumes is identical; they diverge in the posting.
+    expect(shared).toBeGreaterThan(a.indexOf('"posting"'));
     expect(a.slice(0, shared)).toContain("Built Spark pipelines");
-    expect(a.indexOf('"posting"')).toBeGreaterThan(shared);
   });
 });

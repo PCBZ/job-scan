@@ -24,28 +24,36 @@ describe("gatesFor", () => {
     expect(modes({ ...CANADA, needs_sponsorship: "unknown" })).toEqual(["sponsorship:note"]);
   });
 
-  it("frames seniority against the profile's level, with years when known", () => {
+  it("asks seniority against the profile's level, failing on yes, with years when known", () => {
     const [gate] = gatesFor(posting(), { seniority: "mid", years_experience: 4 });
-    expect(gate).toMatchObject({ gate: "seniority", mode: "filter" });
-    expect(gate?.rule).toContain('outside "mid"');
-    expect(gate?.rule).toContain("4 years of experience");
-    expect(gatesFor(posting(), { seniority: "mid" })[0]?.rule).not.toContain("years");
+    expect(gate).toMatchObject({ gate: "seniority", mode: "filter", failsOn: "yes" });
+    expect(gate?.question).toContain('two or more steps away from "mid"');
+    expect(gate?.question).toContain("4 years of experience");
+    expect(gate?.failure).toBe('seniority far from "mid"');
+    expect(gatesFor(posting(), { seniority: "mid" })[0]?.question).not.toContain("years");
   });
 
   it("asks exclude_keywords by meaning, ignoring blanks", () => {
     const [gate] = gatesFor(posting(), { exclude_keywords: ["unpaid", " ", "commission only"] });
-    expect(gate?.rule).toBe(
-      'Fails if the posting describes any of these, even in other words: "unpaid", "commission only".',
-    );
+    expect(gate).toMatchObject({
+      question:
+        'Does the posting describe any of these, even in other words: "unpaid", "commission only"?',
+      failsOn: "yes",
+    });
   });
 
-  it("turns each location question from #16 into a gate, in order", () => {
+  it("asks each location question from #16 as it reads, failing on no, in order", () => {
     const p = posting({
+      location: "Lower Mainland",
       gate_questions: ['Is "Lower Mainland" within commuting distance?', "Q2?"],
     });
-    expect(gatesFor(p, {}).map((g) => g.rule)).toEqual([
-      'Fails if the answer is no: Is "Lower Mainland" within commuting distance?',
-      "Fails if the answer is no: Q2?",
+    expect(gatesFor(p, {}).map((g) => [g.question, g.failsOn, g.failure])).toEqual([
+      [
+        'Is "Lower Mainland" within commuting distance?',
+        "no",
+        "location doesn't fit: Lower Mainland",
+      ],
+      ["Q2?", "no", "location doesn't fit: Lower Mainland"],
     ]);
   });
 });

@@ -56,7 +56,9 @@ export const SAMPLE: Report = {
       gap: { requirement: "", advice: "The requirements the alert lists are all met." },
       unknown: "",
       caps: ["no stated gap"],
-      noted: ['Requires citizenship ("US citizens only")'],
+      noted: [
+        "Would have been filtered: requires citizenship or a clearance, or won't sponsor a visa (Jev 0.91)",
+      ],
     },
   ],
   others: [
