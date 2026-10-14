@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../../src/lib/config/load.js";
 import { rank } from "../../src/lib/judge/rank.js";
-import { dimension, judgement } from "./helpers.js";
+import { dimension, JEV, judgement } from "./helpers.js";
 
 const config = (report: AppConfig["report"] = {}, profile: AppConfig["profile"] = {}) =>
   ({ report, profile }) as AppConfig;
@@ -106,7 +106,7 @@ describe("rank", () => {
 
   it("filters a failed model gate with its reason and quote, and notes a sentinel one", () => {
     const failed = judgement({
-      asked: [{ gate: "sponsorship", mode: "filter", rule: "x" }],
+      asked: [{ gate: "sponsorship", mode: "filter", rule: "x", ...JEV }],
       answer: {
         gates: [
           {
@@ -120,7 +120,7 @@ describe("rank", () => {
     });
     const noted = judgement({
       posting: { title: "Other" },
-      asked: [{ gate: "sponsorship", mode: "note", rule: "x" }],
+      asked: [{ gate: "sponsorship", mode: "note", rule: "x", ...JEV }],
       answer: {
         gates: [
           {
@@ -141,7 +141,16 @@ describe("rank", () => {
       },
     ]);
     expect(out.top.map((r) => [r.posting.title, r.noted])).toEqual([
-      ["Other", ['Requires citizenship ("US citizens only")']],
+      ["Other", ['Would have been filtered: Requires citizenship ("US citizens only")']],
+    ]);
+  });
+
+  it("carries screen's notes on a pick (#121)", () => {
+    const j = judgement({
+      posting: { gate_notes: ['Possibly seniority far from "mid" (Jev 0.65)'] },
+    });
+    expect(rank([j], config()).top[0]?.noted).toEqual([
+      'Possibly seniority far from "mid" (Jev 0.65)',
     ]);
   });
 

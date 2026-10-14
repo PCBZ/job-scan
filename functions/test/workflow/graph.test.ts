@@ -23,7 +23,8 @@ describe("workflow graph", () => {
       ["extract_postings", "validate"],
       ["validate", "dedupe"],
       ["dedupe", "hard_gates"],
-      ["hard_gates", "judge"],
+      ["hard_gates", "screen"],
+      ["screen", "judge"],
       ["load_resumes:end", "judge"],
       ["judge", "verify_judgements"],
       ["verify_judgements", "rank"],
@@ -169,6 +170,27 @@ describe("workflow graph", () => {
     expect(out.outcome).toBe("nothing_left");
     expect(f.log).not.toContain("judge");
     expect(f.log.slice(-2)).toEqual(["deliver", "mark_seen"]);
+  });
+
+  it("when screen filters every posting, skips judging and reports why (#121)", async () => {
+    const f = fakes({ screenAll: true });
+    const out = await run(f);
+    expect(out.outcome).toBe("nothing_left");
+    expect(f.log).toContain("screen");
+    expect(f.log).not.toContain("judge");
+    expect(f.reported.at(-1)?.filtered.map((x) => x.reason)).toContain(
+      "location doesn't fit: Montreal (Jev 0.97)",
+    );
+  });
+
+  it("carries screen's warnings into the report", async () => {
+    const f = fakes({
+      screenWarnings: ["screen: Jev failed, so 2 posting(s) weren't screened: x"],
+    });
+    await run(f);
+    expect(f.reported.at(-1)?.warnings).toContain(
+      "screen: Jev failed, so 2 posting(s) weren't screened: x",
+    );
   });
 
   it("with no resumes, skips judging, reports why, and marks nothing seen", async () => {

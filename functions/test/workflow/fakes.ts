@@ -44,6 +44,10 @@ export interface FakeOptions {
   extractWarnings?: string[];
   /** Flags each extraction attempt returns, until the list runs out. */
   extractSuspicious?: SuspiciousByMessage[];
+  /** screen's warnings, e.g. Jev unavailable (#121). */
+  screenWarnings?: string[];
+  /** Jev screens every posting out (#121). */
+  screenAll?: boolean;
 }
 
 /** Nodes that record every call, in order, with their arguments. */
@@ -137,6 +141,21 @@ export function fakes(o: FakeOptions = {}) {
   };
 
   const modelSteps: ModelSteps = {
+    async screen({ postings }) {
+      log.push("screen");
+      return {
+        kept: o.screenAll ? [] : postings,
+        filtered: o.screenAll
+          ? postings.map((p) => ({
+              posting: p,
+              gate: "location" as const,
+              reason: "location doesn't fit: Montreal (Jev 0.97)",
+            }))
+          : [],
+        usage: { input: 3, output: 1 },
+        warnings: o.screenWarnings ?? [],
+      };
+    },
     async extractPostings(...args) {
       counters.extract++;
       llmCall("extract_postings", args);

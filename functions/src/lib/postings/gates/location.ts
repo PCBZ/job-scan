@@ -3,6 +3,7 @@
 // questions, never failures.
 
 import type { ProfileConfig } from "../../config/schema.js";
+import { question } from "../../judge/questions.js";
 import { countryOf, regionCode } from "../places.js";
 import type { Posting } from "../types.js";
 import { PASS, type Rule } from "./rules.js";
@@ -86,10 +87,10 @@ export const LOCATION: readonly Rule<LocationFacts>[] = [
   [(f) => f.remote && f.openToRemote && f.inScope, PASS],
   [
     (f) => f.remote && f.openToRemote,
-    (f) => ({ ask: `Is this remote role open to someone working from ${f.scopes.join(" or ")}?` }),
+    (f) => ({ ask: question("remote", { scopes: f.scopes.join(" or ") }) }),
   ],
   [(f) => f.places.length === 0, { fail: "not remote, and no locations are listed" }],
-  [(f) => f.where === "", (f) => ({ ask: `Can this role be worked from ${f.places.join(", ")}?` })],
+  [(f) => f.where === "", (f) => ({ ask: question("unlocated", { places: f.places.join(", ") }) })],
   // Before the listed-city pass: "Vancouver, United States" names a listed
   // city, in a country no listed place is in.
   [(f) => f.elsewhere, (f) => ({ fail: `outside locations: ${f.location}` })],
@@ -98,7 +99,7 @@ export const LOCATION: readonly Rule<LocationFacts>[] = [
   [
     () => true,
     (f) => ({
-      ask: `Is "${f.location}" within commuting distance of ${f.places.join(", ")}?`,
+      ask: question("commute", { location: f.location, places: f.places.join(", ") }),
     }),
   ],
 ];

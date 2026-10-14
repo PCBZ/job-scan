@@ -8,6 +8,8 @@
 import { describe, expect, it } from "vitest";
 import { choice, noul, score } from "../../src/lib/decision/client.js";
 import { DEFAULT_JEV_MODEL, decisionClientFromEnv } from "../../src/lib/decision/config.js";
+import { screenStep } from "../../src/lib/judge/screen.js";
+import { posting } from "../postings/helpers.js";
 
 const POSTING = {
   title: "Senior Backend Engineer",
@@ -42,5 +44,45 @@ describe.skipIf(process.env.EVAL_LIVE !== "1")("Jev, live", () => {
     expect(r.answers.seniority.score).toBeGreaterThan(1.5);
     expect(r.answers.language.choice).toBe("go");
     expect(r.usage.input).toBeGreaterThan(0);
+  });
+
+  it("screens postings through their gates (#121)", { timeout: 60_000 }, async () => {
+    const screen = screenStep(decisionClientFromEnv(process.env));
+    const vancouver = posting({ row: 0, title: "Backend Engineer", location: "Vancouver, BC" });
+    const citizens = posting({
+      row: 1,
+      title: "Software Engineer",
+      location: "Seattle, WA",
+      requirements: ["Must be a US citizen with an active security clearance"],
+    });
+    const montreal = posting({
+      row: 2,
+      title: "Full-Stack Developer",
+      location: "Montreal",
+      gate_questions: [
+        'Is "Montreal" within commuting distance of Vancouver, BC, Burnaby, Surrey?',
+      ],
+    });
+    const out = await screen({
+      postings: [vancouver, citizens, montreal],
+      profile: {
+        locations: ["Vancouver, BC", "Seattle, WA"],
+        seniority: "mid",
+        years_experience: 4,
+        needs_sponsorship: true,
+      },
+    });
+    console.log(
+      JSON.stringify(
+        { filtered: out.filtered.map((f) => [f.posting.title, f.reason]), usage: out.usage },
+        null,
+        2,
+      ),
+    );
+    expect(out.kept.map((p) => p.title)).toEqual(["Backend Engineer"]);
+    expect(out.filtered.map((f) => [f.posting.title, f.gate])).toEqual([
+      ["Software Engineer", "sponsorship"],
+      ["Full-Stack Developer", "location"],
+    ]);
   });
 });

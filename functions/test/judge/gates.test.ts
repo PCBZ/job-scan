@@ -9,6 +9,30 @@ const modes = (profile: ProfileConfig, p = posting()) =>
   gatesFor(p, profile).map((g) => `${g.gate}:${g.mode}`);
 
 describe("gatesFor", () => {
+  it("asks each gate of Jev as a plain question, with the answer that fails it (#121)", () => {
+    const p = posting({
+      location: "Montreal",
+      gate_questions: ['Is "Montreal" within commuting distance of Vancouver, BC?'],
+    });
+    const gates = gatesFor(p, {
+      seniority: "mid",
+      exclude_keywords: ["unpaid"],
+      needs_sponsorship: "unknown",
+    });
+    expect(gates.map((g) => [g.gate, g.failsOn, g.failure])).toEqual([
+      ["sponsorship", "yes", "requires citizenship or a clearance, or won't sponsor a visa"],
+      ["seniority", "yes", 'seniority far from "mid"'],
+      ["keyword", "yes", "describes an excluded keyword"],
+      ["location", "no", "location doesn't fit: Montreal"],
+    ]);
+    expect(gates.map((g) => g.question)).toEqual([
+      "Does the posting require citizenship or a security clearance, or say it will not sponsor a work visa?",
+      'Is this role two or more steps away from "mid", in either direction, on the scale new-grad, junior, mid, senior, staff?',
+      'Does the posting describe any of these, even in other words: "unpaid"?',
+      'Is "Montreal" within commuting distance of Vancouver, BC?',
+    ]);
+  });
+
   it("asks nothing when every gate is off", () => {
     expect(gatesFor(posting(), { seniority: "all", needs_sponsorship: false })).toEqual([]);
   });
