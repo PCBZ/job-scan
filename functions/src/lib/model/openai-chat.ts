@@ -50,6 +50,9 @@ export class OpenAIChatClient implements ModelClient {
       usage: {
         input: completion.usage?.prompt_tokens ?? 0,
         output: completion.usage?.completion_tokens ?? 0,
+        ...(completion.usage?.prompt_tokens_details?.cached_tokens !== undefined
+          ? { cached: completion.usage.prompt_tokens_details.cached_tokens }
+          : {}),
       },
       served_by: this.label,
     };

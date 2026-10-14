@@ -27,6 +27,18 @@ export interface StructuredRequest<T> {
 export interface TokenUsage {
   input: number;
   output: number;
+  /**
+   * Of the input, tokens Azure served from its prompt cache (#115), billed at
+   * a tenth of the input price. Absent when the provider doesn't say.
+   */
+  cached?: number;
+}
+
+/** Two usages summed; cached is kept when either side reports it. */
+export function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
+  const sum = { input: a.input + b.input, output: a.output + b.output };
+  if (a.cached === undefined && b.cached === undefined) return sum;
+  return { ...sum, cached: (a.cached ?? 0) + (b.cached ?? 0) };
 }
 
 export interface StructuredResult<T> {

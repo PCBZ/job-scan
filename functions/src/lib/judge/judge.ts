@@ -4,7 +4,7 @@
 
 import type { ProfileConfig } from "../config/schema.js";
 import { isAppError } from "../errors.js";
-import type { ModelClient, RepairTurn, TokenUsage } from "../model/types.js";
+import { addUsage, type ModelClient, type RepairTurn, type TokenUsage } from "../model/types.js";
 import type { Posting } from "../postings/types.js";
 import type { ResumeVariant } from "../resume/load.js";
 import { mapWithLimit } from "../workflow/limit.js";
@@ -65,7 +65,7 @@ export function judgeStep(client: ModelClient, options: JudgeOptions = {}) {
     signal?: AbortSignal,
   ): Promise<LlmResult<Judgement[]>> => {
     const last = repairs.at(-1);
-    const usage: TokenUsage = { input: 0, output: 0 };
+    let usage: TokenUsage = { input: 0, output: 0 };
     const warnings: string[] = [];
 
     const judged = await mapWithLimit(postings, concurrency, async (posting) => {
@@ -83,8 +83,7 @@ export function judgeStep(client: ModelClient, options: JudgeOptions = {}) {
           repairs: historyOf(repairs, id),
           ...(signal ? { signal } : {}),
         });
-        usage.input += r.usage.input;
-        usage.output += r.usage.output;
+        usage = addUsage(usage, r.usage);
         return [{ posting, asked, answer: withoutUnstatedGaps(posting, r.value) }];
       } catch (err) {
         // One unusable answer costs that posting, not the run.
