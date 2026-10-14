@@ -9,15 +9,18 @@
 //   TABLES_URL          seenmessages, seenjobs
 //   GITHUB_RESUME_PAT   read access to the resume repo (#11, from Key Vault via #47)
 //   MODEL_*             the model client (#13)
+//   TYPESAFE_API_KEY    Jev, for the model gates (#61, #121; from Key Vault)
 //   <ACCOUNT>_USER / _PASSWORD, TELEGRAM_BOT_TOKEN  per config (#9, #20, #21)
 
 import type { TokenCredential } from "@azure/identity";
 import { blobConfigSource, loadConfig } from "../config/load.js";
+import { decisionClientFromEnv } from "../decision/config.js";
 import { type AppError, appError } from "../errors.js";
 import { explainStep } from "../explain/explain.js";
 import { verifyExplanations } from "../explain/verify.js";
 import { judgeStep } from "../judge/judge.js";
 import { rank } from "../judge/rank.js";
+import { screenStep } from "../judge/screen.js";
 import { verifyJudgements } from "../judge/verify.js";
 import { type ConnectMailbox, connectImap } from "../mail/mailbox.js";
 import { runFetch } from "../mail/run.js";
@@ -122,6 +125,8 @@ export function composePipeline(
 
   const modelSteps: ModelSteps = {
     extractPostings: extractStep(client),
+    // Without a TypeSafe key the gates go unscreened, and the report says so.
+    screen: screenStep(env.TYPESAFE_API_KEY?.trim() ? decisionClientFromEnv(env) : null),
     judge: judgeStep(client),
     explain: explainStep(client),
   };

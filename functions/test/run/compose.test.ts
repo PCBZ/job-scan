@@ -45,6 +45,7 @@ describe("composePipeline", () => {
       "explain",
       "extractPostings",
       "judge",
+      "screen",
     ]);
     expect(Object.keys(pipeline.effects).sort()).toEqual(["deliver", "markSeen"]);
   });

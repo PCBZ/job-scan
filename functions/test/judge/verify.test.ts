@@ -6,7 +6,7 @@ import {
   verifyJudgements,
 } from "../../src/lib/judge/verify.js";
 import type { ResumeSet } from "../../src/lib/resume/load.js";
-import { dimension, judgement } from "./helpers.js";
+import { dimension, JEV, judgement } from "./helpers.js";
 
 const RESUMES: ResumeSet = {
   variants: [
@@ -27,7 +27,7 @@ const gate = (fails: boolean, quote: string) => ({
   reason: "r",
   quote,
 });
-const ASKED = [{ gate: "sponsorship" as const, mode: "filter" as const, rule: "x" }];
+const ASKED = [{ gate: "sponsorship" as const, mode: "filter" as const, rule: "x", ...JEV }];
 
 describe("verifyJudgements", () => {
   it("passes a judgement whose quotes are real, ignoring case, spacing and edge punctuation", () => {
@@ -174,7 +174,7 @@ describe("verifyJudgements", () => {
   });
 
   it("accepts a gate quote from any field the model was shown, workplace and age included", () => {
-    const asked = [{ gate: "location" as const, mode: "filter" as const, rule: "x" }];
+    const asked = [{ gate: "location" as const, mode: "filter" as const, rule: "x", ...JEV }];
     const onsite = {
       gate: "location" as const,
       fails: true,

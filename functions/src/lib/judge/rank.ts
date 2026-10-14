@@ -101,9 +101,12 @@ export function rank(judged: Judgement[], config: AppConfig): RankResult {
       scores: Object.fromEntries(variants.map((v) => [v.name, v.raw])),
       caps: best.caps,
       confidence: best.caps.length ? "low" : j.answer.unknowns.length > 0 ? "medium" : "high",
-      noted: outcomes
-        .filter((g) => g.fails && g.mode === "note")
-        .map((g) => `${g.reason} ("${g.quote}")`),
+      noted: [
+        ...outcomes
+          .filter((g) => g.fails && g.mode === "note")
+          .map((g) => `Would have been filtered: ${g.reason} ("${g.quote}")`),
+        ...(j.posting.gate_notes ?? []),
+      ],
     });
   }
 

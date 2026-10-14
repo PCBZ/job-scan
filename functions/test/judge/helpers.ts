@@ -57,3 +57,6 @@ export const rankedOf = (j: Judgement, score = 80): Ranked => ({
   confidence: "high",
   noted: [],
 });
+
+/** The fields Jev reads on a gate (#121), for tests about the judge's side. */
+export const JEV = { question: "q?", failsOn: "yes", failure: "f" } as const;

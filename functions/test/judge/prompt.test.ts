@@ -3,6 +3,7 @@ import type { AskedGate } from "../../src/lib/judge/gates.js";
 import { judgeUser } from "../../src/lib/judge/prompt.js";
 import type { ResumeVariant } from "../../src/lib/resume/load.js";
 import { posting } from "../postings/helpers.js";
+import { JEV } from "./helpers.js";
 
 const RESUMES: ResumeVariant[] = [
   { path: "Backend.tex", name: "Backend", text: "Built payment services in Go\n".repeat(40) },
@@ -13,7 +14,9 @@ const PROFILE = {
   seniority: "mid" as const,
   needs_sponsorship: false,
 };
-const SENIORITY: AskedGate[] = [{ gate: "seniority", rule: "Not above mid level", mode: "filter" }];
+const SENIORITY: AskedGate[] = [
+  { gate: "seniority", rule: "Not above mid level", mode: "filter", ...JEV },
+];
 
 /** The length of the longest common prefix. */
 function sharedPrefix(a: string, b: string): number {
