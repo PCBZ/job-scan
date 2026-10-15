@@ -9,6 +9,25 @@ const modes = (profile: ProfileConfig, p = posting()) =>
   gatesFor(p, profile).map((g) => `${g.gate}:${g.mode}`);
 
 describe("gatesFor", () => {
+  it("asks whether the title is near a target role, failing on no (#137)", () => {
+    const [gate] = gatesFor(posting(), {
+      seniority: "all",
+      target_titles: ["Backend Engineer", " ", "Platform Engineer"],
+    });
+    expect(gate).toEqual({
+      gate: "title",
+      mode: "filter",
+      question:
+        'Is this role one of, or close to, the candidate\'s target roles: "Backend Engineer", "Platform Engineer"?',
+      failsOn: "no",
+      failure: "title far from your target roles",
+    });
+  });
+
+  it("skips the title gate without target roles", () => {
+    expect(gatesFor(posting(), { seniority: "all", target_titles: [] })).toEqual([]);
+  });
+
   it("asks each gate of Jev as a plain question, with the answer that fails it (#121)", () => {
     const p = posting({
       location: "Montreal",

@@ -10,7 +10,7 @@ import type { ReportInput } from "../workflow/types.js";
 import type { FilteredGroup, OtherPick, Report, TopPick } from "./types.js";
 
 /** The report lists location failures first, as SKILL.md asks. */
-const GATE_ORDER = ["location", "salary", "keyword", "sponsorship", "seniority"];
+const GATE_ORDER = ["location", "salary", "keyword", "sponsorship", "seniority", "title"];
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 

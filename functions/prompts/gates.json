@@ -4,5 +4,6 @@
   "keyword": "Does the posting describe any of these, even in other words: {{keywords}}?",
   "commute": "Is \"{{location}}\" within commuting distance of {{places}}?",
   "remote": "Is this remote role open to someone working from {{scopes}}?",
-  "unlocated": "Can this role be worked from {{places}}?"
+  "unlocated": "Can this role be worked from {{places}}?",
+  "title": "Is this role one of, or close to, the candidate's target roles: {{targets}}?"
 }
