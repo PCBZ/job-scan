@@ -41,6 +41,8 @@ module "function_app" {
     "EvalQueue__clientId"        = var.platform.app_client_id
     # evalReport reads each run's model-call latency from here (#130).
     "LOG_ANALYTICS_WORKSPACE_ID" = module.monitoring.workspace_id
+    # evalReport posts the post-deploy smoke test's outcome here (#134).
+    "EVAL_SMOKE_URL" = module.storage.queue_urls["eval-smoke"]
     # The release CD deployed, written into each run record.
     "APP_VERSION" = var.app_version
     # Jev, read by functions/src/lib/decision/config.ts. The model is pinned:

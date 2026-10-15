@@ -47,3 +47,28 @@ export function evalQueue(queue: Queue): EvalQueue {
 export function evalQueueFromUrl(queueUrl: string, credential: TokenCredential): EvalQueue {
   return evalQueue(new QueueClient(queueUrl, credential));
 }
+
+/** What evalReport says about a smoke test (#134), for CD to wait on. */
+export interface SmokeResult {
+  id: string;
+  ok: boolean;
+  /** The run record it reported on. */
+  record?: string;
+  subject?: string;
+  error?: string;
+}
+
+/** Sends smoke results to the eval-smoke queue, visible at once, as plain JSON. */
+export function smokeResults(queue: Queue): (result: SmokeResult) => Promise<void> {
+  return async (result) => {
+    await queue.sendMessage(JSON.stringify(result));
+  };
+}
+
+/** From EVAL_SMOKE_URL, the eval-smoke queue's endpoint. */
+export function smokeResultsFromUrl(
+  queueUrl: string,
+  credential: TokenCredential,
+): (result: SmokeResult) => Promise<void> {
+  return smokeResults(new QueueClient(queueUrl, credential));
+}

@@ -66,6 +66,8 @@ export interface RunMeta {
   started_at: string;
   /** When the workflow finished, before the record was written (#129). */
   ended_at: string;
+  /** The run's trace id, to find its telemetry again (#134); absent before. */
+  trace_id?: string;
   /** The deployed release (APP_VERSION), "local" outside CD. */
   version: string;
   /** Milliseconds per node, summed over its runs. */
@@ -224,6 +226,8 @@ export interface RunRecordReader {
    * that can't be read or has no run line is skipped, not fatal (#129).
    */
   earlier(name: string, count: number): Promise<RunStatsRecord[]>;
+  /** The newest run that kept its trace id, for the smoke test (#134); null if none. */
+  latest(): Promise<{ name: string; run: RunStatsRecord & { trace_id: string } } | null>;
 }
 
 type ReadableContainer = Pick<ContainerClient, "getBlockBlobClient" | "listBlobsFlat">;
@@ -237,23 +241,39 @@ const parseJsonl = (text: string): RunRecord[] =>
 export function runRecordReader(container: ReadableContainer): RunRecordReader {
   const read = async (name: string) =>
     parseJsonl((await container.getBlockBlobClient(name).downloadToBuffer()).toString("utf8"));
+  const names = async (before?: string) => {
+    const out: string[] = [];
+    for await (const blob of container.listBlobsFlat()) {
+      if (blob.name.endsWith(".jsonl") && (before === undefined || blob.name < before))
+        out.push(blob.name);
+    }
+    // Names are <day>/<started-at>-<suffix>.jsonl, so they sort by time.
+    return out.sort().reverse();
+  };
+  const runOf = async (name: string) => {
+    try {
+      return (await read(name)).find((r): r is RunStatsRecord => r.kind === "run") ?? null;
+    } catch {
+      // A record that won't parse costs its row in the trend, nothing more.
+      return null;
+    }
+  };
   return {
     read,
-    async earlier(name, count) {
-      // Names are <day>/<started-at>-<suffix>.jsonl, so they sort by time.
-      const names: string[] = [];
-      for await (const blob of container.listBlobsFlat()) {
-        if (blob.name.endsWith(".jsonl") && blob.name < name) names.push(blob.name);
+    async latest() {
+      // A few back at most: only records from before #134 lack the id.
+      for (const name of (await names()).slice(0, 10)) {
+        const run = await runOf(name);
+        if (run?.trace_id) return { name, run: run as RunStatsRecord & { trace_id: string } };
       }
+      return null;
+    },
+    async earlier(name, count) {
       const runs: RunStatsRecord[] = [];
-      for (const n of names.sort().reverse()) {
+      for (const n of await names(name)) {
         if (runs.length >= count) break;
-        try {
-          const run = (await read(n)).find((r): r is RunStatsRecord => r.kind === "run");
-          if (run) runs.push(run);
-        } catch {
-          // A record that won't parse costs its row in the trend, nothing more.
-        }
+        const run = await runOf(n);
+        if (run) runs.push(run);
       }
       return runs;
     },

@@ -95,6 +95,7 @@ export async function runDaily(
       const records = runRecords(state, {
         started_at: startedAt.toISOString(),
         ended_at: new Date().toISOString(),
+        trace_id: traceId,
         version: pipeline.version,
         node_ms: nodeMs,
         throttled_ms: summary.throttledMs,

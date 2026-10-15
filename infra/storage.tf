@@ -20,6 +20,7 @@ module "storage" {
 
   queues = [
     "eval-reports", # one message per run, for its evaluation report (#127)
+    "eval-smoke",   # the post-deploy smoke test's outcome, for CD (#134)
   ]
 
   tables = [
