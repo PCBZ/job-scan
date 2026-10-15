@@ -19,6 +19,12 @@ resource "azurerm_storage_container" "this" {
   container_access_type = "private"
 }
 
+resource "azurerm_storage_queue" "this" {
+  for_each           = var.queues
+  name               = each.key
+  storage_account_id = azurerm_storage_account.this.id
+}
+
 resource "azurerm_storage_table" "this" {
   for_each           = var.tables
   name               = each.key

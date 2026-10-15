@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { runDaily } from "../../src/lib/run/daily.js";
+import type { EvalMessage, EvalQueue } from "../../src/lib/run/eval-queue.js";
 import type { RunRecord, RunRecordStore } from "../../src/lib/run/records.js";
 import { fakes } from "../workflow/fakes.js";
 
@@ -22,7 +23,9 @@ describe("runDaily", () => {
     expect(summary.usage.judge).toEqual({ input: 10, output: 2 });
     expect(r.lines).toContainEqual(expect.stringMatching(/^node judge ok \d+ms tokens 10\/2$/));
     expect(r.lines.some((l) => l.startsWith("node mark_seen ok"))).toBe(true);
-    expect(r.lines.at(-2)).toMatch(/^daily: done \{"outcome":"report","top":1,"warnings":0,/);
+    expect(r.lines.find((l) => l.startsWith("daily: done "))).toMatch(
+      /^daily: done \{"outcome":"report","top":1,"warnings":0,/,
+    );
   });
 
   it("reports how long model calls waited for the TPM budget", async () => {
@@ -74,6 +77,76 @@ describe("runDaily", () => {
     expect(f.log).not.toContain("deliver");
   });
 
+  describe("evaluation report (#128)", () => {
+    function queue(fail = false) {
+      const sent: { message: EvalMessage; delaySeconds: number }[] = [];
+      const evalQueue: EvalQueue = {
+        async send(message, delaySeconds) {
+          if (fail) throw new Error("queue 403");
+          sent.push({ message, delaySeconds });
+        },
+      };
+      return { evalQueue, sent };
+    }
+    const written: RunRecordStore = { write: async () => "2026-10-15/run.jsonl" };
+
+    it("queues the report once the run record is written, naming it and the run's trace", async () => {
+      const q = queue();
+      const r = recorder();
+      await runDaily({ ...fakes(), records: written, ...q }, r.log);
+      expect(q.sent).toEqual([
+        {
+          message: {
+            record: "2026-10-15/run.jsonl",
+            traceId: expect.stringMatching(/^[0-9a-f]{32}$/),
+            startedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
+          },
+          // 15 minutes unless config.toml says otherwise.
+          delaySeconds: 900,
+        },
+      ]);
+      expect(r.lines.at(-1)).toBe("daily: evaluation report queued for 2026-10-15/run.jsonl");
+    });
+
+    it("waits as long as config.toml's report.evaluation_delay_minutes says", async () => {
+      const q = queue();
+      const f = fakes();
+      const loadConfig = f.deterministicSteps.loadConfig;
+      f.deterministicSteps.loadConfig = async () => {
+        const config = await loadConfig();
+        return { ...config, report: { ...config.report, evaluation_delay_minutes: 5 } };
+      };
+      await runDaily({ ...f, records: written, ...q }, recorder().log);
+      expect(q.sent[0]?.delaySeconds).toBe(300);
+    });
+
+    it("logs a failed enqueue without failing the run", async () => {
+      const r = recorder();
+      const summary = await runDaily({ ...fakes(), records: written, ...queue(true) }, r.log);
+      expect(summary.outcome).toBe("report");
+      expect(r.errors).toEqual(["daily: evaluation report not queued: Error: queue 403"]);
+    });
+
+    it("queues nothing when the run record wasn't written: the report reads it", async () => {
+      const q = queue();
+      const failing: RunRecordStore = {
+        write: async () => {
+          throw new Error("blob 403");
+        },
+      };
+      await runDaily({ ...fakes(), records: failing, ...q }, recorder().log);
+      expect(q.sent).toEqual([]);
+    });
+
+    it("queues nothing for a failed run", async () => {
+      const q = queue();
+      await expect(
+        runDaily({ ...fakes({ deliverFails: true }), records: written, ...q }, recorder().log),
+      ).rejects.toThrow();
+      expect(q.sent).toEqual([]);
+    });
+  });
+
   describe("run records", () => {
     function store(fail = false) {
       const writes: { records: RunRecord[]; startedAt: Date }[] = [];
@@ -103,7 +176,7 @@ describe("runDaily", () => {
       const run = records.at(-1);
       expect(run).toMatchObject({ kind: "run", version: "v0.1.6", throttled_ms: 7, top: 1 });
       expect(run && "node_ms" in run && Object.keys(run.node_ms)).toContain("judge");
-      expect(r.lines.at(-1)).toBe("daily: run records 2026-10-13/run.jsonl (5)");
+      expect(r.lines).toContain("daily: run records 2026-10-13/run.jsonl (5)");
     });
 
     it("logs a failed write without failing the run: the report is already out", async () => {

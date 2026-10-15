@@ -62,6 +62,9 @@ const report = z.strictObject({
   // The Telegram chat the daily summary goes to (#21); unset sends none. Not a
   // secret: a bot can only message chats that have started it.
   telegram_chat_id: z.union([z.string().min(1), z.number().int()]).optional(),
+  // How long after the run its evaluation email waits (#127), so the run's
+  // telemetry is in Application Insights first. Default 15.
+  evaluation_delay_minutes: z.number().int().min(1).max(60).optional(),
 });
 
 // `lib` is a path on the operator's machine, used only by the local skill. The

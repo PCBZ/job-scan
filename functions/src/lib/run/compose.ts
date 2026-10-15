@@ -5,6 +5,7 @@
 //   RESUME_CACHE_URL    extracted resume texts (#12)
 //   REPORTS_URL         the private reports container (#19)
 //   RUN_RECORDS_URL     the private run-records container (#97)
+//   EVAL_QUEUE_URL      the eval-reports queue, for the evaluation report (#128)
 //   APP_VERSION         the deployed release, for the run records; "local" if unset
 //   TABLES_URL          seenmessages, seenjobs
 //   GITHUB_RESUME_PAT   read access to the resume repo (#11, from Key Vault via #47)
@@ -38,6 +39,7 @@ import { loadResumes } from "../resume/load.js";
 import { blobTextStore } from "../resume/store.js";
 import type { DeterministicSteps, Effects, ModelSteps } from "../workflow/types.js";
 import { productionEffects } from "./effects.js";
+import { type EvalQueue, evalQueueFromUrl } from "./eval-queue.js";
 import { type RunRecordStore, runRecordStoreFromUrl } from "./records.js";
 
 type Env = Record<string, string | undefined>;
@@ -48,6 +50,7 @@ const REQUIRED = [
   "RESUME_CACHE_URL",
   "REPORTS_URL",
   "RUN_RECORDS_URL",
+  "EVAL_QUEUE_URL",
   "TABLES_URL",
   "GITHUB_RESUME_PAT",
 ] as const;
@@ -71,6 +74,8 @@ export interface Pipeline {
   rateLimited?: () => number;
   /** Where the run's records go (#97). */
   records: RunRecordStore;
+  /** Where the run's evaluation report is queued (#128). */
+  evalQueue: EvalQueue;
   /** The deployed release, for the run records. */
   version: string;
 }
@@ -147,6 +152,7 @@ export function composePipeline(
     throttledMs: () => throttledMs,
     rateLimited: () => rateLimited,
     records: runRecordStoreFromUrl(setting("RUN_RECORDS_URL"), credential),
+    evalQueue: evalQueueFromUrl(setting("EVAL_QUEUE_URL"), credential),
     version: env.APP_VERSION?.trim() || "local",
   };
 }

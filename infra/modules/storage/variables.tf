@@ -16,6 +16,12 @@ variable "containers" {
   type        = set(string)
 }
 
+variable "queues" {
+  description = "Queue names."
+  type        = set(string)
+  default     = []
+}
+
 variable "tables" {
   description = "Table names."
   type        = set(string)

@@ -10,6 +10,7 @@ import { buildWorkflow, type State } from "../workflow/graph.js";
 import type { Loop } from "../workflow/state.js";
 import type { NodeEvent } from "../workflow/types.js";
 import type { Pipeline } from "./compose.js";
+import { EVALUATION_DELAY_MINUTES } from "./eval-queue.js";
 import { loopRecord, runRecords } from "./records.js";
 
 /** Under host.json's functionTimeout of 30 minutes, so the run stops cleanly first. */
@@ -72,7 +73,12 @@ export async function runDaily(
   );
   try {
     // One span over the whole graph; the nodes' spans nest under it (#101).
-    const state = await inSpan("daily run", {}, () => workflow.invoke({}, { signal }));
+    // Its trace id finds the run's telemetry for the evaluation report (#128).
+    let traceId = "";
+    const state = await inSpan("daily run", {}, (span) => {
+      traceId = span.spanContext().traceId;
+      return workflow.invoke({}, { signal });
+    });
     const summary: RunSummary = {
       outcome: state.outcome,
       top: state.top.length,
@@ -95,6 +101,16 @@ export async function runDaily(
       });
       const name = await pipeline.records.write(records, startedAt);
       log.log(`daily: run records ${name} (${records.length})`);
+      // The evaluation report reads this record, so it's queued only once written (#128).
+      try {
+        await pipeline.evalQueue.send(
+          { record: name, traceId, startedAt: startedAt.toISOString() },
+          (state.config?.report.evaluation_delay_minutes ?? EVALUATION_DELAY_MINUTES) * 60,
+        );
+        log.log(`daily: evaluation report queued for ${name}`);
+      } catch (err) {
+        log.error(`daily: evaluation report not queued: ${errorText(err)}`);
+      }
     } catch (err) {
       log.error(`daily: run records not written: ${errorText(err)}`);
     }
