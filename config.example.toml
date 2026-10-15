@@ -176,6 +176,10 @@ suggest_variant = true      # name the best-fitting resume variant per posting
 # email_account = "personal"
 # email_to = "me@example.com"
 
+# After each cloud run, an evaluation email (#127) follows, once the run's
+# telemetry is in Application Insights. It waits this many minutes (1-60).
+# evaluation_delay_minutes = 15
+
 # The cloud run also sends a short Telegram summary with Approve / Skip buttons
 # to this chat. The bot token stays out of this file (Key Vault in Azure,
 # TELEGRAM_BOT_TOKEN locally). Find the id with `npm run telegram:chat-id`

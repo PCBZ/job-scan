@@ -81,7 +81,7 @@ describe("tracing", () => {
   });
 
   it("names the run's trace in its evaluation report message (#128)", async () => {
-    const sent: { traceId?: string }[] = [];
+    const sent: { traceId: string }[] = [];
     await runDaily({ ...fakes(), evalQueue: { send: async (m) => void sent.push(m) } }, quiet);
     expect(sent[0]?.traceId).toBe(named("daily run")?.spanContext().traceId);
     expect(sent[0]?.traceId).toMatch(/^[0-9a-f]{32}$/);

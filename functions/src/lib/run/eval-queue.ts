@@ -10,32 +10,33 @@ import { QueueClient } from "@azure/storage-queue";
 export interface EvalMessage {
   /** The run record's blob name in run-records. */
   record: string;
-  /** The run's trace id, to find its spans in Application Insights; absent untraced. */
-  traceId?: string;
+  /** The run's trace id, to find its spans in Application Insights. */
+  traceId: string;
   startedAt: string;
 }
 
 /**
- * Seconds a message stays hidden: long enough for Application Insights to
- * ingest the run's telemetry before the report looks for it.
+ * How long a message stays hidden unless config.toml's
+ * report.evaluation_delay_minutes says otherwise: long enough for Application
+ * Insights to ingest the run's telemetry before the report looks for it.
  */
-export const REPORT_DELAY_SECONDS = 15 * 60;
+export const EVALUATION_DELAY_MINUTES = 15;
 
 export interface EvalQueue {
-  send(message: EvalMessage): Promise<void>;
+  /** Queue the message, hidden for `delaySeconds`. */
+  send(message: EvalMessage, delaySeconds: number): Promise<void>;
 }
 
 type Queue = Pick<QueueClient, "sendMessage">;
 
 /**
- * Messages are base64-encoded JSON: the Functions queue trigger decodes
- * base64 by default.
+ * Messages are plain JSON, readable in the portal; host.json sets the queue
+ * trigger's messageEncoding to "none" to match.
  */
-export function evalQueue(queue: Queue, delaySeconds = REPORT_DELAY_SECONDS): EvalQueue {
+export function evalQueue(queue: Queue): EvalQueue {
   return {
-    async send(message) {
-      const text = Buffer.from(JSON.stringify(message), "utf8").toString("base64");
-      await queue.sendMessage(text, { visibilityTimeout: delaySeconds });
+    async send(message, delaySeconds) {
+      await queue.sendMessage(JSON.stringify(message), { visibilityTimeout: delaySeconds });
     },
   };
 }

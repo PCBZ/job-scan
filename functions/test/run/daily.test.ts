@@ -79,25 +79,45 @@ describe("runDaily", () => {
 
   describe("evaluation report (#128)", () => {
     function queue(fail = false) {
-      const sent: EvalMessage[] = [];
+      const sent: { message: EvalMessage; delaySeconds: number }[] = [];
       const evalQueue: EvalQueue = {
-        async send(m) {
+        async send(message, delaySeconds) {
           if (fail) throw new Error("queue 403");
-          sent.push(m);
+          sent.push({ message, delaySeconds });
         },
       };
       return { evalQueue, sent };
     }
     const written: RunRecordStore = { write: async () => "2026-10-15/run.jsonl" };
 
-    it("queues the report once the run record is written, naming it", async () => {
+    it("queues the report once the run record is written, naming it and the run's trace", async () => {
       const q = queue();
       const r = recorder();
       await runDaily({ ...fakes(), records: written, ...q }, r.log);
       expect(q.sent).toEqual([
-        { record: "2026-10-15/run.jsonl", startedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
+        {
+          message: {
+            record: "2026-10-15/run.jsonl",
+            traceId: expect.stringMatching(/^[0-9a-f]{32}$/),
+            startedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
+          },
+          // 15 minutes unless config.toml says otherwise.
+          delaySeconds: 900,
+        },
       ]);
       expect(r.lines.at(-1)).toBe("daily: evaluation report queued for 2026-10-15/run.jsonl");
+    });
+
+    it("waits as long as config.toml's report.evaluation_delay_minutes says", async () => {
+      const q = queue();
+      const f = fakes();
+      const loadConfig = f.deterministicSteps.loadConfig;
+      f.deterministicSteps.loadConfig = async () => {
+        const config = await loadConfig();
+        return { ...config, report: { ...config.report, evaluation_delay_minutes: 5 } };
+      };
+      await runDaily({ ...f, records: written, ...q }, recorder().log);
+      expect(q.sent[0]?.delaySeconds).toBe(300);
     });
 
     it("logs a failed enqueue without failing the run", async () => {
