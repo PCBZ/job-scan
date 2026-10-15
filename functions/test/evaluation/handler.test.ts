@@ -30,6 +30,7 @@ describe("evalReportHandler", () => {
         transport: () => ({ sendMail: async () => ({}) }) as never,
         latency: async () => null,
         requeue: async () => {},
+        sent: { claim: async () => true, release: async () => {} },
       };
     };
     await evalReportHandler(make)(MESSAGE, new InvocationContext(), credential);

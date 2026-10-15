@@ -17,7 +17,16 @@ export interface Latency extends CallTimes {
   byNode: (CallTimes & { node: string })[];
 }
 
-export type LatencySource = (traceId: string, startedAt: Date) => Promise<Latency | null>;
+/**
+ * `expectCalls` says whether the run made model calls, from its record. Then
+ * a trace with no calls yet isn't complete: Azure ingests spans in no set
+ * order, so the run's span can arrive before its calls'.
+ */
+export type LatencySource = (
+  traceId: string,
+  startedAt: Date,
+  expectCalls: boolean,
+) => Promise<Latency | null>;
 
 type Logs = Pick<LogsQueryClient, "queryWorkspace">;
 
@@ -44,7 +53,7 @@ function rowsOf(table: LogsTable | undefined): Record<string, unknown>[] {
 const num = (v: unknown) => Math.round(Number(v ?? 0));
 
 export function latencyFromLogs(logs: Logs, workspaceId: string): LatencySource {
-  return async (traceId, startedAt) => {
+  return async (traceId, startedAt, expectCalls) => {
     if (!TRACE_ID.test(traceId)) throw new Error(`not a trace id: ${traceId}`);
     // From just before the run to now: the spans are in it whenever they land.
     const timespan = { startTime: new Date(startedAt.getTime() - 5 * 60_000), endTime: new Date() };
@@ -58,6 +67,7 @@ export function latencyFromLogs(logs: Logs, workspaceId: string): LatencySource 
 calls | summarize ${TIMES}, failed = countif(Success == false)
 | extend runs = toscalar(deps | where Name == "daily run" | count)`);
     if (!total || num(total.runs) === 0) return null;
+    if (expectCalls && num(total.calls) === 0) return null;
     const byNode = await query(`${spans(traceId)}
 calls | summarize ${TIMES} by Node | order by calls desc`);
 

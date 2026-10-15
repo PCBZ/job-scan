@@ -5,16 +5,18 @@
 //
 // It waits for all its data (#130): until the run's trace is in Application
 // Insights, the message goes back on the queue, a few times, before the email
-// goes out without the latency.
+// goes out without the latency. A mark beside the run record lets only one
+// message per run send, whatever the queue redelivers.
 
 import type { Transporter } from "nodemailer";
 import { z } from "zod";
 import type { AppConfig } from "../config/load.js";
 import { type EmailSettings, emailEvaluation, emailSettings } from "../delivery/email.js";
 import type { EvalMessage } from "../run/eval-queue.js";
-import type { RunRecordReader } from "../run/records.js";
+import type { RunRecordReader, RunStatsRecord, SentMarks } from "../run/records.js";
 import { evaluate } from "./evaluate.js";
 import type { Latency, LatencySource } from "./latency.js";
+import { JEV_NODES } from "./prices.js";
 
 /** The runs before this one that the trend shows. */
 export const TREND_RUNS = 6;
@@ -39,6 +41,7 @@ export interface EvalReportDeps {
   latency: LatencySource;
   /** Puts the message back on the queue, hidden for `delaySeconds`. */
   requeue: (message: EvalMessage, delaySeconds: number) => Promise<void>;
+  sent: SentMarks;
 }
 
 export interface EvalReportLog {
@@ -61,10 +64,17 @@ export async function runEvalReport(
     log.log(`evalReport: no report.email_account, so no evaluation email for ${m.record}`);
     return;
   }
+  const records = await d.records.read(m.record);
+  // The run made model calls if an Azure node used tokens: then its trace
+  // isn't complete without them.
+  const run = records.find((r): r is RunStatsRecord => r.kind === "run");
+  const expectCalls = Object.entries(run?.usage ?? {}).some(
+    ([node, u]) => !JEV_NODES.has(node) && u.input > 0,
+  );
   let latency: Latency | null = null;
   let why = "not in Application Insights yet";
   try {
-    latency = await d.latency(m.traceId, new Date(m.startedAt));
+    latency = await d.latency(m.traceId, new Date(m.startedAt), expectCalls);
   } catch (err) {
     why = err instanceof Error ? err.message : String(err);
   }
@@ -75,11 +85,17 @@ export async function runEvalReport(
     );
     return;
   }
-  const evaluation = evaluate(
-    await d.records.read(m.record),
-    await d.records.earlier(m.record, TREND_RUNS),
-    latency,
-  );
-  await emailEvaluation(d.transport(settings), settings, evaluation);
+  const evaluation = evaluate(records, await d.records.earlier(m.record, TREND_RUNS), latency);
+  // At most one email per run: a second message for it stops here.
+  if (!(await d.sent.claim(m.record))) {
+    log.log(`evalReport: ${m.record} already has its evaluation email`);
+    return;
+  }
+  try {
+    await emailEvaluation(d.transport(settings), settings, evaluation);
+  } catch (err) {
+    await d.sent.release(m.record);
+    throw err;
+  }
   log.log(`evalReport: sent for ${m.record} (≈ $${evaluation.usd.toFixed(2)})`);
 }

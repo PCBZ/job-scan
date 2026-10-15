@@ -8,7 +8,7 @@ import { gmailTransport } from "../lib/delivery/email.js";
 import { latencyFromWorkspace } from "../lib/eval/latency.js";
 import { type EvalReportDeps, runEvalReport } from "../lib/eval/report.js";
 import { evalQueueFromUrl } from "../lib/run/eval-queue.js";
-import { runRecordReaderFromUrl } from "../lib/run/records.js";
+import { runRecordReaderFromUrl, sentMarksFromUrl } from "../lib/run/records.js";
 import { loadSecrets, secretClientFromEnv } from "../lib/run/secrets.js";
 
 type Env = Record<string, string | undefined>;
@@ -32,6 +32,7 @@ export function productionDeps(env: Env, credential: TokenCredential): EvalRepor
     latency: latencyFromWorkspace(settings.LOG_ANALYTICS_WORKSPACE_ID, credential),
     requeue: (message, delaySeconds) =>
       evalQueueFromUrl(settings.EVAL_QUEUE_URL, credential).send(message, delaySeconds),
+    sent: sentMarksFromUrl(settings.RUN_RECORDS_URL, credential),
   };
 }
 

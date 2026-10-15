@@ -45,7 +45,7 @@ describe("latencyFromLogs", () => {
         ],
       },
     );
-    const latency = await latencyFromLogs(logs, "ws")(TRACE, STARTED);
+    const latency = await latencyFromLogs(logs, "ws")(TRACE, STARTED, true);
     expect(latency).toEqual({
       calls: 220,
       p50Ms: 3477,
@@ -63,16 +63,30 @@ describe("latencyFromLogs", () => {
 
   it("is null while the run's trace isn't in yet", async () => {
     const { logs, queries } = fakeLogs({ columns: ["calls", "runs"], rows: [[0, 0]] });
-    expect(await latencyFromLogs(logs, "ws")(TRACE, STARTED)).toBeNull();
+    expect(await latencyFromLogs(logs, "ws")(TRACE, STARTED, true)).toBeNull();
     expect(queries).toHaveLength(1);
   });
 
+  it("keeps waiting while a run that made model calls shows none yet", async () => {
+    const zero = {
+      columns: ["calls", "p50Ms", "p95Ms", "slowestMs", "failed", "runs"],
+      rows: [[0, 0, 0, 0, 0, 1]],
+    };
+    expect(await latencyFromLogs(fakeLogs(zero).logs, "ws")(TRACE, STARTED, true)).toBeNull();
+    // A run that made none (no mail) is complete with none.
+    const none = await latencyFromLogs(
+      fakeLogs(zero, { columns: ["Node", "calls"], rows: [] }).logs,
+      "ws",
+    )(TRACE, STARTED, false);
+    expect(none).toMatchObject({ calls: 0, byNode: [] });
+  });
+
   it("throws on a failed query, and never queries with something that isn't a trace id", async () => {
-    await expect(latencyFromLogs(fakeLogs(["fail"]).logs, "ws")(TRACE, STARTED)).rejects.toThrow(
-      "query timed out",
-    );
+    await expect(
+      latencyFromLogs(fakeLogs(["fail"]).logs, "ws")(TRACE, STARTED, true),
+    ).rejects.toThrow("query timed out");
     const { logs, queries } = fakeLogs();
-    await expect(latencyFromLogs(logs, "ws")('" | drop', STARTED)).rejects.toThrow(
+    await expect(latencyFromLogs(logs, "ws")('" | drop', STARTED, true)).rejects.toThrow(
       "not a trace id",
     );
     expect(queries).toEqual([]);
