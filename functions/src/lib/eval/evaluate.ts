@@ -5,6 +5,7 @@ import { runDay } from "../day.js";
 import type { TokenUsage } from "../model/types.js";
 import type { FilteredRecord, PickRecord, RunRecord, RunStatsRecord } from "../run/records.js";
 import type { Loop } from "../workflow/state.js";
+import type { Latency } from "./latency.js";
 import { AZURE, costOf, JEV, JEV_NODES } from "./prices.js";
 
 /** Tokens and their estimated cost, in USD. */
@@ -55,6 +56,8 @@ export interface Evaluation {
   runMs: number | null;
   throttledMs: number;
   rateLimited: number;
+  /** Model-call times from the run's trace; null when it never came in (#130). */
+  latency: Latency | null;
   quality: Record<Loop, { repairs: number; firstPass: number; unresolved: number }>;
   screen: {
     filtered: ScreenedOut[];
@@ -108,7 +111,11 @@ function trendRow(run: RunStatsRecord): TrendRow {
  * The evaluation of one run. `records` are the run's own; `earlier` are the
  * run lines of the runs before it, any order.
  */
-export function evaluate(records: RunRecord[], earlier: RunStatsRecord[]): Evaluation {
+export function evaluate(
+  records: RunRecord[],
+  earlier: RunStatsRecord[],
+  latency: Latency | null = null,
+): Evaluation {
   const run = records.find((r): r is RunStatsRecord => r.kind === "run");
   if (!run) throw new Error("the run record has no run line");
   const filtered = records.filter((r): r is FilteredRecord => r.kind === "filtered");
@@ -163,6 +170,7 @@ export function evaluate(records: RunRecord[], earlier: RunStatsRecord[]): Evalu
     runMs: Number.isNaN(ended) ? null : ended - Date.parse(run.started_at),
     throttledMs: run.throttled_ms,
     rateLimited: run.rate_limited ?? 0,
+    latency,
     quality: Object.fromEntries(
       LOOPS.map((l) => [
         l,

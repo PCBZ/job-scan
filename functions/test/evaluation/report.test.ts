@@ -1,8 +1,9 @@
 import type { ContainerClient } from "@azure/storage-blob";
+import { RestError } from "@azure/storage-blob";
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../../src/lib/config/load.js";
 import { runEvalReport } from "../../src/lib/eval/report.js";
-import { type RunRecord, runRecordReader, toJsonl } from "../../src/lib/run/records.js";
+import { type RunRecord, runRecordReader, sentMarks, toJsonl } from "../../src/lib/run/records.js";
 import { records, runLine } from "./records.js";
 
 const NAME = "2026-10-15/2026-10-15T15:00:00.000Z-aaaa0000.jsonl";
@@ -44,9 +45,53 @@ const CONFIG = {
 } as unknown as AppConfig;
 const ENV = { GMAIL_USER: "sender@example.test", GMAIL_PASSWORD: "app-password" };
 
-function harness(blobs: Record<string, string>, config: AppConfig = CONFIG) {
+const LATENCY = {
+  calls: 220,
+  p50Ms: 3477,
+  p95Ms: 6436,
+  slowestMs: 9491,
+  failed: 0,
+  byNode: [{ node: "judge", calls: 179, p50Ms: 3591, p95Ms: 6849, slowestMs: 9491 }],
+};
+
+/** The blob calls sentMarks makes, a conditional create and a delete, over `marks`. */
+function fakeMarks(marks: Set<string>) {
+  return {
+    getBlockBlobClient: (name: string) => ({
+      upload: async (
+        _body: string,
+        _length: number,
+        o: { conditions?: { ifNoneMatch?: string } },
+      ) => {
+        if (o.conditions?.ifNoneMatch === "*" && marks.has(name))
+          throw new RestError("BlobAlreadyExists", { statusCode: 409 });
+        marks.add(name);
+        return {};
+      },
+      deleteIfExists: async () => {
+        marks.delete(name);
+        return {};
+      },
+    }),
+  } as unknown as ContainerClient;
+}
+
+type Source = (
+  traceId: string,
+  startedAt: Date,
+  expectCalls: boolean,
+) => Promise<typeof LATENCY | null>;
+
+function harness(
+  blobs: Record<string, string>,
+  config: AppConfig = CONFIG,
+  latency: Source = async () => LATENCY,
+  o: { marks?: Set<string>; failSend?: boolean } = {},
+) {
+  const marks = o.marks ?? new Set<string>();
   const sent: { to: string; subject: string; html: string; text: string }[] = [];
   const lines: string[] = [];
+  const requeued: { message: unknown; delaySeconds: number }[] = [];
   const run = (message: unknown) =>
     runEvalReport(
       message,
@@ -54,9 +99,15 @@ function harness(blobs: Record<string, string>, config: AppConfig = CONFIG) {
         env: ENV,
         config: async () => config,
         records: runRecordReader(fakeContainer(blobs)),
+        latency,
+        sent: sentMarks(fakeMarks(marks)),
+        requeue: async (message, delaySeconds) => {
+          requeued.push({ message, delaySeconds });
+        },
         transport: () =>
           ({
             sendMail: async (m: { to: string; subject: string; html: string; text: string }) => {
+              if (o.failSend) throw new Error("smtp down");
               sent.push(m);
               return {};
             },
@@ -64,7 +115,7 @@ function harness(blobs: Record<string, string>, config: AppConfig = CONFIG) {
       },
       { log: (m) => lines.push(m) },
     );
-  return { run, sent, lines };
+  return { run, sent, lines, requeued, marks };
 }
 
 const day = (d: string, over = {}): [string, string] => [
@@ -121,6 +172,83 @@ describe("runEvalReport", () => {
     expect(h.lines.at(-1)).toBe(
       `evalReport: no report.email_account, so no evaluation email for ${NAME}`,
     );
+  });
+});
+
+describe("waiting for the run's trace (#130)", () => {
+  it("puts the message back, hidden 10 minutes, while the trace isn't in", async () => {
+    const h = harness({ [NAME]: toJsonl(records()) }, CONFIG, async () => null);
+    await h.run(MESSAGE);
+    expect(h.sent).toEqual([]);
+    expect(h.requeued).toEqual([{ message: { ...MESSAGE, waited: 1 }, delaySeconds: 600 }]);
+    expect(h.lines.at(-1)).toBe(
+      `evalReport: the run's latency is not in Application Insights yet; waiting for ${NAME} (1/5)`,
+    );
+  });
+
+  it("waits the same way when the query fails", async () => {
+    const h = harness({ [NAME]: toJsonl(records()) }, CONFIG, async () => {
+      throw new Error("latency query: timed out");
+    });
+    await h.run({ ...MESSAGE, waited: 2 });
+    expect(h.requeued[0]?.message).toMatchObject({ waited: 3 });
+    expect(h.lines.at(-1)).toContain("latency is latency query: timed out");
+  });
+
+  it("sends without the latency once it has waited five times, and says so", async () => {
+    const h = harness({ [NAME]: toJsonl(records()) }, CONFIG, async () => null);
+    await h.run({ ...MESSAGE, waited: 5 });
+    expect(h.requeued).toEqual([]);
+    expect(h.sent[0]?.text).toContain("Model-call latency missing");
+  });
+
+  it("puts the latency in the email, per node", async () => {
+    const h = harness({ [NAME]: toJsonl(records()) });
+    await h.run(MESSAGE);
+    expect(h.sent[0]?.text).toContain(
+      "220 model calls · p50 3.5s · p95 6.4s · slowest 9.5s · 0 failed",
+    );
+    expect(h.sent[0]?.text).toContain("judge | 179 | 3.6s | 6.8s | 9.5s");
+    expect(h.sent[0]?.html).toContain("p50 3.5s");
+  });
+});
+
+describe("one evaluation email per run (#130)", () => {
+  it("sends once for two messages about the same run", async () => {
+    const marks = new Set<string>();
+    const blobs = { [NAME]: toJsonl(records()) };
+    const first = harness(blobs, CONFIG, undefined, { marks });
+    const second = harness(blobs, CONFIG, undefined, { marks });
+    await first.run(MESSAGE);
+    await second.run(MESSAGE);
+    expect(first.sent).toHaveLength(1);
+    expect(second.sent).toEqual([]);
+    expect(second.lines.at(-1)).toBe(`evalReport: ${NAME} already has its evaluation email`);
+    expect([...marks]).toEqual([`${NAME}.sent`]);
+  });
+
+  it("gives the mark back when sending fails, so the retry sends", async () => {
+    const marks = new Set<string>();
+    const blobs = { [NAME]: toJsonl(records()) };
+    await expect(
+      harness(blobs, CONFIG, undefined, { marks, failSend: true }).run(MESSAGE),
+    ).rejects.toThrow("smtp down");
+    expect(marks.size).toBe(0);
+    const retry = harness(blobs, CONFIG, undefined, { marks });
+    await retry.run(MESSAGE);
+    expect(retry.sent).toHaveLength(1);
+  });
+
+  it("tells the latency source whether the run made model calls", async () => {
+    const asked: boolean[] = [];
+    const spy: Source = async (_t, _s, expectCalls) => {
+      asked.push(expectCalls);
+      return LATENCY;
+    };
+    await harness({ [NAME]: toJsonl(records()) }, CONFIG, spy).run(MESSAGE);
+    // No mail that day: no node used any tokens.
+    await harness({ [NAME]: toJsonl(records({ usage: {} })) }, CONFIG, spy).run(MESSAGE);
+    expect(asked).toEqual([true, false]);
   });
 });
 

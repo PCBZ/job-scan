@@ -7,7 +7,7 @@
 
 import { randomBytes } from "node:crypto";
 import type { TokenCredential } from "@azure/identity";
-import { ContainerClient } from "@azure/storage-blob";
+import { ContainerClient, RestError } from "@azure/storage-blob";
 import { runDay } from "../day.js";
 import { postingId } from "../judge/verify.js";
 import type { FetchedMessage } from "../mail/types.js";
@@ -266,4 +266,42 @@ export function runRecordReaderFromUrl(
   credential: TokenCredential,
 ): RunRecordReader {
   return runRecordReader(new ContainerClient(containerUrl, credential));
+}
+
+/**
+ * One evaluation email per run (#130): a `<record>.sent` blob beside the run
+ * record, created only if absent, so of two messages for one run (a redelivery,
+ * a requeue racing its original) only the first sends. The reader lists only
+ * .jsonl blobs, and the lifecycle rule ages the marks out with the records.
+ */
+export interface SentMarks {
+  /** True if this caller now holds the run's mark; false if another does. */
+  claim(record: string): Promise<boolean>;
+  /** Gives the mark back after a failed send, so a retry can send. */
+  release(record: string): Promise<void>;
+}
+
+type MarkContainer = Pick<ContainerClient, "getBlockBlobClient">;
+
+export function sentMarks(container: MarkContainer): SentMarks {
+  const mark = (record: string) => container.getBlockBlobClient(`${record}.sent`);
+  return {
+    async claim(record) {
+      try {
+        await mark(record).upload("", 0, { conditions: { ifNoneMatch: "*" } });
+        return true;
+      } catch (err) {
+        if (err instanceof RestError && err.statusCode === 409) return false;
+        throw err;
+      }
+    },
+    async release(record) {
+      await mark(record).deleteIfExists();
+    },
+  };
+}
+
+/** From RUN_RECORDS_URL, the container's endpoint. */
+export function sentMarksFromUrl(containerUrl: string, credential: TokenCredential): SentMarks {
+  return sentMarks(new ContainerClient(containerUrl, credential));
 }

@@ -13,6 +13,8 @@ export interface EvalMessage {
   /** The run's trace id, to find its spans in Application Insights. */
   traceId: string;
   startedAt: string;
+  /** Times the report has already waited for the run's trace (#130). */
+  waited?: number;
 }
 
 /**

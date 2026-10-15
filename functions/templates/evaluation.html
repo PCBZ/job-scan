@@ -23,6 +23,13 @@
 
     <h2 style="margin: 16px 0 6px; font-size: 16px;">Time</h2>
     <p style="margin: 0;">{{time}}</p>
+    <p style="margin: 4px 0 0;">{{latency}}</p>
+    {{#hasLatency}}
+    <table role="presentation" style="border-collapse: collapse; width: 100%; margin-top: 6px;">
+      <tr style="color: #475467; text-align: left;"><th style="padding: 4px 8px 4px 0;">Node</th><th style="padding: 4px 8px; text-align: right;">Calls</th><th style="padding: 4px 8px; text-align: right;">p50</th><th style="padding: 4px 8px; text-align: right;">p95</th><th style="padding: 4px 0 4px 8px; text-align: right;">Slowest</th></tr>
+      {{#byNode}}<tr style="border-top: 1px solid #eaecf0;"><td style="padding: 4px 8px 4px 0;">{{node}}</td><td style="padding: 4px 8px; text-align: right;">{{calls}}</td><td style="padding: 4px 8px; text-align: right;">{{p50}}</td><td style="padding: 4px 8px; text-align: right;">{{p95}}</td><td style="padding: 4px 0 4px 8px; text-align: right;">{{slowest}}</td></tr>{{/byNode}}
+    </table>
+    {{/hasLatency}}
 
     <h2 style="margin: 16px 0 6px; font-size: 16px;">Quality</h2>
     <table role="presentation" style="border-collapse: collapse; width: 100%;">
