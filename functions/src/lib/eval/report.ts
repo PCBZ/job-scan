@@ -122,6 +122,16 @@ function madeModelCalls(records: RunRecord[]): boolean {
  * for CD, rather than back to this queue for retries and repeat emails.
  */
 async function runSmoke(id: string, d: EvalReportDeps, log: EvalReportLog): Promise<void> {
+  // Posting the outcome can fail too; it's logged, never thrown, and CD
+  // then times out pointing at these logs.
+  const post = async (result: SmokeResult) => {
+    try {
+      await d.smokeResult(result);
+    } catch (err) {
+      log.log(`evalReport: smoke ${id}: result not posted: ${errorText(err)}`);
+    }
+  };
+  let passed: SmokeResult;
   try {
     const settings = emailSettings(await d.config(), d.env);
     if (!settings) throw new Error("no report.email_account to send to");
@@ -142,11 +152,16 @@ async function runSmoke(id: string, d: EvalReportDeps, log: EvalReportLog): Prom
       evaluation,
       SMOKE_PREFIX,
     );
-    await d.smokeResult({ id, ok: true, record: latest.name, subject });
-    log.log(`evalReport: smoke ${id} passed on ${latest.name}`);
+    passed = { id, ok: true, record: latest.name, subject };
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
-    await d.smokeResult({ id, ok: false, error });
+    const error = errorText(err);
+    await post({ id, ok: false, error });
     log.log(`evalReport: smoke ${id} failed: ${error}`);
+    return;
   }
+  // Outside the try: once the email is out, a result that won't post isn't a failure.
+  await post(passed);
+  log.log(`evalReport: smoke ${id} passed on ${passed.record}`);
 }
+
+const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));

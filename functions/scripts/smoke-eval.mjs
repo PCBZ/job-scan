@@ -37,12 +37,20 @@ await reports.sendMessage(JSON.stringify({ smoke: true, id }));
 console.log(`smoke ${id}: queued; waiting up to ${WAIT_MS / 60_000} minutes for evalReport`);
 
 const deadline = Date.now() + WAIT_MS;
+let lastError = "";
 while (Date.now() < deadline) {
-  const { receivedMessageItems } = await results.receiveMessages({
-    numberOfMessages: 32,
-    visibilityTimeout: 30,
-  });
-  for (const item of receivedMessageItems) {
+  let items = [];
+  try {
+    ({ receivedMessageItems: items } = await results.receiveMessages({
+      numberOfMessages: 32,
+      visibilityTimeout: 30,
+    }));
+  } catch (err) {
+    // A transient queue or token error: try again until the deadline.
+    lastError = err instanceof Error ? err.message : String(err);
+    console.warn(`smoke ${id}: receive failed, retrying: ${lastError}`);
+  }
+  for (const item of items) {
     let result;
     try {
       result = JSON.parse(item.messageText);
@@ -61,6 +69,6 @@ while (Date.now() < deadline) {
   await new Promise((r) => setTimeout(r, POLL_MS));
 }
 summary(
-  `### Smoke test failed\n\nNo outcome from evalReport within ${WAIT_MS / 60_000} minutes. Check the function's logs in Application Insights, and eval-reports-poison.`,
+  `### Smoke test failed\n\nNo outcome from evalReport within ${WAIT_MS / 60_000} minutes. Check the function's logs in Application Insights, and eval-reports-poison.${lastError ? `\n\nLast receive error: ${lastError}` : ""}`,
 );
 process.exit(1);

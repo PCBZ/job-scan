@@ -292,6 +292,42 @@ describe("the post-deploy smoke test (#134)", () => {
     ]);
   });
 
+  it("never throws when the outcome won't post, so it isn't retried into another email", async () => {
+    const sent: string[] = [];
+    const lines: string[] = [];
+    const run = (failEmail: boolean) =>
+      runEvalReport(
+        { smoke: true, id: "run-4" },
+        {
+          env: ENV,
+          config: async () => CONFIG,
+          records: runRecordReader(fakeContainer(blobs)),
+          latency: async () => (failEmail ? null : LATENCY),
+          requeue: async () => {},
+          sent: sentMarks(fakeMarks(new Set())),
+          smokeResult: async () => {
+            throw new Error("queue 503");
+          },
+          transport: () =>
+            ({
+              sendMail: async (m: { subject: string }) => {
+                sent.push(m.subject);
+                return {};
+              },
+            }) as never,
+        },
+        { log: (m) => lines.push(m) },
+      );
+    // After the email is out: logged, still a pass, sent once.
+    await expect(run(false)).resolves.toBeUndefined();
+    expect(sent).toHaveLength(1);
+    expect(lines).toContain("evalReport: smoke run-4: result not posted: queue 503");
+    expect(lines.at(-1)).toMatch(/^evalReport: smoke run-4 passed on /);
+    // Reporting a failure: logged too, never thrown.
+    await expect(run(true)).resolves.toBeUndefined();
+    expect(sent).toHaveLength(1);
+  });
+
   it("fails when no run kept its trace id yet", async () => {
     const h = harness({ [OLD]: blobs[OLD] as string });
     await h.run({ smoke: true, id: "run-3" });
