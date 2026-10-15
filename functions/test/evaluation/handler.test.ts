@@ -26,11 +26,13 @@ describe("evalReportHandler", () => {
             return [];
           },
           earlier: async () => [],
+          latest: async () => null,
         },
         transport: () => ({ sendMail: async () => ({}) }) as never,
         latency: async () => null,
         requeue: async () => {},
         sent: { claim: async () => true, release: async () => {} },
+        smokeResult: async () => {},
       };
     };
     await evalReportHandler(make)(MESSAGE, new InvocationContext(), credential);

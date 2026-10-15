@@ -62,9 +62,10 @@ module "github_oidc" {
 }
 
 # Contributor builds everything in the group but can't assign roles; the blob
-# role writes the config blob; the secret role reads config-toml.
+# role writes the config blob; the queue role runs the post-deploy smoke test
+# (#134); the secret role reads config-toml.
 resource "azurerm_role_assignment" "deployer" {
-  for_each             = toset(["Contributor", "Storage Blob Data Contributor"])
+  for_each             = toset(["Contributor", "Storage Blob Data Contributor", "Storage Queue Data Contributor"])
   scope                = azurerm_resource_group.main.id
   role_definition_name = each.key
   principal_id         = module.github_oidc.principal_id

@@ -3,6 +3,7 @@ import { RestError } from "@azure/storage-blob";
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../../src/lib/config/load.js";
 import { runEvalReport } from "../../src/lib/eval/report.js";
+import type { SmokeResult } from "../../src/lib/run/eval-queue.js";
 import { type RunRecord, runRecordReader, sentMarks, toJsonl } from "../../src/lib/run/records.js";
 import { records, runLine } from "./records.js";
 
@@ -92,6 +93,7 @@ function harness(
   const sent: { to: string; subject: string; html: string; text: string }[] = [];
   const lines: string[] = [];
   const requeued: { message: unknown; delaySeconds: number }[] = [];
+  const smokes: SmokeResult[] = [];
   const run = (message: unknown) =>
     runEvalReport(
       message,
@@ -101,6 +103,9 @@ function harness(
         records: runRecordReader(fakeContainer(blobs)),
         latency,
         sent: sentMarks(fakeMarks(marks)),
+        smokeResult: async (r) => {
+          smokes.push(r);
+        },
         requeue: async (message, delaySeconds) => {
           requeued.push({ message, delaySeconds });
         },
@@ -115,7 +120,7 @@ function harness(
       },
       { log: (m) => lines.push(m) },
     );
-  return { run, sent, lines, requeued, marks };
+  return { run, sent, lines, requeued, marks, smokes };
 }
 
 const day = (d: string, over = {}): [string, string] => [
@@ -252,6 +257,52 @@ describe("one evaluation email per run (#130)", () => {
   });
 });
 
+describe("the post-deploy smoke test (#134)", () => {
+  const TRACED = "2026-10-15/2026-10-15T15:00:00.000Z-aaaa0000.jsonl";
+  const OLD = "2026-10-14/2026-10-14T15:00:00.000Z-bbbb0000.jsonl";
+  const blobs = {
+    [OLD]: toJsonl([runLine({ started_at: "2026-10-14T15:00:00.000Z" })]),
+    [TRACED]: toJsonl(records({ trace_id: "0af7651916cd43dd8448eb211c80319c" })),
+  };
+
+  it("reports on the latest run with a trace, as [SMOKE], and says it passed", async () => {
+    const asked: string[] = [];
+    const h = harness(blobs, CONFIG, async (traceId) => {
+      asked.push(traceId);
+      return LATENCY;
+    });
+    await h.run({ smoke: true, id: "run-1" });
+    expect(asked).toEqual(["0af7651916cd43dd8448eb211c80319c"]);
+    expect(h.sent).toHaveLength(1);
+    expect(h.sent[0]?.subject).toMatch(/^\[SMOKE\] Job Scan — evaluation 2026-10-15/);
+    expect(h.smokes).toEqual([
+      { id: "run-1", ok: true, record: TRACED, subject: h.sent[0]?.subject },
+    ]);
+    // It takes no sent mark: the run's own evaluation email still goes out.
+    expect(h.marks.size).toBe(0);
+    expect(h.requeued).toEqual([]);
+  });
+
+  it("reports a failure instead of throwing, so the queue doesn't retry it", async () => {
+    const h = harness(blobs, CONFIG, async () => null);
+    await h.run({ smoke: true, id: "run-2" });
+    expect(h.sent).toEqual([]);
+    expect(h.smokes).toEqual([
+      { id: "run-2", ok: false, error: `the trace of ${TRACED} isn't in Application Insights` },
+    ]);
+  });
+
+  it("fails when no run kept its trace id yet", async () => {
+    const h = harness({ [OLD]: blobs[OLD] as string });
+    await h.run({ smoke: true, id: "run-3" });
+    expect(h.smokes[0]).toEqual({
+      id: "run-3",
+      ok: false,
+      error: "no run record with a trace id yet",
+    });
+  });
+});
+
 describe("runRecordReader", () => {
   it("lists earlier runs newest first, up to the count, and never later ones", async () => {
     const blobs = Object.fromEntries([
@@ -264,5 +315,17 @@ describe("runRecordReader", () => {
     expect(
       earlier.map((r: RunRecord & { started_at: string }) => r.started_at.slice(0, 10)),
     ).toEqual(["2026-10-14", "2026-10-13"]);
+  });
+
+  it("finds the newest run that kept its trace id, skipping older-format records", async () => {
+    const blobs = Object.fromEntries([
+      day("2026-10-13", { trace_id: "11111111111111111111111111111111" }),
+      day("2026-10-14", { trace_id: "22222222222222222222222222222222" }),
+      day("2026-10-15"),
+    ]);
+    const latest = await runRecordReader(fakeContainer(blobs)).latest();
+    expect(latest?.name).toBe("2026-10-14/2026-10-14T15:00:00.000Z-x.jsonl");
+    expect(latest?.run.trace_id).toBe("22222222222222222222222222222222");
+    expect(await runRecordReader(fakeContainer({})).latest()).toBeNull();
   });
 });

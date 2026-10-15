@@ -12,8 +12,8 @@ import type { Transporter } from "nodemailer";
 import { z } from "zod";
 import type { AppConfig } from "../config/load.js";
 import { type EmailSettings, emailEvaluation, emailSettings } from "../delivery/email.js";
-import type { EvalMessage } from "../run/eval-queue.js";
-import type { RunRecordReader, RunStatsRecord, SentMarks } from "../run/records.js";
+import type { EvalMessage, SmokeResult } from "../run/eval-queue.js";
+import type { RunRecord, RunRecordReader, RunStatsRecord, SentMarks } from "../run/records.js";
 import { evaluate } from "./evaluate.js";
 import type { Latency, LatencySource } from "./latency.js";
 import { JEV_NODES } from "./prices.js";
@@ -33,6 +33,15 @@ export const evalMessage = z.object({
   waited: z.number().int().nonnegative().default(0),
 });
 
+/** CD's post-deploy smoke test (#134): report on the latest run, and say how it went. */
+export const smokeMessage = z.object({
+  smoke: z.literal(true),
+  id: z.string().min(1).max(100),
+});
+
+/** A smoke test's copy says so in its subject. */
+export const SMOKE_PREFIX = "[SMOKE] ";
+
 export interface EvalReportDeps {
   env: Record<string, string | undefined>;
   config: () => Promise<AppConfig>;
@@ -42,6 +51,8 @@ export interface EvalReportDeps {
   /** Puts the message back on the queue, hidden for `delaySeconds`. */
   requeue: (message: EvalMessage, delaySeconds: number) => Promise<void>;
   sent: SentMarks;
+  /** Where a smoke test's outcome goes, for CD to wait on (#134). */
+  smokeResult: (result: SmokeResult) => Promise<void>;
 }
 
 export interface EvalReportLog {
@@ -57,7 +68,10 @@ export async function runEvalReport(
   d: EvalReportDeps,
   log: EvalReportLog,
 ): Promise<void> {
-  const m = evalMessage.parse(typeof queueEntry === "string" ? JSON.parse(queueEntry) : queueEntry);
+  const entry = typeof queueEntry === "string" ? JSON.parse(queueEntry) : queueEntry;
+  const smoke = smokeMessage.safeParse(entry);
+  if (smoke.success) return runSmoke(smoke.data.id, d, log);
+  const m = evalMessage.parse(entry);
   const config = await d.config();
   const settings = emailSettings(config, d.env);
   if (!settings) {
@@ -65,12 +79,7 @@ export async function runEvalReport(
     return;
   }
   const records = await d.records.read(m.record);
-  // The run made model calls if an Azure node used tokens: then its trace
-  // isn't complete without them.
-  const run = records.find((r): r is RunStatsRecord => r.kind === "run");
-  const expectCalls = Object.entries(run?.usage ?? {}).some(
-    ([node, u]) => !JEV_NODES.has(node) && u.input > 0,
-  );
+  const expectCalls = madeModelCalls(records);
   let latency: Latency | null = null;
   let why = "not in Application Insights yet";
   try {
@@ -98,4 +107,46 @@ export async function runEvalReport(
     throw err;
   }
   log.log(`evalReport: sent for ${m.record} (≈ $${evaluation.usd.toFixed(2)})`);
+}
+
+/** Whether an Azure node used tokens: then the run's trace isn't complete without its calls. */
+function madeModelCalls(records: RunRecord[]): boolean {
+  const run = records.find((r): r is RunStatsRecord => r.kind === "run");
+  return Object.entries(run?.usage ?? {}).some(([node, u]) => !JEV_NODES.has(node) && u.input > 0);
+}
+
+/**
+ * The smoke test: the full report on the latest run that kept its trace id,
+ * sent with a [SMOKE] subject. It takes no sent mark, so the run's own email
+ * isn't blocked, and it never throws: the outcome goes to the result queue
+ * for CD, rather than back to this queue for retries and repeat emails.
+ */
+async function runSmoke(id: string, d: EvalReportDeps, log: EvalReportLog): Promise<void> {
+  try {
+    const settings = emailSettings(await d.config(), d.env);
+    if (!settings) throw new Error("no report.email_account to send to");
+    const latest = await d.records.latest();
+    if (!latest) throw new Error("no run record with a trace id yet");
+    const records = await d.records.read(latest.name);
+    const latency = await d.latency(
+      latest.run.trace_id,
+      new Date(latest.run.started_at),
+      madeModelCalls(records),
+    );
+    if (latency === null)
+      throw new Error(`the trace of ${latest.name} isn't in Application Insights`);
+    const evaluation = evaluate(records, await d.records.earlier(latest.name, TREND_RUNS), latency);
+    const subject = await emailEvaluation(
+      d.transport(settings),
+      settings,
+      evaluation,
+      SMOKE_PREFIX,
+    );
+    await d.smokeResult({ id, ok: true, record: latest.name, subject });
+    log.log(`evalReport: smoke ${id} passed on ${latest.name}`);
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    await d.smokeResult({ id, ok: false, error });
+    log.log(`evalReport: smoke ${id} failed: ${error}`);
+  }
 }

@@ -96,17 +96,23 @@ export function evaluationSubject(e: Evaluation): string {
   return `Job Scan — evaluation ${e.day} (${e.version}): ≈ ${usd(e.usd)}`;
 }
 
-/** Send a run's evaluation (#129) to the daily report's recipient. */
+/**
+ * Send a run's evaluation (#129) to the daily report's recipient, and return
+ * the subject; `subjectPrefix` marks a smoke test's copy (#134).
+ */
 export async function emailEvaluation(
   transport: Pick<Transporter, "sendMail">,
   s: EmailSettings,
   evaluation: Evaluation,
-): Promise<void> {
+  subjectPrefix = "",
+): Promise<string> {
+  const subject = `${subjectPrefix}${evaluationSubject(evaluation)}`;
   await transport.sendMail({
     from: s.user,
     to: s.to,
-    subject: evaluationSubject(evaluation),
+    subject,
     html: renderEvaluationHtml(evaluation),
     text: renderEvaluationText(evaluation),
   });
+  return subject;
 }

@@ -1,6 +1,6 @@
 import type { QueueClient } from "@azure/storage-queue";
 import { describe, expect, it } from "vitest";
-import { evalQueue } from "../../src/lib/run/eval-queue.js";
+import { evalQueue, smokeResults } from "../../src/lib/run/eval-queue.js";
 
 /** The QueueClient calls the adapter makes, recorded. */
 function fakeQueue() {
@@ -25,5 +25,13 @@ describe("evalQueue", () => {
     await evalQueue(queue).send(message, 900);
     // host.json's messageEncoding "none" reads it as is.
     expect(sent).toEqual([{ text: JSON.stringify(message), visibilityTimeout: 900 }]);
+  });
+
+  it("sends a smoke result as plain JSON, visible at once (#134)", async () => {
+    const { queue, sent } = fakeQueue();
+    await smokeResults(queue)({ id: "run-1", ok: true, subject: "s" });
+    expect(sent).toEqual([
+      { text: '{"id":"run-1","ok":true,"subject":"s"}', visibilityTimeout: undefined },
+    ]);
   });
 });

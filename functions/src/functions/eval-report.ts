@@ -7,7 +7,7 @@ import { blobConfigSource, loadConfig } from "../lib/config/load.js";
 import { gmailTransport } from "../lib/delivery/email.js";
 import { latencyFromWorkspace } from "../lib/eval/latency.js";
 import { type EvalReportDeps, runEvalReport } from "../lib/eval/report.js";
-import { evalQueueFromUrl } from "../lib/run/eval-queue.js";
+import { evalQueueFromUrl, smokeResultsFromUrl } from "../lib/run/eval-queue.js";
 import { runRecordReaderFromUrl, sentMarksFromUrl } from "../lib/run/records.js";
 import { loadSecrets, secretClientFromEnv } from "../lib/run/secrets.js";
 
@@ -18,6 +18,7 @@ const settingsSchema = z.object({
   CONFIG_BLOB_URL: z.url(),
   RUN_RECORDS_URL: z.url(),
   EVAL_QUEUE_URL: z.url(),
+  EVAL_SMOKE_URL: z.url(),
   LOG_ANALYTICS_WORKSPACE_ID: z.uuid(),
 });
 
@@ -33,6 +34,7 @@ export function productionDeps(env: Env, credential: TokenCredential): EvalRepor
     requeue: (message, delaySeconds) =>
       evalQueueFromUrl(settings.EVAL_QUEUE_URL, credential).send(message, delaySeconds),
     sent: sentMarksFromUrl(settings.RUN_RECORDS_URL, credential),
+    smokeResult: smokeResultsFromUrl(settings.EVAL_SMOKE_URL, credential),
   };
 }
 
