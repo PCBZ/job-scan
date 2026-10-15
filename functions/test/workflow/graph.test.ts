@@ -118,6 +118,31 @@ describe("workflow graph", () => {
     expect(f.log.slice(-2)).toEqual(["deliver", "mark_seen"]);
   });
 
+  it("restores full resume lines after verification, for rank and the run's state (#138)", async () => {
+    const f = fakes({ judgeProblems: [["x"], []] });
+    const verified: unknown[] = [];
+    const restored = f.deterministicSteps.fullLines;
+    f.deterministicSteps.fullLines = (judged, resumes) => {
+      verified.push(f.log.filter((n) => n === "verify_judgements").length);
+      return restored(judged, resumes).map((j) => ({
+        ...j,
+        posting: { ...j.posting, title: "full" },
+      }));
+    };
+    const ranked: string[] = [];
+    const rank = f.deterministicSteps.rank;
+    f.deterministicSteps.rank = (judged, config) => {
+      ranked.push(...judged.map((j) => j.posting.title));
+      return rank(judged, config);
+    };
+    const state = await run(f);
+    // Once, after the repair passed: the repair saw the model's own phrases.
+    expect(verified).toEqual([2]);
+    expect(ranked.length).toBeGreaterThan(0);
+    expect(ranked.every((t) => t === "full")).toBe(true);
+    expect(state.judged.every((j) => j.posting.title === "full")).toBe(true);
+  });
+
   it("carries extraction warnings and the final dropped counts into the report", async () => {
     const f = fakes({
       extractProblems: [["x"], []],

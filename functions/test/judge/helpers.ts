@@ -24,8 +24,8 @@ export function answer(over: Partial<JudgeAnswer> = {}): JudgeAnswer {
         seniority: dimension({ gap: "8+ years required" }),
       },
     ],
-    location: { level: "exact", reason: "Vancouver is listed" },
-    signal: { level: "strong", reason: "Names the stack" },
+    location: { level: "exact" },
+    signal: { level: "strong" },
     unknowns: [],
     ...over,
   };

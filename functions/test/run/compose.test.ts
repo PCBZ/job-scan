@@ -32,6 +32,7 @@ describe("composePipeline", () => {
       [
         "dedupe",
         "fetchMail",
+        "fullLines",
         "hardGates",
         "loadConfig",
         "loadResumes",

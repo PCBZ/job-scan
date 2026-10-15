@@ -7,6 +7,8 @@ import type { ResumeSet } from "../resume/load.js";
 import { postingFields } from "./fields.js";
 import type { JudgeAnswer } from "./schema.js";
 
+type Fit = JudgeAnswer["variants"][number]["skills"];
+
 export interface Judgement {
   posting: Posting;
   answer: JudgeAnswer;
@@ -31,6 +33,12 @@ export const quotes = (text: string, quote: string) =>
 /** The quote within one line of the text: the prompts forbid joining lines. */
 export const quotesLine = (text: string, quote: string) =>
   text.split("\n").some((line) => quotes(line, quote));
+/** The first line of the text that holds the quote; null when none does. */
+export const lineOf = (text: string, quote: string) =>
+  text
+    .split("\n")
+    .find((line) => quotes(line, quote))
+    ?.trim() ?? null;
 /** The same phrase, give or take a few words at either end. */
 export const samePhrase = (a: string, b: string) =>
   flat(a) !== "" && flat(b) !== "" && (flat(a).includes(flat(b)) || flat(b).includes(flat(a)));
@@ -68,4 +76,30 @@ export function verifyJudgements(judged: Judgement[], resumes: ResumeSet): strin
     }
   }
   return problems;
+}
+
+/**
+ * The judge quotes a short phrase, so its answer costs less (#138); explain,
+ * the run record and the report show the whole resume line it came from. A
+ * phrase found in no line, left unresolved by the repair loop, stays as it is.
+ */
+export function fullLines(judged: Judgement[], resumes: ResumeSet): Judgement[] {
+  const texts = new Map(resumes.variants.map((v) => [v.name, v.text]));
+  const full = (text: string, fit: Fit): Fit =>
+    fit.evidence ? { ...fit, evidence: lineOf(text, fit.evidence) ?? fit.evidence } : fit;
+  return judged.map(({ posting, answer }) => ({
+    posting,
+    answer: {
+      ...answer,
+      variants: answer.variants.map((v) => {
+        const text = texts.get(v.variant) ?? "";
+        return {
+          ...v,
+          skills: full(text, v.skills),
+          domain: full(text, v.domain),
+          seniority: full(text, v.seniority),
+        };
+      }),
+    },
+  }));
 }
