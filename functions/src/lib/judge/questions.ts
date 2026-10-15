@@ -10,7 +10,8 @@ export type QuestionName =
   | "keyword"
   | "commute"
   | "remote"
-  | "unlocated";
+  | "unlocated"
+  | "title";
 
 /** Three levels up from both src/lib/judge and dist/lib/judge. */
 const TEMPLATES = JSON.parse(

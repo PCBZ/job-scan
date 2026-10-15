@@ -9,7 +9,7 @@ import type { Posting } from "../postings/types.js";
 import { question } from "./questions.js";
 
 /** Gates a model decides, after the code gates (#16). */
-export const MODEL_GATES = ["sponsorship", "seniority", "keyword", "location"] as const;
+export const MODEL_GATES = ["sponsorship", "seniority", "keyword", "location", "title"] as const;
 export type ModelGate = (typeof MODEL_GATES)[number];
 
 export interface AskedGate {
@@ -83,6 +83,17 @@ export function gatesFor(p: Posting, profile: ProfileConfig): AskedGate[] {
       question,
       failsOn: "no",
       failure: `location doesn't fit: ${p.location.trim() || "not stated"}`,
+    });
+  }
+  // A plainly unrelated role skips judge, the run's costliest call (#137).
+  const targets = (profile.target_titles ?? []).map((t) => t.trim()).filter(Boolean);
+  if (targets.length > 0) {
+    asked.push({
+      gate: "title",
+      mode: "filter",
+      question: question("title", { targets: targets.map((t) => `"${t}"`).join(", ") }),
+      failsOn: "no",
+      failure: "title far from your target roles",
     });
   }
   return asked;

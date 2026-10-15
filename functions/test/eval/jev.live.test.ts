@@ -85,4 +85,29 @@ describe.skipIf(process.env.EVAL_LIVE !== "1")("Jev, live", () => {
       ["Full-Stack Developer", "location"],
     ]);
   });
+
+  it("screens out a plainly unrelated title and keeps a related one (#137)", {
+    timeout: 60_000,
+  }, async () => {
+    const screen = screenStep(decisionClientFromEnv(process.env));
+    const machinist = posting({ row: 0, title: "CNC Mill Machinist / Programmer" });
+    const backend = posting({
+      row: 1,
+      title: "Senior Backend Developer",
+      requirements: ["Go", "Postgres"],
+    });
+    const out = await screen({
+      postings: [machinist, backend],
+      profile: {
+        seniority: "all",
+        needs_sponsorship: false,
+        target_titles: ["Backend Engineer", "Software Engineer"],
+      },
+    });
+    console.log(JSON.stringify(out.filtered.map((f) => [f.posting.title, f.reason])));
+    expect(out.filtered.map((f) => [f.posting.title, f.gate])).toEqual([
+      ["CNC Mill Machinist / Programmer", "title"],
+    ]);
+    expect(out.kept.map((p) => p.title)).toEqual(["Senior Backend Developer"]);
+  });
 });

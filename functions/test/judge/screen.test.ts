@@ -97,6 +97,23 @@ describe("screenStep", () => {
     expect(out.filtered.map((f) => f.posting.location)).toEqual(["Montreal", "Calgary"]);
   });
 
+  it("filters a plainly unrelated title, and keeps a related one, before judge (#137)", async () => {
+    const profile = {
+      ...VANCOUVER,
+      seniority: "all" as const,
+      target_titles: ["Backend Engineer"],
+    };
+    const machinist = posting({ title: "CNC Mill Machinist", row: 0 });
+    const developer = posting({ title: "Senior Software Developer, Data Delivery", row: 1 });
+    // Jev: yes, it's near a target role, for the developer only.
+    const { client } = jev((state) => (state.title === "CNC Mill Machinist" ? 0.03 : 0.9));
+    const out = await screenStep(client)({ postings: [machinist, developer], profile });
+    expect(out.filtered).toEqual([
+      { posting: machinist, gate: "title", reason: "title far from your target roles (Jev 0.97)" },
+    ]);
+    expect(out.kept).toEqual([developer]);
+  });
+
   it("keeps a posting Jev is unsure about, with a note for the report", async () => {
     const { client } = jev(() => 0.65);
     const out = await screenStep(client)({ postings: [posting()], profile: VANCOUVER });
