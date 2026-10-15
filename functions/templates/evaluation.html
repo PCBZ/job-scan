@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Scan — evaluation {{day}}</title>
+</head>
+<body style="margin: 0; padding: 0; background: #f2f4f7;">
+<div style="max-width: 680px; margin: 0 auto; padding: 16px; font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #101828;">
+  <div style="background: #ffffff; border-radius: 8px; padding: 20px;">
+    <h1 style="margin: 0 0 4px; font-size: 20px;">Job Scan — evaluation, {{day}}</h1>
+    <p style="margin: 0 0 16px; color: #475467;">{{version}} · {{outcome}} · costs are estimates at list prices</p>
+
+    <h2 style="margin: 16px 0 6px; font-size: 16px;">Funnel</h2>
+    <p style="margin: 0;">{{funnel}}</p>
+
+    <h2 style="margin: 16px 0 6px; font-size: 16px;">Cost (estimated)</h2>
+    <table role="presentation" style="border-collapse: collapse; width: 100%;">
+      <tr style="color: #475467; text-align: left;"><th style="padding: 4px 8px 4px 0;">Model</th><th style="padding: 4px 8px;">Input</th><th style="padding: 4px 8px;">Cached</th><th style="padding: 4px 8px;">Output</th><th style="padding: 4px 0 4px 8px; text-align: right;">≈ USD</th></tr>
+      {{#cost}}<tr style="border-top: 1px solid #eaecf0;"><td style="padding: 4px 8px 4px 0;">{{model}}</td><td style="padding: 4px 8px;">{{input}}</td><td style="padding: 4px 8px;">{{cached}}</td><td style="padding: 4px 8px;">{{output}}</td><td style="padding: 4px 0 4px 8px; text-align: right;">{{usd}}</td></tr>{{/cost}}
+      <tr style="border-top: 1px solid #d0d5dd; font-weight: bold;"><td style="padding: 4px 8px 4px 0;" colspan="4">Total</td><td style="padding: 4px 0 4px 8px; text-align: right;">{{total}}</td></tr>
+    </table>
+
+    <h2 style="margin: 16px 0 6px; font-size: 16px;">Time</h2>
+    <p style="margin: 0;">{{time}}</p>
+
+    <h2 style="margin: 16px 0 6px; font-size: 16px;">Quality</h2>
+    <table role="presentation" style="border-collapse: collapse; width: 100%;">
+      <tr style="color: #475467; text-align: left;"><th style="padding: 4px 8px 4px 0;">Loop</th><th style="padding: 4px 8px;">First-pass problems</th><th style="padding: 4px 8px;">Repairs</th><th style="padding: 4px 0 4px 8px;">Unresolved</th></tr>
+      {{#quality}}<tr style="border-top: 1px solid #eaecf0;"><td style="padding: 4px 8px 4px 0;">{{loop}}</td><td style="padding: 4px 8px;">{{firstPass}}</td><td style="padding: 4px 8px;">{{repairs}}</td><td style="padding: 4px 0 4px 8px;">{{unresolved}}</td></tr>{{/quality}}
+    </table>
+
+    <h2 style="margin: 16px 0 6px; font-size: 16px;">Screen (Jev)</h2>
+    <p style="margin: 0 0 6px;">{{screenSummary}}</p>
+    {{#hasScreened}}
+    <table role="presentation" style="border-collapse: collapse; width: 100%;">
+      <tr style="color: #475467; text-align: left;"><th style="padding: 4px 8px 4px 0;">Role</th><th style="padding: 4px 8px;">Company</th><th style="padding: 4px 8px;">Location</th><th style="padding: 4px 8px;">Gate</th><th style="padding: 4px 0 4px 8px; text-align: right;">Jev</th></tr>
+      {{#screened}}<tr style="border-top: 1px solid #eaecf0;"><td style="padding: 4px 8px 4px 0;">{{title}}</td><td style="padding: 4px 8px;">{{company}}</td><td style="padding: 4px 8px;">{{location}}</td><td style="padding: 4px 8px;">{{gate}}</td><td style="padding: 4px 0 4px 8px; text-align: right;">{{probability}}</td></tr>{{/screened}}
+    </table>
+    {{/hasScreened}}
+
+    <h2 style="margin: 16px 0 6px; font-size: 16px;">Dropped as misaligned</h2>
+    <p style="margin: 0;">{{dropped}}</p>
+
+    <h2 style="margin: 16px 0 6px; font-size: 16px;">Recent runs</h2>
+    <table role="presentation" style="border-collapse: collapse; width: 100%;">
+      <tr style="color: #475467; text-align: left;"><th style="padding: 4px 8px 4px 0;">Day</th><th style="padding: 4px 8px;">Version</th><th style="padding: 4px 8px; text-align: right;">≈ USD</th><th style="padding: 4px 8px; text-align: right;">Judged</th><th style="padding: 4px 8px; text-align: right;">Judge 1st-pass</th><th style="padding: 4px 8px; text-align: right;">Filtered</th><th style="padding: 4px 0 4px 8px; text-align: right;">Cached</th></tr>
+      {{#trend}}<tr style="border-top: 1px solid #eaecf0;"><td style="padding: 4px 8px 4px 0;">{{day}}</td><td style="padding: 4px 8px;">{{version}}</td><td style="padding: 4px 8px; text-align: right;">{{usd}}</td><td style="padding: 4px 8px; text-align: right;">{{judged}}</td><td style="padding: 4px 8px; text-align: right;">{{firstPass}}</td><td style="padding: 4px 8px; text-align: right;">{{filtered}}</td><td style="padding: 4px 0 4px 8px; text-align: right;">{{cachedShare}}</td></tr>{{/trend}}
+    </table>
+  </div>
+  <p style="margin: 12px 0 0; color: #667085; font-size: 12px; text-align: center;">job-scan · evaluation · prices: Azure Retail Prices API 2026-10; Jev from secondary sources</p>
+</div>
+</body>
+</html>

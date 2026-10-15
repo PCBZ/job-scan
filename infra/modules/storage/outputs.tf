@@ -28,3 +28,9 @@ output "table_endpoint" {
 output "queue_urls" {
   value = { for key, q in azurerm_storage_queue.this : key => q.url }
 }
+
+# The account's queue endpoint, after the queues exist so consumers wait.
+output "queue_endpoint" {
+  value      = azurerm_storage_account.this.primary_queue_endpoint
+  depends_on = [azurerm_storage_queue.this]
+}

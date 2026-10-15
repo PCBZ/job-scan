@@ -15,6 +15,7 @@ import { posting } from "../postings/helpers.js";
 
 const META: RunMeta = {
   started_at: "2026-10-13T15:00:00.000Z",
+  ended_at: "2026-10-13T15:08:13.000Z",
   version: "v0.1.6",
   node_ms: { judge: 1200 },
   throttled_ms: 50,
