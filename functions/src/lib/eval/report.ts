@@ -6,10 +6,9 @@
 import type { Transporter } from "nodemailer";
 import { z } from "zod";
 import type { AppConfig } from "../config/load.js";
-import { type EmailSettings, emailSettings } from "../delivery/email.js";
+import { type EmailSettings, emailEvaluation, emailSettings } from "../delivery/email.js";
 import type { RunRecordReader } from "../run/records.js";
 import { evaluate } from "./evaluate.js";
-import { renderHtml, renderText, subjectOf } from "./render.js";
 
 /** The runs before this one that the trend shows. */
 export const TREND_RUNS = 6;
@@ -32,15 +31,15 @@ export interface EvalReportLog {
 }
 
 /**
- * Accepts the message as the queue trigger hands it over: parsed JSON, or
- * the JSON text when the runtime didn't parse it.
+ * The queue entry is `unknown`, as the Functions SDK types it: parsed JSON,
+ * or the JSON text when the runtime didn't parse it. The schema checks it.
  */
 export async function runEvalReport(
-  message: unknown,
+  queueEntry: unknown,
   d: EvalReportDeps,
   log: EvalReportLog,
 ): Promise<void> {
-  const m = evalMessage.parse(typeof message === "string" ? JSON.parse(message) : message);
+  const m = evalMessage.parse(typeof queueEntry === "string" ? JSON.parse(queueEntry) : queueEntry);
   const config = await d.config();
   const settings = emailSettings(config, d.env);
   if (!settings) {
@@ -51,12 +50,6 @@ export async function runEvalReport(
     await d.records.read(m.record),
     await d.records.earlier(m.record, TREND_RUNS),
   );
-  await d.transport(settings).sendMail({
-    from: settings.user,
-    to: settings.to,
-    subject: subjectOf(evaluation),
-    html: renderHtml(evaluation),
-    text: renderText(evaluation),
-  });
+  await emailEvaluation(d.transport(settings), settings, evaluation);
   log.log(`evalReport: sent for ${m.record} (≈ $${evaluation.usd.toFixed(2)})`);
 }
