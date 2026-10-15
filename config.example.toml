@@ -126,7 +126,21 @@ max_total_messages = 150
 # empty core_skills. A disabled gate is treated as a deliberate choice, not as
 # missing config — the posting is kept and the requirement is reported instead,
 # so you can see the full field and narrow later from real output.
-target_titles = ["Software Engineer", "Backend Engineer"]  # TODO
+# TODO — every kind of role you'd take. screen's title gate (Jev) asks whether a
+# posting is one of, or close to, these, so list each kind once, not every
+# spelling; a posting far from all of them skips judge.
+target_titles = [
+  "Software Engineer", "Software Development Engineer", "Software Developer",
+  "Backend Engineer", "Full Stack Engineer", "Product Engineer",
+  "Member of Technical Staff",
+  "iOS Engineer", "iOS Developer", "Mobile Engineer", "Mobile Developer",
+  "AI Agent Engineer", "AI Engineer", "Applied AI Engineer", "LLM Engineer",
+  "Machine Learning Engineer", "Data Engineer",
+  "Platform Engineer", "DevOps Engineer", "Cloud Engineer",
+  "Site Reliability Engineer",
+  "Scientific Software Developer", "Systems Software Engineer",
+  "Quantitative Developer",
+]
 seniority = "all"           # all | new-grad | junior | mid | senior | staff
 years_experience = "unknown"
 # TODO — the places you will actually work, not a region. This gate has no
