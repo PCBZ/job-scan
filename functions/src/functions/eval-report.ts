@@ -5,7 +5,9 @@ import { DefaultAzureCredential, type TokenCredential } from "@azure/identity";
 import { z } from "zod";
 import { blobConfigSource, loadConfig } from "../lib/config/load.js";
 import { gmailTransport } from "../lib/delivery/email.js";
+import { latencyFromWorkspace } from "../lib/eval/latency.js";
 import { type EvalReportDeps, runEvalReport } from "../lib/eval/report.js";
+import { evalQueueFromUrl } from "../lib/run/eval-queue.js";
 import { runRecordReaderFromUrl } from "../lib/run/records.js";
 import { loadSecrets, secretClientFromEnv } from "../lib/run/secrets.js";
 
@@ -15,6 +17,8 @@ type Env = Record<string, string | undefined>;
 const settingsSchema = z.object({
   CONFIG_BLOB_URL: z.url(),
   RUN_RECORDS_URL: z.url(),
+  EVAL_QUEUE_URL: z.url(),
+  LOG_ANALYTICS_WORKSPACE_ID: z.uuid(),
 });
 
 /** Its dependencies in Azure, from app settings and the app's identity. */
@@ -25,6 +29,9 @@ export function productionDeps(env: Env, credential: TokenCredential): EvalRepor
     config: () => loadConfig(blobConfigSource(settings.CONFIG_BLOB_URL, credential)),
     records: runRecordReaderFromUrl(settings.RUN_RECORDS_URL, credential),
     transport: gmailTransport,
+    latency: latencyFromWorkspace(settings.LOG_ANALYTICS_WORKSPACE_ID, credential),
+    requeue: (message, delaySeconds) =>
+      evalQueueFromUrl(settings.EVAL_QUEUE_URL, credential).send(message, delaySeconds),
   };
 }
 

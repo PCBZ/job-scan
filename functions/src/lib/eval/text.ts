@@ -24,6 +24,15 @@ export function renderText(e: Evaluation): string {
     "",
     "Time",
     v.time,
+    v.latency,
+    ...(v.hasLatency
+      ? [
+          table(
+            ["Node", "Calls", "p50", "p95", "Slowest"],
+            v.byNode.map((n) => [n.node, String(n.calls), n.p50, n.p95, n.slowest]),
+          ),
+        ]
+      : []),
     "",
     "Quality",
     table(

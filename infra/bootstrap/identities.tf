@@ -20,6 +20,7 @@ locals {
     "Storage Table Data Contributor", # seen messages, seen jobs
     "Storage Queue Data Contributor", # used internally by identity-based host storage
     "Cognitive Services OpenAI User", # the model
+    "Log Analytics Reader",           # evalReport reads each run's latency (#130)
   ])
 }
 

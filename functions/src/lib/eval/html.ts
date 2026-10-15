@@ -37,6 +37,15 @@ export function duration(ms: number): string {
   return DURATION.format({ minutes: Math.floor(s / 60), seconds: s % 60 });
 }
 
+/** 3.5s: one decimal, as a call's time reads. */
+const SECONDS = new Intl.NumberFormat("en", {
+  style: "unit",
+  unit: "second",
+  unitDisplay: "narrow",
+  maximumFractionDigits: 1,
+});
+const seconds = (ms: number) => SECONDS.format(ms / 1000);
+
 const percent = (share: number | null) => (share === null ? "—" : PERCENT.format(share));
 
 /** The evaluation shaped for both channels: Mustache has no logic, so this does it. */
@@ -68,6 +77,18 @@ export function view(e: Evaluation) {
       `${duration(e.throttledMs)} waiting on the TPM budget`,
       `${e.rateLimited} rate-limited`,
     ].join(" · "),
+    latency:
+      e.latency === null
+        ? "Model-call latency missing: the run's trace wasn't in Application Insights within the hour."
+        : `${e.latency.calls} model calls · p50 ${seconds(e.latency.p50Ms)} · p95 ${seconds(e.latency.p95Ms)} · slowest ${seconds(e.latency.slowestMs)} · ${e.latency.failed} failed`,
+    hasLatency: (e.latency?.byNode.length ?? 0) > 0,
+    byNode: (e.latency?.byNode ?? []).map((n) => ({
+      node: n.node,
+      calls: n.calls,
+      p50: seconds(n.p50Ms),
+      p95: seconds(n.p95Ms),
+      slowest: seconds(n.slowestMs),
+    })),
     quality: (["extract", "judge", "explain"] as const).map((loop) => ({
       loop,
       ...e.quality[loop],

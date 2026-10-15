@@ -44,9 +44,23 @@ const CONFIG = {
 } as unknown as AppConfig;
 const ENV = { GMAIL_USER: "sender@example.test", GMAIL_PASSWORD: "app-password" };
 
-function harness(blobs: Record<string, string>, config: AppConfig = CONFIG) {
+const LATENCY = {
+  calls: 220,
+  p50Ms: 3477,
+  p95Ms: 6436,
+  slowestMs: 9491,
+  failed: 0,
+  byNode: [{ node: "judge", calls: 179, p50Ms: 3591, p95Ms: 6849, slowestMs: 9491 }],
+};
+
+function harness(
+  blobs: Record<string, string>,
+  config: AppConfig = CONFIG,
+  latency: () => Promise<typeof LATENCY | null> = async () => LATENCY,
+) {
   const sent: { to: string; subject: string; html: string; text: string }[] = [];
   const lines: string[] = [];
+  const requeued: { message: unknown; delaySeconds: number }[] = [];
   const run = (message: unknown) =>
     runEvalReport(
       message,
@@ -54,6 +68,10 @@ function harness(blobs: Record<string, string>, config: AppConfig = CONFIG) {
         env: ENV,
         config: async () => config,
         records: runRecordReader(fakeContainer(blobs)),
+        latency,
+        requeue: async (message, delaySeconds) => {
+          requeued.push({ message, delaySeconds });
+        },
         transport: () =>
           ({
             sendMail: async (m: { to: string; subject: string; html: string; text: string }) => {
@@ -64,7 +82,7 @@ function harness(blobs: Record<string, string>, config: AppConfig = CONFIG) {
       },
       { log: (m) => lines.push(m) },
     );
-  return { run, sent, lines };
+  return { run, sent, lines, requeued };
 }
 
 const day = (d: string, over = {}): [string, string] => [
@@ -121,6 +139,44 @@ describe("runEvalReport", () => {
     expect(h.lines.at(-1)).toBe(
       `evalReport: no report.email_account, so no evaluation email for ${NAME}`,
     );
+  });
+});
+
+describe("waiting for the run's trace (#130)", () => {
+  it("puts the message back, hidden 10 minutes, while the trace isn't in", async () => {
+    const h = harness({ [NAME]: toJsonl(records()) }, CONFIG, async () => null);
+    await h.run(MESSAGE);
+    expect(h.sent).toEqual([]);
+    expect(h.requeued).toEqual([{ message: { ...MESSAGE, waited: 1 }, delaySeconds: 600 }]);
+    expect(h.lines.at(-1)).toBe(
+      `evalReport: the run's latency is not in Application Insights yet; waiting for ${NAME} (1/5)`,
+    );
+  });
+
+  it("waits the same way when the query fails", async () => {
+    const h = harness({ [NAME]: toJsonl(records()) }, CONFIG, async () => {
+      throw new Error("latency query: timed out");
+    });
+    await h.run({ ...MESSAGE, waited: 2 });
+    expect(h.requeued[0]?.message).toMatchObject({ waited: 3 });
+    expect(h.lines.at(-1)).toContain("latency is latency query: timed out");
+  });
+
+  it("sends without the latency once it has waited five times, and says so", async () => {
+    const h = harness({ [NAME]: toJsonl(records()) }, CONFIG, async () => null);
+    await h.run({ ...MESSAGE, waited: 5 });
+    expect(h.requeued).toEqual([]);
+    expect(h.sent[0]?.text).toContain("Model-call latency missing");
+  });
+
+  it("puts the latency in the email, per node", async () => {
+    const h = harness({ [NAME]: toJsonl(records()) });
+    await h.run(MESSAGE);
+    expect(h.sent[0]?.text).toContain(
+      "220 model calls · p50 3.5s · p95 6.4s · slowest 9.5s · 0 failed",
+    );
+    expect(h.sent[0]?.text).toContain("judge | 179 | 3.6s | 6.8s | 9.5s");
+    expect(h.sent[0]?.html).toContain("p50 3.5s");
   });
 });
 
