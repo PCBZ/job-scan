@@ -35,6 +35,10 @@ module "function_app" {
     "RUN_RECORDS_URL" = module.storage.container_endpoints["run-records"]
     # Private; the daily run queues each run's evaluation report here (#128).
     "EVAL_QUEUE_URL" = module.storage.queue_urls["eval-reports"]
+    # evalReport's queue trigger (#129) connects as the app's identity.
+    "EvalQueue__queueServiceUri" = module.storage.queue_endpoint
+    "EvalQueue__credential"      = "managedidentity"
+    "EvalQueue__clientId"        = var.platform.app_client_id
     # The release CD deployed, written into each run record.
     "APP_VERSION" = var.app_version
     # Jev, read by functions/src/lib/decision/config.ts. The model is pinned:

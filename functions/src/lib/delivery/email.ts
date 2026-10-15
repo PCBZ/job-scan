@@ -6,6 +6,9 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import type { AppConfig } from "../config/load.js";
 import { appError } from "../errors.js";
+import type { Evaluation } from "../eval/evaluate.js";
+import { renderHtml as renderEvaluationHtml, usd } from "../eval/html.js";
+import { renderText as renderEvaluationText } from "../eval/text.js";
 import { renderHtml } from "../report/html.js";
 import { NO_RESUMES } from "../report/source.js";
 import { renderText } from "../report/text.js";
@@ -85,5 +88,25 @@ export async function emailReport(
     subject: subjectOf(report),
     html: renderHtml(report, webUrl),
     text: renderText(report, webUrl),
+  });
+}
+
+/** The evaluation email's subject (#129): numbers only, never a posting's words. */
+export function evaluationSubject(e: Evaluation): string {
+  return `Job Scan — evaluation ${e.day} (${e.version}): ≈ ${usd(e.usd)}`;
+}
+
+/** Send a run's evaluation (#129) to the daily report's recipient. */
+export async function emailEvaluation(
+  transport: Pick<Transporter, "sendMail">,
+  s: EmailSettings,
+  evaluation: Evaluation,
+): Promise<void> {
+  await transport.sendMail({
+    from: s.user,
+    to: s.to,
+    subject: evaluationSubject(evaluation),
+    html: renderEvaluationHtml(evaluation),
+    text: renderEvaluationText(evaluation),
   });
 }

@@ -64,6 +64,8 @@ export interface LoopRecord {
 
 export interface RunMeta {
   started_at: string;
+  /** When the workflow finished, before the record was written (#129). */
+  ended_at: string;
   /** The deployed release (APP_VERSION), "local" outside CD. */
   version: string;
   /** Milliseconds per node, summed over its runs. */
@@ -212,4 +214,56 @@ export function runRecordStoreFromUrl(
   credential: TokenCredential,
 ): RunRecordStore {
   return runRecordStore(new ContainerClient(containerUrl, credential));
+}
+
+export interface RunRecordReader {
+  /** One run's records, from its blob name. */
+  read(name: string): Promise<RunRecord[]>;
+  /**
+   * The run lines of up to `count` runs before `name`, newest first. A record
+   * that can't be read or has no run line is skipped, not fatal (#129).
+   */
+  earlier(name: string, count: number): Promise<RunStatsRecord[]>;
+}
+
+type ReadableContainer = Pick<ContainerClient, "getBlockBlobClient" | "listBlobsFlat">;
+
+const parseJsonl = (text: string): RunRecord[] =>
+  text
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => JSON.parse(line) as RunRecord);
+
+export function runRecordReader(container: ReadableContainer): RunRecordReader {
+  const read = async (name: string) =>
+    parseJsonl((await container.getBlockBlobClient(name).downloadToBuffer()).toString("utf8"));
+  return {
+    read,
+    async earlier(name, count) {
+      // Names are <day>/<started-at>-<suffix>.jsonl, so they sort by time.
+      const names: string[] = [];
+      for await (const blob of container.listBlobsFlat()) {
+        if (blob.name.endsWith(".jsonl") && blob.name < name) names.push(blob.name);
+      }
+      const runs: RunStatsRecord[] = [];
+      for (const n of names.sort().reverse()) {
+        if (runs.length >= count) break;
+        try {
+          const run = (await read(n)).find((r): r is RunStatsRecord => r.kind === "run");
+          if (run) runs.push(run);
+        } catch {
+          // A record that won't parse costs its row in the trend, nothing more.
+        }
+      }
+      return runs;
+    },
+  };
+}
+
+/** From RUN_RECORDS_URL, the container's endpoint. */
+export function runRecordReaderFromUrl(
+  containerUrl: string,
+  credential: TokenCredential,
+): RunRecordReader {
+  return runRecordReader(new ContainerClient(containerUrl, credential));
 }
