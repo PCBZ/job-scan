@@ -176,6 +176,20 @@ describe("short evidence (#138)", () => {
     );
   });
 
+  it("ignores punctuation and symbols between the words, within one line (#146)", () => {
+    const text = "Northwind | Go, gRPC and Postgres | ECS/Fargate\nC++ and C# tooling";
+    expect(lineOf(text, "Northwind Go gRPC and Postgres")).toBe(
+      "Northwind | Go, gRPC and Postgres | ECS/Fargate",
+    );
+    expect(lineOf(text, "Postgres ECS Fargate")).not.toBeNull();
+    expect(lineOf(text, "C++ and C# tooling")).toBe("C++ and C# tooling");
+    expect(lineOf(text, "C and C tooling")).toBeNull();
+    // Still in order, contiguous, and within a line.
+    expect(lineOf(text, "Go Postgres")).toBeNull();
+    expect(lineOf(text, "Fargate C++")).toBeNull();
+    expect(lineOf(text, ", |")).toBeNull();
+  });
+
   it("finds the line that holds a phrase, trimmed, or null", () => {
     const text = RESUMES.variants[0]?.text ?? "";
     expect(lineOf(text, "PAYMENT services")).toBe(
