@@ -28,36 +28,50 @@ It runs two ways:
 
 ```mermaid
 flowchart TB
-  gmail[(Gmail<br/>IMAP)]
-  github[(Resume repo<br/>GitHub)]
-  openai([Azure OpenAI API<br/>gpt-5.4-mini])
-  jev([Jev API<br/>jev-1.13.0])
+  subgraph inputs [Inputs]
+    direction LR
+    gmail[(Gmail · IMAP<br/>job alerts)]
+    github[(GitHub<br/>resume repo)]
+  end
 
   subgraph app [Azure Functions app]
-    direction TB
-    subgraph daily [daily · timer, 15:00 UTC]
+    subgraph daily ["daily · timer, 15:00 UTC"]
+      direction LR
       fetch --> extract --> gates[dedupe,<br/>hard gates] --> screen --> judge --> rank --> explain --> report
     end
-    subgraph evalfn [evalReport · queue trigger]
+    subgraph evalfn ["evalReport · queue trigger"]
+      direction LR
       evaluate[figures, latency,<br/>trend]
     end
   end
 
-  queue[[Storage Queue<br/>eval-reports]]
-  blob[(Blob Storage<br/>run records, reports)]
-  logs[(Log Analytics)]
-  smtp[Gmail SMTP]
-  tg[Telegram]
+  subgraph apis [Model APIs]
+    direction LR
+    openai([Azure OpenAI · gpt-5.4-mini<br/>extract, judge, explain])
+    jev([Jev · jev-1.13.0<br/>screen])
+  end
 
-  gmail --> fetch
-  github --> judge
-  extract & judge & explain <--> openai
-  screen <--> jev
-  report --> blob & smtp & tg
-  report -- "run done,<br/>visible in 15 min" --> queue --> evaluate
-  evaluate -. "trace not in yet:<br/>back for 10 min" .-> queue
-  blob & logs --> evaluate
-  evaluate -- "evaluation email" --> smtp
+  subgraph storage [Azure Storage]
+    direction LR
+    blob[(Blob<br/>run records, reports)]
+    queue[[Queue<br/>eval-reports]]
+  end
+
+  subgraph out [Delivery]
+    direction LR
+    smtp[Gmail SMTP<br/>report, evaluation email]
+    tg[Telegram<br/>summary, link]
+  end
+
+  logs[(Log Analytics<br/>traces)]
+
+  inputs --> daily
+  daily <--> apis
+  daily -- "run record, report;<br/>run done → queue, visible in 15 min" --> storage
+  storage --> evalfn
+  logs --> evalfn
+  daily --> out
+  evalfn --> out
 ```
 
 | Step | Decided by | |
