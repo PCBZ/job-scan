@@ -27,48 +27,39 @@ It runs two ways:
 ## How it works
 
 ```mermaid
-flowchart TB
+flowchart LR
   subgraph inputs [Inputs]
-    direction LR
     gmail[(Gmail · IMAP<br/>job alerts)]
     github[(GitHub<br/>resume repo)]
   end
 
-  subgraph app [Azure Functions app]
-    subgraph daily ["daily · timer, 15:00 UTC"]
-      direction LR
-      fetch --> extract --> gates[dedupe,<br/>hard gates] --> screen --> judge --> rank --> explain --> report
-    end
-    subgraph evalfn ["evalReport · queue trigger"]
-      direction LR
-      evaluate[figures, latency,<br/>trend]
-    end
-  end
-
   subgraph apis [Model APIs]
-    direction LR
     openai([Azure OpenAI · gpt-5.4-mini<br/>extract, judge, explain])
     jev([Jev · jev-1.13.0<br/>screen])
   end
 
-  subgraph storage [Azure Storage]
-    direction LR
-    blob[(Blob<br/>run records, reports)]
-    queue[[Queue<br/>eval-reports]]
+  subgraph app [Azure Functions app]
+    subgraph daily ["daily · timer, 15:00 UTC"]
+      fetch --> extract --> gates[dedupe,<br/>hard gates] --> screen --> judge --> rank --> explain --> report
+    end
+    queue[[Storage Queue<br/>eval-reports]]
+    subgraph evalfn ["evalReport · queue trigger"]
+      evaluate[figures, latency,<br/>trend]
+    end
+    daily -- "run done,<br/>visible in 15 min" --> queue --> evalfn
   end
 
+  blob[(Blob Storage<br/>run records, reports)]
+  logs[(Log Analytics<br/>traces)]
+
   subgraph out [Delivery]
-    direction LR
     smtp[Gmail SMTP<br/>report, evaluation email]
     tg[Telegram<br/>summary, link]
   end
 
-  logs[(Log Analytics<br/>traces)]
-
   inputs --> daily
   daily <--> apis
-  daily -- "run record, report;<br/>run done → queue, visible in 15 min" --> storage
-  storage --> evalfn
+  daily --> blob --> evalfn
   logs --> evalfn
   daily --> out
   evalfn --> out
