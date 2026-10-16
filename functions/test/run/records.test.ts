@@ -29,7 +29,7 @@ function message(id: string): FetchedMessage {
     from: "alerts@jobs.example.test",
     subject: `Jobs for you ${id}`,
     date: "2026-10-13T14:00:00Z",
-    body: `cleaned body of ${id}`,
+    body: `cleaned body of ${id}: Vancouver, BC · $120,000–$140,000 a year · 2d`,
     body_source: "plain",
     links: [{ text: "Backend Engineer", url: "https://jobs.example.test/1" }],
   } as FetchedMessage;
@@ -68,9 +68,16 @@ const byKind = <K extends RunRecord["kind"]>(records: RunRecord[], kind: K) =>
   records.filter((r): r is Extract<RunRecord, { kind: K }> => r.kind === kind);
 
 describe("runRecords", () => {
-  const a0 = posting({ message_id: "<a@x>", row: 0, title: "Backend Engineer" });
+  const a0 = posting({ message_id: "<a@x>", row: 0, title: "Backend Engineer", link: 0 });
   const a1 = posting({ message_id: "<a@x>", row: 1, title: "Platform Engineer" });
-  const b0 = posting({ message_id: "<b@x>", row: 0, title: "Data Engineer" });
+  // Its salary isn't the message's, and its link names another job.
+  const b0 = posting({
+    message_id: "<b@x>",
+    row: 0,
+    title: "Data Engineer",
+    salary: "CAD 120k",
+    link: 0,
+  });
   const pick = { ...rankedOf(judgement({ posting: a0 }), 88), variant: "Resume" };
   const full = state({
     mail: { messages: [message("<a@x>"), message("<b@x>")] } as unknown as FetchPayload,
@@ -122,14 +129,20 @@ describe("runRecords", () => {
       "Jobs for you <b@x>",
     ]);
     expect(postings[0]?.message).toMatchObject({
-      body: "cleaned body of <a@x>",
+      body: "cleaned body of <a@x>: Vancouver, BC · $120,000–$140,000 a year · 2d",
       links: [{ text: "Backend Engineer", url: "https://jobs.example.test/1" }],
     });
   });
 
   it("writes every filter with its gate and reason", () => {
     expect(byKind(runRecords(full, META), "filtered")).toEqual([
-      { kind: "filtered", posting: a1, gate: "location", reason: "Toronto only" },
+      {
+        kind: "filtered",
+        posting: a1,
+        gate: "location",
+        reason: "Toronto only",
+        checks: { reason: true },
+      },
     ]);
   });
 
@@ -170,6 +183,29 @@ describe("runRecords", () => {
       },
       warnings: 1,
       usage: { judge: { input: 10, output: 2 } },
+      checks: {
+        verbatim: { checked: 9, failed: 1 },
+        link_title: { checked: 2, failed: 1, no_link: 1 },
+        duplicates: { count: 0, fingerprints: [] },
+        filter_reason: { checked: 1, failed: 0 },
+      },
+    });
+  });
+
+  it("stores each posting's checks on its record", () => {
+    const postings = byKind(runRecords(full, META), "posting");
+    expect(postings.map((p) => p.checks)).toEqual([
+      { verbatim: { salary: true, location: true, posted: true }, link_title: true },
+      { verbatim: { salary: true, location: true, posted: true }, link_title: null },
+      { verbatim: { salary: false, location: true, posted: true }, link_title: false },
+    ]);
+  });
+
+  it("counts postings that dedupe let through twice", () => {
+    const twice = { ...pick.judgement, posting: { ...a0, row: 5 } };
+    const run = runRecords({ ...full, judged: [pick.judgement, twice] }, META).at(-1);
+    expect(run).toMatchObject({
+      checks: { duplicates: { count: 1, fingerprints: ["northwind|backend engineer"] } },
     });
   });
 
