@@ -1,15 +1,18 @@
 # job-scan
 
-<p>
-  <img src="https://skillicons.dev/icons?i=ts,nodejs,python,azure,terraform,githubactions,vitest,latex" alt="TypeScript, Node.js, Python, Azure, Terraform, GitHub Actions, Vitest, LaTeX">
-</p>
-
-![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757?logo=claude&logoColor=white)
-![Azure Functions](https://img.shields.io/badge/Azure_Functions-Flex_Consumption-0078D4)
+![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
+![Azure Functions](https://img.shields.io/badge/Azure_Functions-v4_Flex_Consumption-0078D4)
 ![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-gpt--5.4--mini-0078D4)
-![LangGraph](https://img.shields.io/badge/LangGraph-workflow-1C3C3C?logo=langchain&logoColor=white)
-![Jev](https://img.shields.io/badge/Jev-screen-5B5BD6)
-![Telegram](https://img.shields.io/badge/Telegram-summary-26A5E4?logo=telegram&logoColor=white)
+![Jev](https://img.shields.io/badge/Jev-1.13.0-5B5BD6)
+![LangGraph](https://img.shields.io/badge/LangGraph-1.4-1C3C3C?logo=langchain&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-1.13-844FBA?logo=terraform&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-5.0-6E9F18?logo=vitest&logoColor=white)
+![Biome](https://img.shields.io/badge/Biome-2.5-60A5FA?logo=biome&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CD-2088FF?logo=githubactions&logoColor=white)
+![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757?logo=claude&logoColor=white)
+![Telegram](https://img.shields.io/badge/Telegram-Bot_API-26A5E4?logo=telegram&logoColor=white)
 
 Reads your job-alert emails, matches the postings against your actual resume,
 and writes a ranked daily report — including which resume variant to send and
@@ -25,23 +28,36 @@ It runs two ways:
 
 ```mermaid
 flowchart TB
-  subgraph read [Read]
-    direction LR
-    mail[(Mailboxes)] --> fetch[fetch<br/>code] --> extract[extract<br/>model]
+  gmail[(Gmail<br/>IMAP)]
+  github[(Resume repo<br/>GitHub)]
+  openai([Azure OpenAI API<br/>gpt-5.4-mini])
+  jev([Jev API<br/>jev-1.13.0])
+
+  subgraph app [Azure Functions app]
+    direction TB
+    subgraph daily [daily · timer, 15:00 UTC]
+      fetch --> extract --> gates[dedupe,<br/>hard gates] --> screen --> judge --> rank --> explain --> report
+    end
+    subgraph evalfn [evalReport · queue trigger]
+      evaluate[figures, latency,<br/>trend]
+    end
   end
-  subgraph filter [Filter]
-    direction LR
-    dedupe[dedupe, hard gates<br/>code] --> screen[screen<br/>Jev]
-  end
-  subgraph match [Match]
-    direction LR
-    resumes[(Resume repo)] --> judge[judge<br/>model] --> rank[rank<br/>code] --> explain[explain<br/>model]
-  end
-  subgraph deliver [Deliver]
-    direction LR
-    report[report] --> email[Email] & tg[Telegram]
-  end
-  read --> filter --> match --> deliver
+
+  queue[[Storage Queue<br/>eval-reports]]
+  blob[(Blob Storage<br/>run records, reports)]
+  logs[(Log Analytics)]
+  smtp[Gmail SMTP]
+  tg[Telegram]
+
+  gmail --> fetch
+  github --> judge
+  extract & judge & explain <--> openai
+  screen <--> jev
+  report --> blob & smtp & tg
+  report -- "run done,<br/>visible in 15 min" --> queue --> evaluate
+  evaluate -. "trace not in yet:<br/>back for 10 min" .-> queue
+  blob & logs --> evaluate
+  evaluate -- "evaluation email" --> smtp
 ```
 
 | Step | Decided by | |
@@ -59,11 +75,8 @@ filtered posting is listed in the report with its gate and reason, never scored.
 
 ## Evaluation
 
-```mermaid
-flowchart LR
-  run[daily run] --> record[(run record<br/>Blob)] --> queue[[eval-reports<br/>queue, 15 min]] --> eval[evalReport] --> email[evaluation email<br/>once per run]
-  eval -. "trace not in<br/>Log Analytics yet" .-> queue
-```
+`evalReport` is a second function, started by the queue message `daily` sends
+when its run ends:
 
 - **Run record**: every posting, filter and pick, with counts, first-pass
   problems, tokens and node times. Private, kept 90 days.
