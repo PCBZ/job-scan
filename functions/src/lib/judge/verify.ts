@@ -33,16 +33,22 @@ export const quotes = (text: string, quote: string) =>
 /** The quote within one line of the text: the prompts forbid joining lines. */
 export const quotesLine = (text: string, quote: string) =>
   text.split("\n").some((line) => quotes(line, quote));
-const WORD = /[\p{L}\p{N}]/u;
-/** The quote as whole words: "Built Go" is not in "Rebuilt Go" (#138). */
+/**
+ * A text's words, lowercased: letters and digits, with "+" and "#" kept so
+ * C++ and C# stay words. Punctuation and symbols between them don't count.
+ */
+const wordsOf = (s: string) => s.toLowerCase().match(/[\p{L}\p{N}+#]+/gu) ?? [];
+/**
+ * The quote as whole words, in order and contiguous: "Built Go" is not in
+ * "Rebuilt Go" (#138), and a dropped comma or LaTeX's " | " between a macro's
+ * arguments doesn't make a quote miss (#146).
+ */
 export function quotesWords(text: string, quote: string): boolean {
-  const t = flat(text);
-  const q = flat(quote);
-  if (q === "") return false;
-  for (let i = t.indexOf(q); i !== -1; i = t.indexOf(q, i + 1)) {
-    const before = t[i - 1] ?? " ";
-    const after = t[i + q.length] ?? " ";
-    if (!WORD.test(before) && !WORD.test(after)) return true;
+  const q = wordsOf(quote);
+  if (q.length === 0) return false;
+  const t = wordsOf(text);
+  for (let i = 0; i + q.length <= t.length; i++) {
+    if (q.every((w, j) => t[i + j] === w)) return true;
   }
   return false;
 }
