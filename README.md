@@ -1,5 +1,16 @@
 # job-scan
 
+<p>
+  <img src="https://skillicons.dev/icons?i=ts,nodejs,python,azure,terraform,githubactions,vitest,latex" alt="TypeScript, Node.js, Python, Azure, Terraform, GitHub Actions, Vitest, LaTeX">
+</p>
+
+![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757?logo=claude&logoColor=white)
+![Azure Functions](https://img.shields.io/badge/Azure_Functions-Flex_Consumption-0078D4)
+![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-gpt--5.4--mini-0078D4)
+![LangGraph](https://img.shields.io/badge/LangGraph-workflow-1C3C3C?logo=langchain&logoColor=white)
+![Jev](https://img.shields.io/badge/Jev-screen-5B5BD6)
+![Telegram](https://img.shields.io/badge/Telegram-summary-26A5E4?logo=telegram&logoColor=white)
+
 Reads your job-alert emails, matches the postings against your actual resume,
 and writes a ranked daily report — including which resume variant to send and
 the gap to address for each pick.
@@ -12,10 +23,13 @@ It runs two ways:
 
 ## How it works
 
-```
-mailboxes ─▶ extract ─▶ dedupe ─▶ hard gates ─▶ screen ─▶ judge ─▶ rank ─▶ explain ─▶ report
-              model       code       code         Jev       model    code    model      │
-resume repo ──────────────────────────────────────┘                  email + Telegram ◀─┘
+```mermaid
+flowchart LR
+  mail[(Mailboxes)] --> fetch --> extract[extract<br/>model] --> dedupe[dedupe<br/>code]
+  dedupe --> gates[hard gates<br/>code] --> screen[screen<br/>Jev] --> judge[judge<br/>model]
+  resumes[(Resume repo)] --> judge
+  judge --> rank[rank<br/>code] --> explain[explain<br/>model] --> report[report]
+  report --> email[Email] & tg[Telegram]
 ```
 
 | Step | Decided by | |
@@ -33,8 +47,13 @@ filtered posting is listed in the report with its gate and reason, never scored.
 
 ## Evaluation
 
-```
-daily run ─▶ run record (Blob) ─▶ eval-reports queue (visible in 15 min) ─▶ evalReport ─▶ evaluation email
+```mermaid
+flowchart LR
+  run[daily run] --> record[(run record<br/>Blob)] & queue[[eval-reports queue<br/>visible in 15 min]]
+  queue --> eval[evalReport]
+  eval -- "trace not in<br/>Log Analytics yet" --> queue
+  record --> eval
+  eval --> email[evaluation email<br/>once per run]
 ```
 
 - **Run record**: every posting, filter and pick, with counts, first-pass
@@ -61,9 +80,17 @@ reply to, forward, or flag mail; does not open links found in email; does not
 fill forms, upload a resume, or submit applications. Links land in the report for
 *you* to click.
 
-## Quick start (local)
+## Requirements
 
-Needs Python 3.14 or newer, and nothing else.
+| | Local skill | Cloud run |
+|---|---|---|
+| Runtime | Python 3.14+, no packages; [Claude Code](https://claude.com/claude-code) | Node.js 24, on Azure Functions (Flex Consumption) |
+| Mail | An IMAP mailbox per alert inbox; Gmail needs an [App Password](https://myaccount.google.com/apppasswords) | The same; the report mailbox also sends over Gmail SMTP |
+| Resumes | A local directory of `.tex`, `.md` or `.pdf` variants | The same, in a GitHub repo, read with a read-only fine-grained PAT |
+| Models | Claude, in Claude Code | An Azure OpenAI deployment of gpt-5.4-mini; a [TypeSafe](https://typesafe.ai) API key for Jev |
+| Deploy | — | An Azure subscription, Terraform 1.13+, a GitHub repo for CD; a Telegram bot, optional |
+
+## Quick start (local)
 
 ```bash
 git clone https://github.com/<you>/job-scan.git ~/Developer/job-scan
@@ -78,8 +105,7 @@ bin/python scripts/fetch_mail.py --check              # each mailbox signs in
 Then, in Claude Code: `/job-scan`.
 
 `config.toml`, `.env`, `data/` and `reports/` stay in this directory, gitignored
-and guarded by the pre-commit hook. Gmail needs an
-[App Password](https://myaccount.google.com/apppasswords) per account.
+and guarded by the pre-commit hook.
 
 ## Deploy to Azure
 
