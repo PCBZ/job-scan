@@ -47,7 +47,7 @@ flowchart TB
 
   subgraph apis [Model APIs]
     direction LR
-    openai([Azure AI Foundry · Azure OpenAI<br/>gpt-5.4-mini: extract, judge, explain])
+    openai(["Azure AI Foundry · Azure OpenAI<br/>gpt-5.4-mini: extract, judge, explain"])
     jev([Jev · jev-1.13.0<br/>screen])
   end
 
@@ -56,7 +56,7 @@ flowchart TB
     vault[(Key Vault<br/>secrets, config)]
     blob[(Blob Storage<br/>run records, reports)]
     table[(Table Storage<br/>seen messages, jobs)]
-    logs[(Application Insights,<br/>Log Analytics: traces)]
+    logs[("Application Insights,<br/>Log Analytics: traces")]
   end
 
   subgraph out [Delivery]
