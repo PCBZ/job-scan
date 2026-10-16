@@ -1,8 +1,14 @@
 # job-scan
 
-A [Claude Code](https://claude.com/claude-code) skill that reads your job-alert
-emails, matches the postings against your actual resume, and writes a ranked
-daily report — including which resume variant to send.
+Reads your job-alert emails, matches the postings against your actual resume,
+and writes a ranked daily report — including which resume variant to send.
+
+It runs two ways:
+- **Locally**, as a [Claude Code](https://claude.com/claude-code) skill:
+  `/job-scan` writes `reports/<date>.md`. Most of this README covers it.
+- **In the cloud**, as an Azure Functions app that runs every day on its own and
+  emails you the report, with a Telegram summary. See
+  [Daily run on Azure](#daily-run-on-azure).
 
 Scripts do the deterministic work (IMAP, HTML cleanup, LaTeX flattening,
 dedupe). Claude does only the judgment. A LinkedIn alert arrives as ~40 KB of
@@ -38,6 +44,48 @@ resume repo ──▶ resume_text.py ──────────┘
 7. **Report** to `reports/<date>.md`, with the resume variant to use
    and the specific gap to address for each pick.
 
+## Daily run on Azure
+
+`functions/` is the same workflow in TypeScript, on Azure Functions. A timer
+starts it at 15:00 UTC every day:
+
+```
+mailboxes ─▶ extract ─▶ dedupe ─▶ hard gates ─▶ screen ─▶ judge ─▶ rank ─▶ explain ─▶ report
+              model       code       code         Jev       model    code    model      │
+resume repo (GitHub) ─────────────────────────────────────┘          email + Telegram ◀─┘
+```
+
+| Step | What decides | |
+|---|---|---|
+| extract | gpt-5.4-mini | Each cleaned alert into postings; every row is checked against the message, and a miss goes back for repair |
+| dedupe, hard gates | code | Seen jobs, location, salary and excluded keywords: only what code can decide exactly |
+| screen | [Jev](https://typesafe.ai) | Yes/no questions with a confidence: sponsorship, seniority, excluded keywords, location, and whether the title is near `target_titles`. A sure "fails" filters the posting; an unsure one becomes a note |
+| judge | gpt-5.4-mini | Each posting against every resume variant. Every level quotes the resume and every gap quotes the posting, both checked by code |
+| rank | code | A weighted score, the best variant, the top picks past the floor |
+| explain | gpt-5.4-mini | Fit and Gap for each top pick, quoting the chosen resume |
+
+Then it publishes the HTML report to private Blob storage, emails it, sends a
+Telegram summary with a link to it, and records what it saw so tomorrow's run
+skips it. Filtered postings are listed in the report with their gate and
+reason, so a wrong filter is visible.
+
+**After each run**, an evaluation email follows: the funnel, tokens and their
+estimated cost, model-call latency from Application Insights, first-pass
+problems, the postings Jev filtered, and a trend over the last runs. Each run's
+records go to a private container for that report and for offline evaluation.
+
+**Deployment** is Terraform in two stacks (see [`infra/README.md`](infra/README.md)):
+you apply `infra/bootstrap` once, for identities, roles and the Key Vault; CD
+applies the rest on every `v*` tag, deploys the app, then smoke-tests the
+evaluation email. Secrets and `config.toml` reach Key Vault with
+`node functions/scripts/upload-secrets.mjs` (preview), then `--apply`; upload
+before the release that should use them.
+
+The [wiki](https://github.com/PCBZ/job-scan/wiki) has the
+[plan](https://github.com/PCBZ/job-scan/wiki/Azure-Functions-Plan), the
+[evaluation plan](https://github.com/PCBZ/job-scan/wiki/Evaluation-Plan), and
+[what a run costs](https://github.com/PCBZ/job-scan/wiki/Cost-Optimization).
+
 ## Trust boundary
 
 Your inbox is an attacker-reachable surface: anyone can mail you. When this runs
@@ -48,8 +96,9 @@ to direct the agent — "ignore previous instructions", send a reply, visit a UR
 attach your resume, claims of urgency or authority — is quoted in the report's
 `Suspicious` section and acted on by nobody.
 
-The workflow is read-only on the mailbox plus one local report file. It does not
-send, reply, forward, or flag mail; does not open links found in email; does not
+The workflow is read-only on the mailbox. Locally it writes one report file; in
+the cloud it sends the report to you alone, by email and Telegram. It does not
+reply to, forward, or flag mail; does not open links found in email; does not
 fill forms, upload a resume, or submit applications. Links land in the report for
 *you* to click.
 
@@ -243,6 +292,8 @@ In Claude Code, from any directory:
 
 For a daily run, create a scheduled task pointing at the same skill. Scheduled
 tasks fire only while Claude Code is open; a missed run happens at next launch.
+For a run that doesn't need your machine, deploy the
+[Azure app](#daily-run-on-azure).
 
 ## Scripts
 
