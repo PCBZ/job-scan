@@ -164,6 +164,18 @@ describe("short evidence (#138)", () => {
     );
   });
 
+  it("flags a phrase that only matches inside a word, and restores no line for it", () => {
+    const rebuilt: ResumeSet = {
+      ...RESUMES,
+      variants: [{ path: "B.tex", name: "Backend", text: "Rebuilt Go services at Northwind" }],
+    };
+    const j = short("Built Go services");
+    expect(verifyJudgements([j], rebuilt)[0]).toContain('evidence "Built Go services" is not');
+    expect(fullLines([j], rebuilt)[0]?.answer.variants[0]?.skills.evidence).toBe(
+      "Built Go services",
+    );
+  });
+
   it("finds the line that holds a phrase, trimmed, or null", () => {
     const text = RESUMES.variants[0]?.text ?? "";
     expect(lineOf(text, "PAYMENT services")).toBe(
