@@ -1,0 +1,91 @@
+# Publish a release's app build to GitHub Packages, as @pcbz/job-scan on the
+# npm registry (#143): one version per tag, so every deployed build is kept.
+#
+# CD calls this after the smoke test passes. Run it by hand ("Run workflow")
+# with a tag to publish one already released.
+name: Publish package
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag, such as v0.1.10
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, such as v0.1.10
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: publish-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    defaults:
+      run:
+        working-directory: functions
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Tag is a release tag
+        working-directory: .
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Not a release tag: $TAG"; exit 1; }
+
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Tag is on main
+        run: git merge-base --is-ancestor HEAD origin/main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+          registry-url: https://npm.pkg.github.com
+          scope: "@pcbz"
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # The package fields are set here, not committed, so a tag made before
+      # this workflow publishes too. Its contents are what CD deploys, less
+      # node_modules: the code, prompts, report template and host.json.
+      - name: Package fields
+        run: |
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+            delete pkg.private;
+            Object.assign(pkg, {
+              name: "@pcbz/job-scan",
+              version: process.env.TAG.slice(1),
+              files: ["dist", "prompts", "templates", "host.json"],
+              publishConfig: { registry: "https://npm.pkg.github.com" },
+              repository: { type: "git", url: "git+https://github.com/PCBZ/job-scan.git", directory: "functions" },
+            });
+            writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          '
+
+      - name: Publish
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

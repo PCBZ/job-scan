@@ -4,7 +4,8 @@ name: CD
 
 # A release is a v* tag on main: git tag vX.Y.Z && git push origin vX.Y.Z.
 # It applies infra/ as committed, deploys the tag's build as the app's code,
-# then smoke-tests the deployed evaluation report (#134).
+# smoke-tests the deployed evaluation report (#134), then publishes the build
+# to GitHub Packages (#143).
 #
 # Run by hand ("Run workflow", on a tag), it runs the smoke test alone: the
 # deploy identity trusts this workflow on tags, so a branch run gets no token.
@@ -211,3 +212,15 @@ jobs:
       - name: Smoke test
         working-directory: functions
         run: node scripts/smoke-eval.mjs "${{ steps.storage.outputs.name }}"
+
+  # Only a build that is deployed and smoke-tested becomes a package version.
+  package:
+    name: Publish to GitHub Packages
+    needs: smoke
+    if: github.event_name == 'push' && needs.smoke.result == 'success'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag: ${{ github.ref_name }}
