@@ -37,9 +37,11 @@ flowchart TB
     direction LR
     resumes[(Resume repo)] --> judge[judge<br/>model] --> rank[rank<br/>code] --> explain[explain<br/>model]
   end
-  extract --> dedupe
-  screen --> judge
-  explain --> report[report] --> email[Email] & tg[Telegram]
+  subgraph deliver [Deliver]
+    direction LR
+    report[report] --> email[Email] & tg[Telegram]
+  end
+  read --> filter --> match --> deliver
 ```
 
 | Step | Decided by | |
