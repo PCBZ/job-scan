@@ -1,8 +1,9 @@
 # Publish a release's app build to GitHub Packages, as @pcbz/job-scan on the
 # npm registry (#143): one version per tag, so every deployed build is kept.
 #
-# CD calls this after the smoke test passes. Run it by hand ("Run workflow")
-# with a tag to publish one already released.
+# CD calls this after the smoke test passes. By hand: Actions → Publish
+# package → Run workflow, with a tag to publish one already released, or blank
+# for the latest release tag.
 name: Publish package
 
 on:
@@ -15,19 +16,20 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag, such as v0.1.10
+        description: Release tag, such as v0.1.10; blank for the latest
         type: string
-        required: true
+        required: false
+        default: ""
 
 permissions: {}
 
 concurrency:
-  group: publish-${{ inputs.tag }}
+  group: publish-${{ inputs.tag || 'latest' }}
   cancel-in-progress: false
 
 jobs:
   publish:
-    name: Publish ${{ inputs.tag }}
+    name: Publish ${{ inputs.tag || 'the latest tag' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -36,17 +38,26 @@ jobs:
     defaults:
       run:
         working-directory: functions
-    env:
-      TAG: ${{ inputs.tag }}
     steps:
-      - name: Tag is a release tag
+      - name: Release tag
+        id: tag
         working-directory: .
+        env:
+          INPUT: ${{ inputs.tag }}
+          REPO: ${{ github.server_url }}/${{ github.repository }}.git
         run: |
-          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Not a release tag: $TAG"; exit 1; }
+          tag="$INPUT"
+          if [ -z "$tag" ]; then
+            tag=$(git ls-remote --tags --refs --sort=-v:refname "$REPO" 'v*' \
+              | sed 's|.*refs/tags/||' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+          fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Not a release tag: '$tag'"; exit 1; }
+          echo "Publishing $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v5
         with:
-          ref: refs/tags/${{ inputs.tag }}
+          ref: refs/tags/${{ steps.tag.outputs.tag }}
           fetch-depth: 0
 
       - name: Tag is on main
@@ -70,6 +81,8 @@ jobs:
       # this workflow publishes too. Its contents are what CD deploys, less
       # node_modules: the code, prompts, report template and host.json.
       - name: Package fields
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           node --input-type=module -e '
             import { readFileSync, writeFileSync } from "node:fs";
