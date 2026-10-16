@@ -24,12 +24,22 @@ It runs two ways:
 ## How it works
 
 ```mermaid
-flowchart LR
-  mail[(Mailboxes)] --> fetch --> extract[extract<br/>model] --> dedupe[dedupe<br/>code]
-  dedupe --> gates[hard gates<br/>code] --> screen[screen<br/>Jev] --> judge[judge<br/>model]
-  resumes[(Resume repo)] --> judge
-  judge --> rank[rank<br/>code] --> explain[explain<br/>model] --> report[report]
-  report --> email[Email] & tg[Telegram]
+flowchart TB
+  subgraph read [Read]
+    direction LR
+    mail[(Mailboxes)] --> fetch[fetch<br/>code] --> extract[extract<br/>model]
+  end
+  subgraph filter [Filter]
+    direction LR
+    dedupe[dedupe, hard gates<br/>code] --> screen[screen<br/>Jev]
+  end
+  subgraph match [Match]
+    direction LR
+    resumes[(Resume repo)] --> judge[judge<br/>model] --> rank[rank<br/>code] --> explain[explain<br/>model]
+  end
+  extract --> dedupe
+  screen --> judge
+  explain --> report[report] --> email[Email] & tg[Telegram]
 ```
 
 | Step | Decided by | |
