@@ -1,6 +1,6 @@
 # job-scan
 
-| | |
+| Area | Stack |
 |---|---|
 | Languages | ![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?logo=typescript&logoColor=white) ![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white) ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white) |
 | Azure compute | ![Azure Functions](https://img.shields.io/badge/Azure_Functions-v4_Flex_Consumption-0078D4) ![Managed Identity](https://img.shields.io/badge/Managed_Identity-user--assigned-0078D4) |
