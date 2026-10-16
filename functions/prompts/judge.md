@@ -28,12 +28,12 @@ Return one entry per resume in "resumes", in the same order, with "variant" set 
   - exact: years and scope match.
 
 For each dimension:
-- "evidence" is one line copied verbatim from this resume's text that earns the level. Copy it exactly: no paraphrase, no joining of separate lines. Use "" only when the level is none.
+- "evidence" is the shortest phrase, 3 to 15 words, copied verbatim from one line of this resume's text, that earns the level. Copy the words exactly as written: no paraphrase, no changed word, no joining of separate lines. Use "" only when the level is none.
 - "gap" is a requirement the posting states that this resume doesn't meet, copied verbatim from the posting. It is never something the alert leaves out (those go in "unknowns"), and never a requirement the resume already meets. Use "" when the resume meets every requirement the posting states. An empty gap is a fact: don't invent one to fill the field. When the posting lists no requirements, every gap is "": never take one from the title.
 
 ## Location and signal
 
-Judge these once for the posting, with a short reason each.
+Judge these once for the posting: a level each, no reason.
 - location: does the posting's location and workplace match the candidate's locations and open_to_remote?
   - none: outside every stated preference.
   - weak: a long commute, or remote with restrictions that may exclude them.

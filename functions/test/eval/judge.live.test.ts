@@ -12,7 +12,7 @@ import type { Explanation } from "../../src/lib/explain/schema.js";
 import { verifyExplanations } from "../../src/lib/explain/verify.js";
 import { judgeStep } from "../../src/lib/judge/judge.js";
 import { rank } from "../../src/lib/judge/rank.js";
-import { type Judgement, verifyJudgements } from "../../src/lib/judge/verify.js";
+import { fullLines, type Judgement, verifyJudgements } from "../../src/lib/judge/verify.js";
 import { modelClientFromEnv } from "../../src/lib/model/config.js";
 import type { RepairTurn } from "../../src/lib/model/types.js";
 import type { ResumeSet } from "../../src/lib/resume/load.js";
@@ -99,7 +99,8 @@ describe.skipIf(process.env.EVAL_LIVE !== "1")("judging and explaining, live", (
       if (problems.length === 0) break;
       repairs.push({ previous: judged, problems });
     }
-    const ranked = rank(judged, CONFIG);
+    // Then rank, after each phrase becomes its whole line, as in the graph (#138).
+    const ranked = rank(fullLines(judged, RESUMES), CONFIG);
     for (const r of [...ranked.top, ...ranked.rest]) {
       console.log(
         `${r.posting.title}: ${r.score} via ${r.variant}${r.either ? ` (either ${r.either})` : ""}, ${r.confidence}`,

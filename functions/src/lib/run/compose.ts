@@ -22,7 +22,7 @@ import { verifyExplanations } from "../explain/verify.js";
 import { judgeStep } from "../judge/judge.js";
 import { rank } from "../judge/rank.js";
 import { screenStep } from "../judge/screen.js";
-import { verifyJudgements } from "../judge/verify.js";
+import { fullLines, verifyJudgements } from "../judge/verify.js";
 import { type ConnectMailbox, connectImap } from "../mail/mailbox.js";
 import { runFetch } from "../mail/run.js";
 import { TableSeenStore } from "../mail/seen-store.js";
@@ -123,6 +123,7 @@ export function composePipeline(
     dedupe: dedupeStep(seenJobs, now),
     hardGates: hardGatesStep(),
     verifyJudgements,
+    fullLines,
     rank,
     verifyExplanations,
     renderReport: (input) => buildReport(input, now()),

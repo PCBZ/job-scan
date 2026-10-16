@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  fullLines,
+  lineOf,
   postingId,
   problemAbout,
   problemsAbout,
@@ -134,6 +136,79 @@ describe("verifyJudgements", () => {
     expect(verifyJudgements([j], RESUMES)[0]).toContain(
       "answer one entry per resume, in this order: Backend",
     );
+  });
+});
+
+describe("short evidence (#138)", () => {
+  const short = (evidence: string) =>
+    judgement({
+      answer: {
+        variants: [
+          {
+            variant: "Backend",
+            skills: dimension({ evidence }),
+            domain: dimension({ evidence: "Postgres and Kafka" }),
+            seniority: dimension({ level: "none", evidence: "" }),
+          },
+        ],
+      },
+    });
+
+  it("passes a phrase from within one line", () => {
+    expect(verifyJudgements([short("payment services in Go")], RESUMES)).toEqual([]);
+  });
+
+  it("flags a paraphrased phrase, so a repair asks for the resume's words", () => {
+    expect(verifyJudgements([short("payment systems in Go")], RESUMES)[0]).toContain(
+      'Backend skills: evidence "payment systems in Go" is not a line of that resume',
+    );
+  });
+
+  it("flags a phrase that only matches inside a word, and restores no line for it", () => {
+    const rebuilt: ResumeSet = {
+      ...RESUMES,
+      variants: [{ path: "B.tex", name: "Backend", text: "Rebuilt Go services at Northwind" }],
+    };
+    const j = short("Built Go services");
+    expect(verifyJudgements([j], rebuilt)[0]).toContain('evidence "Built Go services" is not');
+    expect(fullLines([j], rebuilt)[0]?.answer.variants[0]?.skills.evidence).toBe(
+      "Built Go services",
+    );
+  });
+
+  it("finds the line that holds a phrase, trimmed, or null", () => {
+    const text = RESUMES.variants[0]?.text ?? "";
+    expect(lineOf(text, "PAYMENT services")).toBe(
+      "Built payment services in Go,  serving 2M users.",
+    );
+    expect(lineOf(text, "Kafka streams")).toBeNull();
+  });
+
+  it("restores each phrase to its whole line, and keeps the rest of the answer", () => {
+    const j = short("payment services in Go");
+    const [full] = fullLines([j], RESUMES);
+    const v = full?.answer.variants[0];
+    expect(v?.skills.evidence).toBe("Built payment services in Go,  serving 2M users.");
+    expect(v?.domain.evidence).toBe("Postgres and Kafka");
+    expect(v?.seniority).toEqual(j.answer.variants[0]?.seniority);
+    expect(full?.posting).toBe(j.posting);
+    expect({ ...full?.answer, variants: [] }).toEqual({ ...j.answer, variants: [] });
+  });
+
+  it("takes the first line when a phrase is in two", () => {
+    const twice: ResumeSet = {
+      ...RESUMES,
+      variants: [
+        { path: "B.tex", name: "Backend", text: "Go services at Northwind\nGo services at Lumen" },
+      ],
+    };
+    const [full] = fullLines([short("Go services")], twice);
+    expect(full?.answer.variants[0]?.skills.evidence).toBe("Go services at Northwind");
+  });
+
+  it("leaves a phrase found nowhere as it is", () => {
+    const [full] = fullLines([short("payment systems in Go")], RESUMES);
+    expect(full?.answer.variants[0]?.skills.evidence).toBe("payment systems in Go");
   });
 });
 

@@ -80,6 +80,8 @@ export interface DeterministicSteps {
     config: AppConfig,
   ): Promise<{ kept: Posting[]; filtered: Filtered[]; notes: string[] }>;
   verifyJudgements(judged: Judgement[], resumes: ResumeSet): string[];
+  /** Each evidence phrase, verified, becomes the whole resume line it came from. */
+  fullLines(judged: Judgement[], resumes: ResumeSet): Judgement[];
   /** Top N past the floor, the rest and notes. */
   rank(judged: Judgement[], config: AppConfig): RankResult;
   verifyExplanations(explained: Explanation[], top: Ranked[], resumes: ResumeSet): string[];

@@ -7,6 +7,8 @@ import type { ResumeSet } from "../resume/load.js";
 import { postingFields } from "./fields.js";
 import type { JudgeAnswer } from "./schema.js";
 
+type Fit = JudgeAnswer["variants"][number]["skills"];
+
 export interface Judgement {
   posting: Posting;
   answer: JudgeAnswer;
@@ -31,6 +33,29 @@ export const quotes = (text: string, quote: string) =>
 /** The quote within one line of the text: the prompts forbid joining lines. */
 export const quotesLine = (text: string, quote: string) =>
   text.split("\n").some((line) => quotes(line, quote));
+const WORD = /[\p{L}\p{N}]/u;
+/** The quote as whole words: "Built Go" is not in "Rebuilt Go" (#138). */
+export function quotesWords(text: string, quote: string): boolean {
+  const t = flat(text);
+  const q = flat(quote);
+  if (q === "") return false;
+  for (let i = t.indexOf(q); i !== -1; i = t.indexOf(q, i + 1)) {
+    const before = t[i - 1] ?? " ";
+    const after = t[i + q.length] ?? " ";
+    if (!WORD.test(before) && !WORD.test(after)) return true;
+  }
+  return false;
+}
+/**
+ * The first line of the text that holds the evidence phrase as whole words;
+ * null when none does. verify_judgements and fullLines both use it, so a
+ * phrase that passes is a phrase that restores.
+ */
+export const lineOf = (text: string, quote: string) =>
+  text
+    .split("\n")
+    .find((line) => quotesWords(line, quote))
+    ?.trim() ?? null;
 /** The same phrase, give or take a few words at either end. */
 export const samePhrase = (a: string, b: string) =>
   flat(a) !== "" && flat(b) !== "" && (flat(a).includes(flat(b)) || flat(b).includes(flat(a)));
@@ -52,7 +77,7 @@ export function verifyJudgements(judged: Judgement[], resumes: ResumeSet): strin
       const text = texts.get(v.variant) ?? "";
       for (const dim of ["skills", "domain", "seniority"] as const) {
         const { level, evidence } = v[dim];
-        if (level !== "none" && !quotesLine(text, evidence)) {
+        if (level !== "none" && lineOf(text, evidence) === null) {
           say(`${v.variant} ${dim}: evidence "${evidence}" is not a line of that resume`);
         }
       }
@@ -68,4 +93,30 @@ export function verifyJudgements(judged: Judgement[], resumes: ResumeSet): strin
     }
   }
   return problems;
+}
+
+/**
+ * The judge quotes a short phrase, so its answer costs less (#138); explain,
+ * the run record and the report show the whole resume line it came from. A
+ * phrase found in no line, left unresolved by the repair loop, stays as it is.
+ */
+export function fullLines(judged: Judgement[], resumes: ResumeSet): Judgement[] {
+  const texts = new Map(resumes.variants.map((v) => [v.name, v.text]));
+  const full = (text: string, fit: Fit): Fit =>
+    fit.evidence ? { ...fit, evidence: lineOf(text, fit.evidence) ?? fit.evidence } : fit;
+  return judged.map(({ posting, answer }) => ({
+    posting,
+    answer: {
+      ...answer,
+      variants: answer.variants.map((v) => {
+        const text = texts.get(v.variant) ?? "";
+        return {
+          ...v,
+          skills: full(text, v.skills),
+          domain: full(text, v.domain),
+          seniority: full(text, v.seniority),
+        };
+      }),
+    },
+  }));
 }

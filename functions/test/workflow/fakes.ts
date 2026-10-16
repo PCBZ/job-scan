@@ -107,6 +107,7 @@ export function fakes(o: FakeOptions = {}) {
       log.push("verify_judgements");
       return take(o.judgeProblems, counters.judge - 1);
     },
+    fullLines: (judged) => judged,
     rank(judged) {
       log.push("rank");
       return {

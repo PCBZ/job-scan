@@ -1,5 +1,5 @@
-// What the model returns for one posting. Every outcome carries its reason: a
-// rubric level quotes the resume and names a gap. Gates are screen's (#121).
+// What the model returns for one posting. A rubric level quotes the resume
+// and names a gap; location and signal are levels. Gates are screen's (#121).
 
 import { z } from "zod";
 
@@ -10,7 +10,10 @@ const level = z.enum(LEVELS);
 
 const fit = z.object({
   level,
-  /** A line quoted verbatim from this variant's resume; "" when the level is none. */
+  /**
+   * A phrase quoted verbatim from one line of this variant's resume; "" when
+   * the level is none. After verification it holds that whole line (#138).
+   */
   evidence: z.string(),
   /** A requirement in the posting this resume does not meet; "" when there is none. */
   gap: z.string(),
@@ -19,8 +22,9 @@ const fit = z.object({
 export const judgeAnswer = z.object({
   /** One per resume variant, in the order given. */
   variants: z.array(z.object({ variant: z.string(), skills: fit, domain: fit, seniority: fit })),
-  location: z.object({ level, reason: z.string() }),
-  signal: z.object({ level, reason: z.string() }),
+  // Levels only: rank reads nothing else, and a reason was output paid for (#138).
+  location: z.object({ level }),
+  signal: z.object({ level }),
   /** What the alert doesn't say that the judgement needed. */
   unknowns: z.array(z.string()),
 });
