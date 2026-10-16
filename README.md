@@ -27,19 +27,17 @@ It runs two ways:
 ## How it works
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph inputs [Inputs]
+    direction LR
     gmail[(Gmail · IMAP<br/>job alerts)]
     github[(GitHub<br/>resume repo)]
   end
 
-  subgraph apis [Model APIs]
-    openai([Azure OpenAI · gpt-5.4-mini<br/>extract, judge, explain])
-    jev([Jev · jev-1.13.0<br/>screen])
-  end
-
   subgraph app [Azure Functions app]
+    direction LR
     subgraph daily ["daily · timer, 15:00 UTC"]
+      direction TB
       fetch --> extract --> gates[dedupe,<br/>hard gates] --> screen --> judge --> rank --> explain --> report
     end
     queue[[Storage Queue<br/>eval-reports]]
@@ -49,18 +47,28 @@ flowchart LR
     daily -- "run done,<br/>visible in 15 min" --> queue --> evalfn
   end
 
-  blob[(Blob Storage<br/>run records, reports)]
-  logs[(Log Analytics<br/>traces)]
+  subgraph apis [Model APIs]
+    direction LR
+    openai([Azure OpenAI · gpt-5.4-mini<br/>extract, judge, explain])
+    jev([Jev · jev-1.13.0<br/>screen])
+  end
+
+  subgraph data [Data]
+    direction LR
+    blob[(Blob Storage<br/>run records, reports)]
+    logs[(Log Analytics<br/>traces)]
+  end
 
   subgraph out [Delivery]
+    direction LR
     smtp[Gmail SMTP<br/>report, evaluation email]
     tg[Telegram<br/>summary, link]
   end
 
   inputs --> daily
   daily <--> apis
-  daily --> blob --> evalfn
-  logs --> evalfn
+  daily --> data
+  data --> evalfn
   daily --> out
   evalfn --> out
 ```
