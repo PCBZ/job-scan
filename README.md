@@ -1,16 +1,14 @@
 # job-scan
 
-| Area | Stack |
-|---|---|
-| Languages | ![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?logo=typescript&logoColor=white) ![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white) ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white) |
-| Azure compute | ![Azure Functions](https://img.shields.io/badge/Azure_Functions-v4_Flex_Consumption-0078D4) ![Managed Identity](https://img.shields.io/badge/Managed_Identity-user--assigned-0078D4) |
-| Azure AI | ![Azure AI Foundry](https://img.shields.io/badge/Azure_AI_Foundry-AIServices_project-0078D4) ![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-gpt--5.4--mini-0078D4) |
-| Azure data | ![Blob Storage](https://img.shields.io/badge/Blob_Storage-run_records,_reports-0078D4) ![Storage Queues](https://img.shields.io/badge/Storage_Queues-eval--reports-0078D4) ![Table Storage](https://img.shields.io/badge/Table_Storage-seen_jobs-0078D4) ![Key Vault](https://img.shields.io/badge/Key_Vault-secrets,_config-0078D4) |
-| Observability | ![Application Insights](https://img.shields.io/badge/Application_Insights-traces-0078D4) ![Log Analytics](https://img.shields.io/badge/Log_Analytics-KQL-0078D4) ![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-2.10-425CC7?logo=opentelemetry&logoColor=white) |
-| AI workflow | ![LangGraph](https://img.shields.io/badge/LangGraph-1.4-1C3C3C?logo=langchain&logoColor=white) ![Jev](https://img.shields.io/badge/Jev-1.13.0-5B5BD6) ![Zod](https://img.shields.io/badge/Zod-4.6-3E67B1?logo=zod&logoColor=white) ![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757?logo=claude&logoColor=white) |
-| Delivery | ![Gmail](https://img.shields.io/badge/Gmail-IMAP,_SMTP-EA4335?logo=gmail&logoColor=white) ![Telegram](https://img.shields.io/badge/Telegram-Bot_API-26A5E4?logo=telegram&logoColor=white) |
-| Infra and CI | ![Terraform](https://img.shields.io/badge/Terraform-1.13-844FBA?logo=terraform&logoColor=white) ![azurerm](https://img.shields.io/badge/azurerm-5.8-844FBA?logo=terraform&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CD-2088FF?logo=githubactions&logoColor=white) ![GitHub Packages](https://img.shields.io/badge/GitHub_Packages-npm-181717?logo=github&logoColor=white) |
-| Tooling | ![Vitest](https://img.shields.io/badge/Vitest-5.0-6E9F18?logo=vitest&logoColor=white) ![Biome](https://img.shields.io/badge/Biome-2.5-60A5FA?logo=biome&logoColor=white) ![Azurite](https://img.shields.io/badge/Azurite-3.37-0078D4) ![LaTeX](https://img.shields.io/badge/unified--latex-1.8-008080?logo=latex&logoColor=white) |
+![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?logo=typescript&logoColor=white) ![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white) ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
+![Azure Functions](https://img.shields.io/badge/Azure_Functions-v4_Flex_Consumption-0078D4) ![Managed Identity](https://img.shields.io/badge/Managed_Identity-user--assigned-0078D4)
+![Azure AI Foundry](https://img.shields.io/badge/Azure_AI_Foundry-AIServices_project-0078D4) ![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-gpt--5.4--mini-0078D4)
+![Blob Storage](https://img.shields.io/badge/Blob_Storage-run_records,_reports-0078D4) ![Storage Queues](https://img.shields.io/badge/Storage_Queues-eval--reports-0078D4) ![Table Storage](https://img.shields.io/badge/Table_Storage-seen_jobs-0078D4) ![Key Vault](https://img.shields.io/badge/Key_Vault-secrets,_config-0078D4)
+![Application Insights](https://img.shields.io/badge/Application_Insights-traces-0078D4) ![Log Analytics](https://img.shields.io/badge/Log_Analytics-KQL-0078D4) ![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-2.10-425CC7?logo=opentelemetry&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-1.4-1C3C3C?logo=langchain&logoColor=white) ![Jev](https://img.shields.io/badge/Jev-1.13.0-5B5BD6) ![Zod](https://img.shields.io/badge/Zod-4.6-3E67B1?logo=zod&logoColor=white) ![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757?logo=claude&logoColor=white)
+![Gmail](https://img.shields.io/badge/Gmail-IMAP,_SMTP-EA4335?logo=gmail&logoColor=white) ![Telegram](https://img.shields.io/badge/Telegram-Bot_API-26A5E4?logo=telegram&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-1.13-844FBA?logo=terraform&logoColor=white) ![azurerm](https://img.shields.io/badge/azurerm-5.8-844FBA?logo=terraform&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CD-2088FF?logo=githubactions&logoColor=white) ![GitHub Packages](https://img.shields.io/badge/GitHub_Packages-npm-181717?logo=github&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-5.0-6E9F18?logo=vitest&logoColor=white) ![Biome](https://img.shields.io/badge/Biome-2.5-60A5FA?logo=biome&logoColor=white) ![Azurite](https://img.shields.io/badge/Azurite-3.37-0078D4) ![LaTeX](https://img.shields.io/badge/unified--latex-1.8-008080?logo=latex&logoColor=white)
 
 Reads your job-alert emails, matches the postings against your actual resume,
 and writes a ranked daily report — including which resume variant to send and
@@ -34,15 +32,10 @@ flowchart TB
 
   subgraph app [Azure Functions app]
     direction LR
-    subgraph daily ["daily · timer, 15:00 UTC"]
-      direction TB
-      fetch --> extract --> gates[dedupe,<br/>hard gates] --> screen --> judge --> rank --> explain --> report
-    end
+    daily["daily<br/>timer, 15:00 UTC"]
     queue[[Storage Queue<br/>eval-reports]]
-    subgraph evalfn ["evalReport · queue trigger"]
-      evaluate[figures, latency,<br/>trend]
-    end
-    daily -- "run done,<br/>visible in 15 min" --> queue --> evalfn
+    evalfn["evalReport<br/>queue trigger"]
+    daily -- "run done" --> queue --> evalfn
   end
 
   subgraph apis [Model APIs]
@@ -73,6 +66,23 @@ flowchart TB
   evalfn --> out
 ```
 
+### The daily function
+
+```mermaid
+flowchart TB
+  timer([timer, 15:00 UTC]) --> config[load config<br/>Blob, Key Vault]
+  config --> fetch[fetch mail<br/>Gmail IMAP] & resumes[load resumes<br/>GitHub]
+  fetch --> extract[extract<br/>Azure OpenAI] --> vx{every row<br/>in its message?}
+  vx -- "no: repair" --> extract
+  vx -- yes --> dedupe[dedupe<br/>Table Storage] --> gates[hard gates<br/>code] --> screen[screen<br/>Jev]
+  screen & resumes --> judge[judge<br/>Azure OpenAI] --> vj{quotes in the<br/>resume and posting?}
+  vj -- "no: repair" --> judge
+  vj -- yes --> rank[rank<br/>code] --> explain[explain<br/>Azure OpenAI] --> ve{quotes in<br/>the resume?}
+  ve -- "no: repair" --> explain
+  ve -- yes --> report[report<br/>Blob] --> deliver[email, Telegram] --> seen[mark seen<br/>Table Storage]
+  seen --> record[run record<br/>Blob] --> queue[[eval-reports queue<br/>visible in 15 min]]
+```
+
 | Step | Decided by | |
 |---|---|---|
 | fetch | code | IMAP, read-only (`BODY.PEEK`); HTML to clean text, tracking params removed |
@@ -90,6 +100,19 @@ filtered posting is listed in the report with its gate and reason, never scored.
 
 `evalReport` is a second function, started by the queue message `daily` sends
 when its run ends:
+
+```mermaid
+flowchart TB
+  msg[[eval-reports message]] --> smoke{smoke test?}
+  smoke -- yes --> latest[latest traced run] --> smail["[SMOKE] email"] --> result[[eval-smoke queue<br/>outcome for CD]]
+  smoke -- no --> read[run record and the<br/>6 runs before it<br/>Blob]
+  read --> trace{trace in<br/>Log Analytics?}
+  trace -- "no, under 5 waits" --> wait[[back on the queue<br/>for 10 min]] --> msg
+  trace -- "yes, or 5 waits done" --> figures[funnel, cost, latency,<br/>quality, screen, trend]
+  figures --> first{first message<br/>for this run?}
+  first -- no --> stop([done])
+  first -- yes --> email[evaluation email<br/>Gmail SMTP]
+```
 
 - **Run record**: every posting, filter and pick, with counts, first-pass
   problems, tokens and node times. Private, kept 90 days.
