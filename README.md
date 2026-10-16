@@ -72,15 +72,13 @@ flowchart TB
 flowchart TB
   timer([timer, 15:00 UTC]) --> config[load config<br/>Blob, Key Vault]
   config --> fetch[fetch mail<br/>Gmail IMAP] & resumes[load resumes<br/>GitHub]
-  fetch --> extract[extract<br/>Azure OpenAI] --> vx{every row<br/>in its message?}
-  vx -- "no: repair" --> extract
-  vx -- yes --> dedupe[dedupe<br/>Table Storage] --> gates[hard gates<br/>code] --> screen[screen<br/>Jev]
-  screen & resumes --> judge[judge<br/>Azure OpenAI] --> vj{quotes in the<br/>resume and posting?}
-  vj -- "no: repair" --> judge
-  vj -- yes --> rank[rank<br/>code] --> explain[explain<br/>Azure OpenAI] --> ve{quotes in<br/>the resume?}
-  ve -- "no: repair" --> explain
-  ve -- yes --> report[report<br/>Blob] --> deliver[email, Telegram] --> seen[mark seen<br/>Table Storage]
+  fetch --> extract[extract<br/>Azure OpenAI] --> dedupe[dedupe<br/>Table Storage] --> gates[hard gates<br/>code] --> screen[screen<br/>Jev]
+  screen & resumes --> judge[judge<br/>Azure OpenAI] --> rank[rank<br/>code] --> explain[explain<br/>Azure OpenAI]
+  explain --> report[report<br/>Blob] --> deliver[email, Telegram] --> seen[mark seen<br/>Table Storage]
   seen --> record[run record<br/>Blob] --> queue[[eval-reports queue<br/>visible in 15 min]]
+  extract -. "repair: a row not in its message" .-> extract
+  judge -. "repair: a quote not in the resume or posting" .-> judge
+  explain -. "repair: a quote not in the resume" .-> explain
 ```
 
 | Step | Decided by | |
