@@ -69,10 +69,39 @@ Telegram summary with a link to it, and records what it saw so tomorrow's run
 skips it. Filtered postings are listed in the report with their gate and
 reason, so a wrong filter is visible.
 
-**After each run**, an evaluation email follows: the funnel, tokens and their
-estimated cost, model-call latency from Application Insights, first-pass
-problems, the postings Jev filtered, and a trend over the last runs. Each run's
-records go to a private container for that report and for offline evaluation.
+### Evaluation
+
+Each run is evaluated from what it recorded, with no labelled set and no LLM
+judge. A second function sends the result as its own email:
+
+```
+daily run ─▶ run record (Blob) ─▶ message on the eval-reports queue, visible in 15 min
+                                          │
+evalReport ◀──────────────────────────────┘
+  ├─ the run's trace in Log Analytics? no ─▶ back on the queue for 10 min (5 times at most)
+  ├─ figures from the record and the six runs before it
+  └─ evaluation email, at most once per run
+```
+
+- **Run record**: every posting with its message text, every filter with its
+  gate and reason, each pick with its judgement, and a run line with counts,
+  first-pass and unresolved problems, tokens per node, node times and the trace
+  id. JSONL in a private container, kept 90 days.
+- **The email**: the funnel from messages to top picks; tokens and estimated
+  cost for Azure OpenAI and Jev, at list prices; run time and model-call latency
+  from the trace; repairs and first-pass problems per loop; the postings Jev
+  filtered, with its confidence; and a trend over the last runs.
+- **Waiting for the trace**: telemetry reaches Log Analytics minutes after the
+  run, so the message goes back on the queue until every model call is there.
+  After five waits the email goes out without latency. A mark beside the record
+  stops a redelivered message from sending twice.
+- **Smoke test**: after each deploy, CD queues a smoke message; evalReport
+  reports on the latest run with a `[SMOKE]` subject and posts the outcome to
+  the `eval-smoke` queue, which CD waits on.
+
+Offline, `npm run eval:extract`, `eval:judge` and `eval:jev` run the model
+steps live against synthetic fixtures; `eval:email` and `eval:telegram` send
+the synthetic sample report for real.
 
 **Deployment** is Terraform in two stacks (see [`infra/README.md`](infra/README.md)):
 you apply `infra/bootstrap` once, for identities, roles and the Key Vault; CD
