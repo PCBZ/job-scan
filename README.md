@@ -61,11 +61,8 @@ filtered posting is listed in the report with its gate and reason, never scored.
 
 ```mermaid
 flowchart LR
-  run[daily run] --> record[(run record<br/>Blob)] & queue[[eval-reports queue<br/>visible in 15 min]]
-  queue --> eval[evalReport]
-  eval -- "trace not in<br/>Log Analytics yet" --> queue
-  record --> eval
-  eval --> email[evaluation email<br/>once per run]
+  run[daily run] --> record[(run record<br/>Blob)] --> queue[[eval-reports<br/>queue, 15 min]] --> eval[evalReport] --> email[evaluation email<br/>once per run]
+  eval -. "trace not in<br/>Log Analytics yet" .-> queue
 ```
 
 - **Run record**: every posting, filter and pick, with counts, first-pass
