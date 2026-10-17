@@ -6,12 +6,17 @@ import type { TokenUsage } from "../model/types.js";
 import type { FilteredRecord, PickRecord, RunRecord, RunStatsRecord } from "../run/records.js";
 import type { Loop } from "../workflow/state.js";
 import type { Latency } from "./latency.js";
-import { azurePrice, costOf, JEV, JEV_NODES } from "./prices.js";
+import { costOf, JEV_NODES, LEGACY_AZURE_MODEL, NO_PRICES, type Prices } from "./prices.js";
 
-/** Tokens and their estimated cost, in USD. */
+/** Tokens and their estimated cost in USD; null when there's no price for them. */
 export interface Spend extends TokenUsage {
   cached: number;
-  usd: number;
+  usd: number | null;
+}
+
+/** One model's tokens and cost: an Azure OpenAI model, or "Jev". */
+export interface CostRow extends Spend {
+  model: string;
 }
 
 export interface ScreenedOut {
@@ -26,7 +31,7 @@ export interface ScreenedOut {
 export interface TrendRow {
   day: string;
   version: string;
-  usd: number;
+  usd: number | null;
   judged: number;
   firstPass: number;
   filtered: number;
@@ -49,9 +54,12 @@ export interface Evaluation {
     judged: number;
     top: number;
   };
-  azure: Spend;
-  jev: Spend;
-  usd: number;
+  /** Tokens and cost per model, at the prices the report found. */
+  cost: CostRow[];
+  /** Where the prices came from, for the footer. */
+  pricedBy: { azureOn: string | null; jev: boolean };
+  /** The run's cost; null when a part of it has no price. */
+  usd: number | null;
   /** Start to end of the workflow; null for records from before #129. */
   runMs: number | null;
   throttledMs: number;
@@ -77,21 +85,41 @@ const JEV_REASON = /\(Jev (\d(?:\.\d+)?)\)$/;
 
 const LOOPS: Loop[] = ["extract", "judge", "explain"];
 
-function spend(
-  usage: Record<string, TokenUsage>,
-  jev: boolean,
-  models: Record<string, string> = {},
-): Spend {
-  const total: Spend = { input: 0, output: 0, cached: 0, usd: 0 };
-  for (const [node, u] of Object.entries(usage)) {
-    if (JEV_NODES.has(node) !== jev) continue;
-    total.input += u.input;
-    total.output += u.output;
-    total.cached += u.cached ?? 0;
-    total.usd += costOf(u, jev ? JEV : azurePrice(models[node]));
+/** The model behind an Azure node; records before #148 name none. */
+export const modelOf = (run: RunStatsRecord, node: string) =>
+  run.models?.[node] ?? LEGACY_AZURE_MODEL;
+
+/** Every Azure OpenAI model these runs used, to look up their prices. */
+export const azureModels = (runs: RunStatsRecord[]) => [
+  ...new Set(
+    runs.flatMap((r) =>
+      Object.keys(r.usage)
+        .filter((n) => !JEV_NODES.has(n))
+        .map((n) => modelOf(r, n)),
+    ),
+  ),
+];
+
+/** A run's tokens and cost per model, Azure's first and Jev's last. */
+function costRows(run: RunStatsRecord, prices: Prices): CostRow[] {
+  const rows = new Map<string, CostRow>();
+  for (const [node, u] of Object.entries(run.usage)) {
+    const jev = JEV_NODES.has(node);
+    const model = jev ? "Jev" : modelOf(run, node);
+    const price = jev ? prices.jev : (prices.azure[model] ?? null);
+    const row = rows.get(model) ?? { model, input: 0, output: 0, cached: 0, usd: 0 };
+    row.input += u.input;
+    row.output += u.output;
+    row.cached += u.cached ?? 0;
+    row.usd = row.usd === null || price === null ? null : row.usd + costOf(u, price);
+    rows.set(model, row);
   }
-  return total;
+  return [...rows.values()].sort((a, b) => Number(a.model === "Jev") - Number(b.model === "Jev"));
 }
+
+/** The sum, or null when any part has no price. */
+const total = (rows: CostRow[]) =>
+  rows.reduce<number | null>((t, r) => (t === null || r.usd === null ? null : t + r.usd), 0);
 
 function cachedShare(run: RunStatsRecord): number | null {
   const judge = run.usage.judge;
@@ -99,11 +127,11 @@ function cachedShare(run: RunStatsRecord): number | null {
   return judge.cached / judge.input;
 }
 
-function trendRow(run: RunStatsRecord): TrendRow {
+function trendRow(run: RunStatsRecord, prices: Prices): TrendRow {
   return {
     day: runDay(new Date(run.started_at)),
     version: run.version,
-    usd: spend(run.usage, false, run.models).usd + spend(run.usage, true).usd,
+    usd: total(costRows(run, prices)),
     judged: run.judged,
     firstPass: run.loops.judge.first_pass.length,
     filtered: run.filtered,
@@ -119,6 +147,7 @@ export function evaluate(
   records: RunRecord[],
   earlier: RunStatsRecord[],
   latency: Latency | null = null,
+  prices: Prices = NO_PRICES,
 ): Evaluation {
   const run = records.find((r): r is RunStatsRecord => r.kind === "run");
   if (!run) throw new Error("the run record has no run line");
@@ -146,12 +175,11 @@ export function evaluate(
       extractedBy[r.posting.source] = (extractedBy[r.posting.source] ?? 0) + 1;
   }
 
-  const azure = spend(run.usage, false, run.models);
-  const jev = spend(run.usage, true);
+  const cost = costRows(run, prices);
   const ended = run.ended_at ? Date.parse(run.ended_at) : Number.NaN;
   const trend = [...earlier.filter((e) => e.started_at < run.started_at), run]
     .sort((a, b) => a.started_at.localeCompare(b.started_at))
-    .map(trendRow);
+    .map((r) => trendRow(r, prices));
 
   return {
     day: runDay(new Date(run.started_at)),
@@ -168,9 +196,9 @@ export function evaluate(
       judged: run.judged,
       top: run.top,
     },
-    azure,
-    jev,
-    usd: azure.usd + jev.usd,
+    cost,
+    pricedBy: { azureOn: prices.azureOn, jev: prices.jev !== null },
+    usd: total(cost),
     runMs: Number.isNaN(ended) ? null : ended - Date.parse(run.started_at),
     throttledMs: run.throttled_ms,
     rateLimited: run.rate_limited ?? 0,

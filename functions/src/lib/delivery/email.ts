@@ -93,7 +93,7 @@ export async function emailReport(
 
 /** The evaluation email's subject (#129): numbers only, never a posting's words. */
 export function evaluationSubject(e: Evaluation): string {
-  return `Job Scan — evaluation ${e.day} (${e.version}): ≈ ${usd(e.usd)}`;
+  return `Job Scan — evaluation ${e.day} (${e.version}): ${e.usd === null ? "cost unpriced" : `≈ ${usd(e.usd)}`}`;
 }
 
 /**

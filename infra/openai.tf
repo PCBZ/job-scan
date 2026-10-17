@@ -14,10 +14,11 @@ module "openai" {
   capacity_k_tpm = 250
 
   # Extraction on gpt-5.4-nano (#148): about a quarter of mini's price, on its
-  # own TPM. A run's extraction is about 96K tokens.
+  # own TPM; a run's extraction is about 96K tokens. It follows the default
+  # version, since code checks every row it extracts; judge stays pinned above,
+  # as its levels move the ranking.
   extract_model = {
     name           = "gpt-5.4-nano"
-    version        = "2026-03-17"
     capacity_k_tpm = 150
   }
 }

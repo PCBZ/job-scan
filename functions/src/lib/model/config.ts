@@ -142,8 +142,7 @@ const SHARED_KEYS = ["PROVIDER", "ENDPOINT", "API_VERSION", "API_KEY"];
 
 /**
  * The client extraction calls (#148): its own deployment when
- * MODEL_EXTRACT_NAME is set, falling back to `main` when that provider fails;
- * otherwise `main` itself.
+ * MODEL_EXTRACT_NAME is set, otherwise `main` itself.
  */
 export function extractClientFromEnv(
   env: Env,
@@ -156,13 +155,12 @@ export function extractClientFromEnv(
   for (const key of SHARED_KEYS) {
     if (!env[`MODEL_EXTRACT_${key}`]?.trim()) merged[`MODEL_EXTRACT_${key}`] = env[`MODEL_${key}`];
   }
-  const extract = paced(
+  return paced(
     slot(merged, "MODEL_EXTRACT", "extract", credential, options),
     merged,
     "MODEL_EXTRACT",
     options,
   );
-  return new FallbackClient(extract, main, options.onFallback);
 }
 
 /** The model behind each Azure OpenAI node, so the evaluation prices it (#148). */

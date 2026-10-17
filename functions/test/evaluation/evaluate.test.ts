@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { evaluate } from "../../src/lib/eval/evaluate.js";
-import { AZURE, AZURE_MODELS, azurePrice, costOf, JEV } from "../../src/lib/eval/prices.js";
-import { records, runLine } from "./records.js";
+import { costOf } from "../../src/lib/eval/prices.js";
+import { PRICES, records, runLine } from "./records.js";
 
 describe("costOf", () => {
   it("prices cached input at the cached rate, the rest at full", () => {
     // 200K full input, 800K cached, 100K output.
-    expect(costOf({ input: 1_000_000, output: 100_000, cached: 800_000 }, AZURE)).toBeCloseTo(
-      0.2 * 0.75 + 0.8 * 0.075 + 0.1 * 4.5,
-    );
-    expect(costOf({ input: 1_000_000, output: 0 }, JEV)).toBeCloseTo(0.042);
+    const mini = PRICES.azure["gpt-5.4-mini"];
+    expect(
+      mini && costOf({ input: 1_000_000, output: 100_000, cached: 800_000 }, mini),
+    ).toBeCloseTo(0.2 * 0.75 + 0.8 * 0.075 + 0.1 * 4.5);
   });
 });
 
 describe("evaluate", () => {
-  const e = evaluate(records(), []);
+  const e = evaluate(records(), [], null, PRICES);
 
   it("counts the funnel, telling Jev's filters from code's", () => {
     expect(e.funnel).toEqual({
@@ -29,30 +29,40 @@ describe("evaluate", () => {
     });
   });
 
-  it("splits tokens and cost between Azure and Jev", () => {
-    expect(e.azure).toMatchObject({ input: 1_090_000, output: 116_800, cached: 800_000 });
-    expect(e.jev).toMatchObject({ input: 30_000, output: 0, cached: 0 });
-    expect(e.jev.usd).toBeCloseTo(0.03 * 0.042);
-    expect(e.usd).toBeCloseTo(e.azure.usd + e.jev.usd);
+  it("splits tokens and cost per model, Azure's first, Jev's last", () => {
+    expect(e.cost.map((c) => c.model)).toEqual(["gpt-5.4-mini", "Jev"]);
+    expect(e.cost[0]).toMatchObject({ input: 1_090_000, output: 116_800, cached: 800_000 });
+    expect(e.cost[1]).toMatchObject({ input: 30_000, output: 0, cached: 0 });
+    expect(e.cost[1]?.usd).toBeCloseTo(0.03 * 0.042);
+    expect(e.usd).toBeCloseTo((e.cost[0]?.usd ?? 0) + (e.cost[1]?.usd ?? 0));
+    expect(e.pricedBy).toEqual({ azureOn: "2026-10-17", jev: true });
   });
 
-  it("prices each Azure node at its model's rates; mini when the record names none (#148)", () => {
-    const usage = runLine().usage;
-    const at = (models?: Record<string, string>) =>
-      evaluate(records(models ? { models } : {}), []).azure.usd;
-    const mini = at();
-    const nano = at({
-      extract_postings: "gpt-5.4-nano",
-      judge: "gpt-5.4-mini",
-      explain: "gpt-5.4-mini",
-    });
-    const extract = usage.extract_postings ?? { input: 0, output: 0 };
-    expect(mini - nano).toBeCloseTo(
-      costOf(extract, AZURE) - costOf(extract, AZURE_MODELS["gpt-5.4-nano"] ?? AZURE),
+  it("prices each Azure node at its model's rates; a record naming none used mini (#148)", () => {
+    const nano = evaluate(
+      records({
+        models: {
+          extract_postings: "gpt-5.4-nano",
+          judge: "gpt-5.4-mini",
+          explain: "gpt-5.4-mini",
+        },
+      }),
+      [],
+      null,
+      PRICES,
     );
-    expect(at({ extract_postings: "some-new-model" })).toBeCloseTo(mini);
-    expect(azurePrice(undefined)).toBe(AZURE);
-    expect(azurePrice("gpt-5.4-nano")).toEqual({ input: 0.2, cached: 0.02, output: 1.25 });
+    expect(nano.cost.map((c) => c.model)).toEqual(["gpt-5.4-nano", "gpt-5.4-mini", "Jev"]);
+    const extract = runLine().usage.extract_postings ?? { input: 0, output: 0 };
+    const nanoPrice = PRICES.azure["gpt-5.4-nano"];
+    expect(nano.cost[0]?.usd).toBeCloseTo(nanoPrice ? costOf(extract, nanoPrice) : Number.NaN);
+  });
+
+  it("leaves a cost unpriced, never guessed, when its price is missing", () => {
+    const none = evaluate(records(), [], null, { azure: {}, jev: null, azureOn: null });
+    expect(none.cost.map((c) => c.usd)).toEqual([null, null]);
+    expect(none.usd).toBeNull();
+    expect(none.trend.at(-1)?.usd).toBeNull();
+    expect(none.pricedBy).toEqual({ azureOn: null, jev: false });
   });
 
   it("times the run from start to end, with the TPM wait", () => {

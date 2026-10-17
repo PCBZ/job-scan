@@ -32,13 +32,22 @@ export interface TokenUsage {
    * a tenth of the input price. Absent when the provider doesn't say.
    */
   cached?: number;
+  /**
+   * The models that answered, as the provider names them with their version,
+   * e.g. "gpt-5.4-nano-2026-03-17" (#148): a deployment that follows the
+   * default version shows here when it moves. Absent when it doesn't say.
+   */
+  models?: string[];
 }
 
 /** Two usages summed; cached is kept when either side reports it. */
 export function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
-  const sum = { input: a.input + b.input, output: a.output + b.output };
-  if (a.cached === undefined && b.cached === undefined) return sum;
-  return { ...sum, cached: (a.cached ?? 0) + (b.cached ?? 0) };
+  const sum: TokenUsage = { input: a.input + b.input, output: a.output + b.output };
+  if (a.cached !== undefined || b.cached !== undefined)
+    sum.cached = (a.cached ?? 0) + (b.cached ?? 0);
+  if (a.models || b.models)
+    sum.models = [...new Set([...(a.models ?? []), ...(b.models ?? [])])].sort();
+  return sum;
 }
 
 export interface StructuredResult<T> {

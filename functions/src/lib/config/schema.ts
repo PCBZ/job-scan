@@ -65,6 +65,12 @@ const report = z.strictObject({
   // How long after the run its evaluation email waits (#127), so the run's
   // telemetry is in Application Insights first. Default 15.
   evaluation_delay_minutes: z.number().int().min(1).max(60).optional(),
+  // Jev's price for the evaluation email's estimate, USD per 1M tokens (#148):
+  // no API publishes it. Unset, Jev's cost shows as unpriced.
+  jev_usd_per_1m: z
+    .object({ input: z.number().nonnegative(), output: z.number().nonnegative() })
+    .strict()
+    .optional(),
 });
 
 // `lib` is a path on the operator's machine, used only by the local skill. The

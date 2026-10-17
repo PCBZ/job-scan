@@ -28,8 +28,9 @@ const PERCENT = new Intl.NumberFormat("en", { style: "percent" });
 /** 1.52M, 122.4K, 950. */
 export const tokens = (n: number) => COMPACT.format(n);
 
-/** $1.71; $0.0013 for a fraction of a cent. */
-export const usd = (n: number) => (n > 0 && n < 0.01 ? CENTS : DOLLARS).format(n);
+/** $1.71; $0.0013 for a fraction of a cent; "no price" without one. */
+export const usd = (n: number | null) =>
+  n === null ? "no price" : (n > 0 && n < 0.01 ? CENTS : DOLLARS).format(n);
 
 /** 8m 13s. */
 export function duration(ms: number): string {
@@ -61,16 +62,19 @@ export function view(e: Evaluation) {
     funnel:
       `${f.messages} emails → ${f.extracted} postings (${f.duplicates} duplicates, ${f.repeats} repeats) → ` +
       `${f.codeFiltered} filtered by code → ${f.screenFiltered} by Jev → ${f.judged} judged → ${f.top} picks`,
-    cost: [
-      { model: "Azure gpt-5.4-mini", spend: e.azure },
-      { model: "Jev", spend: e.jev },
-    ].map(({ model, spend }) => ({
-      model,
-      input: tokens(spend.input),
-      cached: tokens(spend.cached),
-      output: tokens(spend.output),
-      usd: usd(spend.usd),
+    cost: e.cost.map((c) => ({
+      model: c.model === "Jev" ? "Jev" : `Azure ${c.model}`,
+      input: tokens(c.input),
+      cached: tokens(c.cached),
+      output: tokens(c.output),
+      usd: usd(c.usd),
     })),
+    prices: [
+      e.pricedBy.azureOn
+        ? `Azure Retail Prices API, ${e.pricedBy.azureOn}`
+        : "Azure prices unavailable",
+      e.pricedBy.jev ? "Jev from config" : "no Jev price in config",
+    ].join("; "),
     total: usd(e.usd),
     time: [
       e.runMs === null ? "Run time not recorded" : `Run ${duration(e.runMs)}`,

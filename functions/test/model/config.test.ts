@@ -106,7 +106,8 @@ describe("modelClientFromEnv", () => {
     });
     expect(out).toEqual({
       value: { title: "Engineer" },
-      usage: { input: 50, output: 10 },
+      // The version that answered, as the provider names it (#148).
+      usage: { input: 50, output: 10, models: ["m"] },
       served_by: "primary",
     });
     expect(seen).toHaveLength(2);
@@ -233,16 +234,23 @@ describe("extractClientFromEnv (#148)", () => {
     expect(h.calls).toEqual(["gpt-5.4-nano"]);
   });
 
-  it("falls back to the main client when its provider fails, and says so", async () => {
+  it("doesn't fall back: a provider error on its deployment fails the call", async () => {
     const h = http(["gpt-5.4-nano"]);
     const env = { ...AZURE, MODEL_EXTRACT_NAME: "gpt-5.4-nano", MODEL_MAX_RETRIES: "0" };
-    const reasons: string[] = [];
-    const options = { fetch: h.fetch, onFallback: (e: Error) => reasons.push(e.message) };
-    const main = modelClientFromEnv(env, credential, options);
-    const out = await ask(extractClientFromEnv(env, credential, main, options));
-    expect(out).toMatchObject({ value: { title: "Engineer" }, served_by: "primary" });
-    expect(h.calls).toEqual(["gpt-5.4-nano", "gpt-5.4-mini"]);
-    expect(reasons).toHaveLength(1);
+    const main = modelClientFromEnv(env, credential, { fetch: h.fetch });
+    await expect(
+      ask(extractClientFromEnv(env, credential, main, { fetch: h.fetch })),
+    ).rejects.toThrow();
+    expect(h.calls).toEqual(["gpt-5.4-nano"]);
+  });
+
+  it("paces to MODEL_EXTRACT_TPM", () => {
+    const env = { ...AZURE, MODEL_EXTRACT_NAME: "gpt-5.4-nano" };
+    const main = modelClientFromEnv(env, credential);
+    expect(
+      extractClientFromEnv({ ...env, MODEL_EXTRACT_TPM: "150000" }, credential, main),
+    ).toBeInstanceOf(RateLimitedClient);
+    expect(extractClientFromEnv(env, credential, main)).toBeInstanceOf(OpenAIChatClient);
   });
 
   it("names the model behind each Azure node", () => {

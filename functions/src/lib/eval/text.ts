@@ -68,6 +68,6 @@ export function renderText(e: Evaluation): string {
       ]),
     ),
     "",
-    "job-scan · evaluation · prices: Azure Retail Prices API 2026-10; Jev from secondary sources",
+    `job-scan · evaluation · prices: ${v.prices}`,
   ].join("\n");
 }

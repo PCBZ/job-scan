@@ -30,10 +30,9 @@ variable "capacity_k_tpm" {
 }
 
 variable "extract_model" {
-  description = "A deployment for extraction alone; null to extract with the main one."
+  description = "A deployment for extraction alone, on the model's default version; null to extract with the main one."
   type = object({
     name           = string
-    version        = string
     capacity_k_tpm = number
   })
   default = null
