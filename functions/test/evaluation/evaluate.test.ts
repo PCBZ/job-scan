@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evaluate } from "../../src/lib/eval/evaluate.js";
-import { AZURE, costOf, JEV } from "../../src/lib/eval/prices.js";
+import { AZURE, AZURE_MODELS, azurePrice, costOf, JEV } from "../../src/lib/eval/prices.js";
 import { records, runLine } from "./records.js";
 
 describe("costOf", () => {
@@ -34,6 +34,25 @@ describe("evaluate", () => {
     expect(e.jev).toMatchObject({ input: 30_000, output: 0, cached: 0 });
     expect(e.jev.usd).toBeCloseTo(0.03 * 0.042);
     expect(e.usd).toBeCloseTo(e.azure.usd + e.jev.usd);
+  });
+
+  it("prices each Azure node at its model's rates; mini when the record names none (#148)", () => {
+    const usage = runLine().usage;
+    const at = (models?: Record<string, string>) =>
+      evaluate(records(models ? { models } : {}), []).azure.usd;
+    const mini = at();
+    const nano = at({
+      extract_postings: "gpt-5.4-nano",
+      judge: "gpt-5.4-mini",
+      explain: "gpt-5.4-mini",
+    });
+    const extract = usage.extract_postings ?? { input: 0, output: 0 };
+    expect(mini - nano).toBeCloseTo(
+      costOf(extract, AZURE) - costOf(extract, AZURE_MODELS["gpt-5.4-nano"] ?? AZURE),
+    );
+    expect(at({ extract_postings: "some-new-model" })).toBeCloseTo(mini);
+    expect(azurePrice(undefined)).toBe(AZURE);
+    expect(azurePrice("gpt-5.4-nano")).toEqual({ input: 0.2, cached: 0.02, output: 1.25 });
   });
 
   it("times the run from start to end, with the TPM wait", () => {

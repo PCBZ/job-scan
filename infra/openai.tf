@@ -12,4 +12,12 @@ module "openai" {
   # The first run's backlog hit 50K TPM's 429s (#91). The subscription's quota
   # is 1000K; capacity is a ceiling on that quota, and billing stays per token.
   capacity_k_tpm = 250
+
+  # Extraction on gpt-5.4-nano (#148): about a quarter of mini's price, on its
+  # own TPM. A run's extraction is about 96K tokens.
+  extract_model = {
+    name           = "gpt-5.4-nano"
+    version        = "2026-03-17"
+    capacity_k_tpm = 150
+  }
 }

@@ -6,7 +6,7 @@ import type { TokenUsage } from "../model/types.js";
 import type { FilteredRecord, PickRecord, RunRecord, RunStatsRecord } from "../run/records.js";
 import type { Loop } from "../workflow/state.js";
 import type { Latency } from "./latency.js";
-import { AZURE, costOf, JEV, JEV_NODES } from "./prices.js";
+import { azurePrice, costOf, JEV, JEV_NODES } from "./prices.js";
 
 /** Tokens and their estimated cost, in USD. */
 export interface Spend extends TokenUsage {
@@ -77,14 +77,18 @@ const JEV_REASON = /\(Jev (\d(?:\.\d+)?)\)$/;
 
 const LOOPS: Loop[] = ["extract", "judge", "explain"];
 
-function spend(usage: Record<string, TokenUsage>, jev: boolean): Spend {
+function spend(
+  usage: Record<string, TokenUsage>,
+  jev: boolean,
+  models: Record<string, string> = {},
+): Spend {
   const total: Spend = { input: 0, output: 0, cached: 0, usd: 0 };
   for (const [node, u] of Object.entries(usage)) {
     if (JEV_NODES.has(node) !== jev) continue;
     total.input += u.input;
     total.output += u.output;
     total.cached += u.cached ?? 0;
-    total.usd += costOf(u, jev ? JEV : AZURE);
+    total.usd += costOf(u, jev ? JEV : azurePrice(models[node]));
   }
   return total;
 }
@@ -99,7 +103,7 @@ function trendRow(run: RunStatsRecord): TrendRow {
   return {
     day: runDay(new Date(run.started_at)),
     version: run.version,
-    usd: spend(run.usage, false).usd + spend(run.usage, true).usd,
+    usd: spend(run.usage, false, run.models).usd + spend(run.usage, true).usd,
     judged: run.judged,
     firstPass: run.loops.judge.first_pass.length,
     filtered: run.filtered,
@@ -142,7 +146,7 @@ export function evaluate(
       extractedBy[r.posting.source] = (extractedBy[r.posting.source] ?? 0) + 1;
   }
 
-  const azure = spend(run.usage, false);
+  const azure = spend(run.usage, false, run.models);
   const jev = spend(run.usage, true);
   const ended = run.ended_at ? Date.parse(run.ended_at) : Number.NaN;
   const trend = [...earlier.filter((e) => e.started_at < run.started_at), run]

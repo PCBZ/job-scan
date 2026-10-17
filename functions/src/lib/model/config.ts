@@ -12,6 +12,9 @@
 // The same keys prefixed MODEL_FALLBACK_ configure an optional fallback, which
 // is paced to its own MODEL_FALLBACK_TPM. MODEL_MAX_RETRIES and
 // MODEL_TIMEOUT_MS apply to both.
+//
+// MODEL_EXTRACT_NAME gives extraction its own deployment (#148), paced to
+// MODEL_EXTRACT_TPM; its other MODEL_EXTRACT_ keys default to the MODEL_ ones.
 
 import { getBearerTokenProvider, type TokenCredential } from "@azure/identity";
 import OpenAI, { AzureOpenAI } from "openai";
@@ -132,4 +135,42 @@ export function modelClientFromEnv(
     options,
   );
   return new FallbackClient(primary, fallback, options.onFallback);
+}
+
+/** The keys an extract slot takes from the main one unless it sets its own. */
+const SHARED_KEYS = ["PROVIDER", "ENDPOINT", "API_VERSION", "API_KEY"];
+
+/**
+ * The client extraction calls (#148): its own deployment when
+ * MODEL_EXTRACT_NAME is set, falling back to `main` when that provider fails;
+ * otherwise `main` itself.
+ */
+export function extractClientFromEnv(
+  env: Env,
+  credential: TokenCredential,
+  main: ModelClient,
+  options: ModelClientOptions = {},
+): ModelClient {
+  if (!env.MODEL_EXTRACT_NAME?.trim()) return main;
+  const merged: Env = { ...env };
+  for (const key of SHARED_KEYS) {
+    if (!env[`MODEL_EXTRACT_${key}`]?.trim()) merged[`MODEL_EXTRACT_${key}`] = env[`MODEL_${key}`];
+  }
+  const extract = paced(
+    slot(merged, "MODEL_EXTRACT", "extract", credential, options),
+    merged,
+    "MODEL_EXTRACT",
+    options,
+  );
+  return new FallbackClient(extract, main, options.onFallback);
+}
+
+/** The model behind each Azure OpenAI node, so the evaluation prices it (#148). */
+export function modelNames(env: Env): Record<string, string> {
+  const main = env.MODEL_NAME?.trim() ?? "";
+  return {
+    extract_postings: env.MODEL_EXTRACT_NAME?.trim() || main,
+    judge: main,
+    explain: main,
+  };
 }

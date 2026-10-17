@@ -24,9 +24,12 @@ module "function_app" {
     "MODEL_ENDPOINT" = module.openai.endpoint
     "MODEL_NAME"     = module.openai.deployment_name
     # Calls are paced to the deployment's TPM (functions/src/lib/model/rate-limit.ts, #93).
-    "MODEL_TPM"        = tostring(module.openai.tokens_per_minute)
-    "CONFIG_BLOB_URL"  = module.config_blob.url
-    "RESUME_CACHE_URL" = module.storage.container_endpoints["resume-cache"]
+    "MODEL_TPM" = tostring(module.openai.tokens_per_minute)
+    # Extraction's own deployment (#148); the other MODEL_ keys are shared.
+    "MODEL_EXTRACT_NAME" = module.openai.extract_deployment_name
+    "MODEL_EXTRACT_TPM"  = tostring(module.openai.extract_tokens_per_minute)
+    "CONFIG_BLOB_URL"    = module.config_blob.url
+    "RESUME_CACHE_URL"   = module.storage.container_endpoints["resume-cache"]
     # seenmessages and seenjobs (#9, #15).
     "TABLES_URL" = module.storage.table_endpoint
     # Private; reports are read through user delegation SAS links (#19).

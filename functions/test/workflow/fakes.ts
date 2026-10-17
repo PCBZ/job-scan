@@ -218,6 +218,7 @@ export function fakes(o: FakeOptions = {}) {
     records,
     evalQueue,
     version: "test",
+    models: { extract_postings: "nano-test", judge: "mini-test", explain: "mini-test" },
     log,
     llmInputs,
     counters,

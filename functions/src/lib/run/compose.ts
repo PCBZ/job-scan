@@ -26,7 +26,12 @@ import { fullLines, verifyJudgements } from "../judge/verify.js";
 import { type ConnectMailbox, connectImap } from "../mail/mailbox.js";
 import { runFetch } from "../mail/run.js";
 import { TableSeenStore } from "../mail/seen-store.js";
-import { modelClientFromEnv } from "../model/config.js";
+import {
+  extractClientFromEnv,
+  type ModelClientOptions,
+  modelClientFromEnv,
+  modelNames,
+} from "../model/config.js";
 import { dedupeStep } from "../postings/dedupe.js";
 import { extractStep } from "../postings/extract.js";
 import { hardGatesStep } from "../postings/gates.js";
@@ -78,6 +83,8 @@ export interface Pipeline {
   evalQueue: EvalQueue;
   /** The deployed release, for the run records. */
   version: string;
+  /** The model behind each Azure OpenAI node, for the run records (#148). */
+  models: Record<string, string>;
 }
 
 export function composePipeline(
@@ -98,7 +105,7 @@ export function composePipeline(
   const resumeStore = blobTextStore(setting("RESUME_CACHE_URL"), credential);
   let throttledMs = 0;
   let rateLimited = 0;
-  const client = modelClientFromEnv(env, credential, {
+  const clientOptions: ModelClientOptions = {
     ...(o.onFallback ? { onFallback: o.onFallback } : {}),
     onThrottle: (ms) => {
       throttledMs += ms;
@@ -106,7 +113,9 @@ export function composePipeline(
     onRateLimited: () => {
       rateLimited++;
     },
-  });
+  };
+  const client = modelClientFromEnv(env, credential, clientOptions);
+  const extractClient = extractClientFromEnv(env, credential, client, clientOptions);
 
   const deterministicSteps: DeterministicSteps = {
     loadConfig: () => loadConfig(configSource),
@@ -130,7 +139,7 @@ export function composePipeline(
   };
 
   const modelSteps: ModelSteps = {
-    extractPostings: extractStep(client),
+    extractPostings: extractStep(extractClient),
     // Without a TypeSafe key the gates go unscreened, and the report says so.
     screen: screenStep(env.TYPESAFE_API_KEY?.trim() ? decisionClientFromEnv(env) : null),
     judge: judgeStep(client),
@@ -155,5 +164,6 @@ export function composePipeline(
     records: runRecordStoreFromUrl(setting("RUN_RECORDS_URL"), credential),
     evalQueue: evalQueueFromUrl(setting("EVAL_QUEUE_URL"), credential),
     version: env.APP_VERSION?.trim() || "local",
+    models: modelNames(env),
   };
 }
