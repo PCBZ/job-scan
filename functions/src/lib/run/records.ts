@@ -75,6 +75,11 @@ export interface RunMeta {
   throttled_ms: number;
   /** 429s the provider answered, retries included. */
   rate_limited: number;
+  /**
+   * The model behind each Azure OpenAI node, so the evaluation prices it at its
+   * own rates (#148); absent before, when every node was gpt-5.4-mini.
+   */
+  models?: Record<string, string>;
 }
 
 export interface RunStatsRecord extends RunMeta {

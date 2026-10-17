@@ -1,3 +1,4 @@
+import type { Prices } from "../../src/lib/eval/prices.js";
 import type { RunRecord, RunStatsRecord } from "../../src/lib/run/records.js";
 import { posting } from "../postings/helpers.js";
 
@@ -82,3 +83,13 @@ export function records(over: Partial<RunStatsRecord> = {}): RunRecord[] {
     runLine(over),
   ] as RunRecord[];
 }
+
+/** Synthetic prices: what a report would have read. */
+export const PRICES: Prices = {
+  azure: {
+    "gpt-5.4-mini": { input: 0.75, cached: 0.075, output: 4.5 },
+    "gpt-5.4-nano": { input: 0.2, cached: 0.02, output: 1.25 },
+  },
+  jev: { input: 0.042, cached: 0.042, output: 0 },
+  azureOn: "2026-10-17",
+};

@@ -19,6 +19,7 @@ describe("evalReportHandler", () => {
       given.push(c);
       return {
         env: {},
+        azurePrices: async () => ({}),
         config: async () => ({ report: {} }) as never,
         records: {
           read: async (name) => {

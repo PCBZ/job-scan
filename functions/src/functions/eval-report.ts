@@ -6,6 +6,7 @@ import { z } from "zod";
 import { blobConfigSource, loadConfig } from "../lib/config/load.js";
 import { gmailTransport } from "../lib/delivery/email.js";
 import { latencyFromWorkspace } from "../lib/eval/latency.js";
+import { retailPrices } from "../lib/eval/prices.js";
 import { type EvalReportDeps, runEvalReport } from "../lib/eval/report.js";
 import { evalQueueFromUrl, smokeResultsFromUrl } from "../lib/run/eval-queue.js";
 import { runRecordReaderFromUrl, sentMarksFromUrl } from "../lib/run/records.js";
@@ -35,6 +36,7 @@ export function productionDeps(env: Env, credential: TokenCredential): EvalRepor
       evalQueueFromUrl(settings.EVAL_QUEUE_URL, credential).send(message, delaySeconds),
     sent: sentMarksFromUrl(settings.RUN_RECORDS_URL, credential),
     smokeResult: smokeResultsFromUrl(settings.EVAL_SMOKE_URL, credential),
+    azurePrices: retailPrices(),
   };
 }
 

@@ -19,4 +19,14 @@ describe("addUsage", () => {
       output: 3,
     });
   });
+
+  it("keeps every model that answered, once each (#148)", () => {
+    expect(
+      addUsage(
+        { input: 1, output: 1, models: ["gpt-5.4-nano-2026-03-17"] },
+        { input: 1, output: 1, models: ["gpt-5.4-nano-2026-03-17", "gpt-5.4-nano-2026-09-01"] },
+      ).models,
+    ).toEqual(["gpt-5.4-nano-2026-03-17", "gpt-5.4-nano-2026-09-01"]);
+    expect(addUsage({ input: 1, output: 1 }, { input: 1, output: 1 })).not.toHaveProperty("models");
+  });
 });
