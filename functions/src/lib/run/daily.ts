@@ -100,6 +100,7 @@ export async function runDaily(
         node_ms: nodeMs,
         throttled_ms: summary.throttledMs,
         rate_limited: summary.rateLimited,
+        models: pipeline.models,
       });
       const name = await pipeline.records.write(records, startedAt);
       log.log(`daily: run records ${name} (${records.length})`);

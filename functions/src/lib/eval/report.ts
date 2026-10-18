@@ -11,12 +11,13 @@
 import type { Transporter } from "nodemailer";
 import { z } from "zod";
 import type { AppConfig } from "../config/load.js";
+import { runDay } from "../day.js";
 import { type EmailSettings, emailEvaluation, emailSettings } from "../delivery/email.js";
 import type { EvalMessage, SmokeResult } from "../run/eval-queue.js";
 import type { RunRecord, RunRecordReader, RunStatsRecord, SentMarks } from "../run/records.js";
-import { evaluate } from "./evaluate.js";
+import { evaluate, modelOf, modelsUsed } from "./evaluate.js";
 import type { Latency, LatencySource } from "./latency.js";
-import { JEV_NODES } from "./prices.js";
+import { configPrices, modelKey, type Price, type PriceSource, type Prices } from "./prices.js";
 
 /** The runs before this one that the trend shows. */
 export const TREND_RUNS = 6;
@@ -53,6 +54,9 @@ export interface EvalReportDeps {
   sent: SentMarks;
   /** Where a smoke test's outcome goes, for CD to wait on (#134). */
   smokeResult: (result: SmokeResult) => Promise<void>;
+  /** Azure OpenAI's list prices, read on each report (#148). */
+  azurePrices: PriceSource;
+  now?: () => Date;
 }
 
 export interface EvalReportLog {
@@ -94,7 +98,9 @@ export async function runEvalReport(
     );
     return;
   }
-  const evaluation = evaluate(records, await d.records.earlier(m.record, TREND_RUNS), latency);
+  const earlier = await d.records.earlier(m.record, TREND_RUNS);
+  const prices = await pricesFor([...records, ...earlier], config, d, log);
+  const evaluation = evaluate(records, earlier, latency, prices);
   // At most one email per run: a second message for it stops here.
   if (!(await d.sent.claim(m.record))) {
     log.log(`evalReport: ${m.record} already has its evaluation email`);
@@ -106,13 +112,84 @@ export async function runEvalReport(
     await d.sent.release(m.record);
     throw err;
   }
-  log.log(`evalReport: sent for ${m.record} (≈ $${evaluation.usd.toFixed(2)})`);
+  log.log(
+    `evalReport: sent for ${m.record} (${evaluation.usd === null ? "unpriced" : `≈ $${evaluation.usd.toFixed(2)}`})`,
+  );
 }
 
-/** Whether an Azure node used tokens: then the run's trace isn't complete without its calls. */
+/** A provider's price source, and how the footer names it with and without prices. */
+interface PriceSourceOf {
+  read: PriceSource;
+  found: string;
+  missing: string;
+}
+
+/** Where each provider's prices come from: an API when one publishes them, config otherwise. */
+function priceSources(config: AppConfig, d: EvalReportDeps): Record<string, PriceSourceOf> {
+  const day = runDay(d.now?.() ?? new Date());
+  return {
+    "azure-openai": {
+      read: d.azurePrices,
+      found: `Azure Retail Prices API, ${day}`,
+      missing: "Azure prices unavailable",
+    },
+    jev: {
+      read: configPrices(config.report.jev_usd_per_1m),
+      found: "Jev from config",
+      missing: "no Jev price in config",
+    },
+  };
+}
+
+/**
+ * The prices a report uses: each provider's, for every model these runs used,
+ * read now. A source that fails leaves its models unpriced rather than
+ * failing the report.
+ */
+async function pricesFor(
+  records: RunRecord[],
+  config: AppConfig,
+  d: EvalReportDeps,
+  log: EvalReportLog,
+): Promise<Prices> {
+  const runs = records.filter((r): r is RunStatsRecord => r.kind === "run");
+  const byProvider = new Map<string, string[]>();
+  for (const m of modelsUsed(runs))
+    byProvider.set(m.provider, [...(byProvider.get(m.provider) ?? []), m.model]);
+  const known = priceSources(config, d);
+  const byModel: Record<string, Price> = {};
+  const sources: string[] = [];
+  for (const [provider, models] of byProvider) {
+    const source = known[provider];
+    if (!source) {
+      sources.push(`no price source for ${provider}`);
+      continue;
+    }
+    try {
+      const prices = Object.entries(await source.read(models));
+      for (const [model, price] of prices) byModel[modelKey({ provider, model })] = price;
+      sources.push(prices.length > 0 ? source.found : source.missing);
+    } catch (err) {
+      log.log(`evalReport: ${provider} prices unavailable: ${errorText(err)}`);
+      sources.push(source.missing);
+    }
+  }
+  return { byModel, sources };
+}
+
+/**
+ * The providers whose calls the run's trace holds: OpenInference instruments
+ * the OpenAI SDK (#101), which these two use.
+ */
+const TRACED_PROVIDERS: ReadonlySet<string> = new Set(["azure-openai", "openai-compatible"]);
+
+/** Whether a traced node used tokens: then the run's trace isn't complete without its calls. */
 function madeModelCalls(records: RunRecord[]): boolean {
   const run = records.find((r): r is RunStatsRecord => r.kind === "run");
-  return Object.entries(run?.usage ?? {}).some(([node, u]) => !JEV_NODES.has(node) && u.input > 0);
+  if (!run) return false;
+  return Object.entries(run.usage).some(
+    ([node, u]) => TRACED_PROVIDERS.has(modelOf(run, node).provider) && u.input > 0,
+  );
 }
 
 /**
@@ -133,7 +210,8 @@ async function runSmoke(id: string, d: EvalReportDeps, log: EvalReportLog): Prom
   };
   let passed: SmokeResult;
   try {
-    const settings = emailSettings(await d.config(), d.env);
+    const config = await d.config();
+    const settings = emailSettings(config, d.env);
     if (!settings) throw new Error("no report.email_account to send to");
     const latest = await d.records.latest();
     if (!latest) throw new Error("no run record with a trace id yet");
@@ -145,7 +223,9 @@ async function runSmoke(id: string, d: EvalReportDeps, log: EvalReportLog): Prom
     );
     if (latency === null)
       throw new Error(`the trace of ${latest.name} isn't in Application Insights`);
-    const evaluation = evaluate(records, await d.records.earlier(latest.name, TREND_RUNS), latency);
+    const earlier = await d.records.earlier(latest.name, TREND_RUNS);
+    const prices = await pricesFor([...records, ...earlier], config, d, log);
+    const evaluation = evaluate(records, earlier, latency, prices);
     const subject = await emailEvaluation(
       d.transport(settings),
       settings,

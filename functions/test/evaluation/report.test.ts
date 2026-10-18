@@ -2,10 +2,17 @@ import type { ContainerClient } from "@azure/storage-blob";
 import { RestError } from "@azure/storage-blob";
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../../src/lib/config/load.js";
+import { retailPrices } from "../../src/lib/eval/prices.js";
 import { runEvalReport } from "../../src/lib/eval/report.js";
 import type { SmokeResult } from "../../src/lib/run/eval-queue.js";
 import { type RunRecord, runRecordReader, sentMarks, toJsonl } from "../../src/lib/run/records.js";
-import { records, runLine } from "./records.js";
+import { JEV_PRICE, MINI_PRICE, records, runLine } from "./records.js";
+import { modelRows, retailApi } from "./retail.js";
+
+/** When the report runs: 15 minutes after its run, as the queue delays it. */
+const REPORT_TIME = () => new Date("2026-10-15T15:15:00Z");
+/** The Retail Prices API with gpt-5.4-mini listed, at the test's prices. */
+const PRICED = () => retailApi(modelRows("gpt-5.4-mini", MINI_PRICE));
 
 const NAME = "2026-10-15/2026-10-15T15:00:00.000Z-aaaa0000.jsonl";
 const MESSAGE = {
@@ -42,7 +49,11 @@ const CONFIG = {
       },
     ],
   },
-  report: { email_account: "personal", email_to: "me@example.test" },
+  report: {
+    email_account: "personal",
+    email_to: "me@example.test",
+    jev_usd_per_1m: { input: JEV_PRICE.input, output: JEV_PRICE.output },
+  },
 } as unknown as AppConfig;
 const ENV = { GMAIL_USER: "sender@example.test", GMAIL_PASSWORD: "app-password" };
 
@@ -87,8 +98,9 @@ function harness(
   blobs: Record<string, string>,
   config: AppConfig = CONFIG,
   latency: Source = async () => LATENCY,
-  o: { marks?: Set<string>; failSend?: boolean } = {},
+  o: { marks?: Set<string>; failSend?: boolean; prices?: ReturnType<typeof retailApi> } = {},
 ) {
+  const api = o.prices ?? PRICED();
   const marks = o.marks ?? new Set<string>();
   const sent: { to: string; subject: string; html: string; text: string }[] = [];
   const lines: string[] = [];
@@ -101,6 +113,8 @@ function harness(
         env: ENV,
         config: async () => config,
         records: runRecordReader(fakeContainer(blobs)),
+        azurePrices: retailPrices(api.fetch, REPORT_TIME),
+        now: REPORT_TIME,
         latency,
         sent: sentMarks(fakeMarks(marks)),
         smokeResult: async (r) => {
@@ -120,7 +134,7 @@ function harness(
       },
       { log: (m) => lines.push(m) },
     );
-  return { run, sent, lines, requeued, marks, smokes };
+  return { run, sent, lines, requeued, marks, smokes, priceUrls: api.urls };
 }
 
 const day = (d: string, over = {}): [string, string] => [
@@ -141,6 +155,28 @@ describe("runEvalReport", () => {
     expect(h.sent[0]?.text).toContain("2026-10-13");
     expect(h.sent[0]?.text).toContain("2026-10-14");
     expect(h.lines.at(-1)).toMatch(/^evalReport: sent for 2026-10-15/);
+  });
+
+  it("prices the cost from the Retail Prices API, read once per report (#148)", async () => {
+    const h = harness({ [NAME]: toJsonl(records()) });
+    await h.run(MESSAGE);
+    expect(h.priceUrls).toHaveLength(1);
+    expect(h.sent[0]?.subject).toMatch(/: ≈ \$\d+\.\d{2}$/);
+    expect(h.sent[0]?.text).toContain(
+      "prices: Azure Retail Prices API, 2026-10-15; Jev from config",
+    );
+  });
+
+  it("still sends, with the cost unpriced, when the Retail Prices API fails", async () => {
+    const h = harness({ [NAME]: toJsonl(records()) }, CONFIG, async () => LATENCY, {
+      prices: retailApi([], { status: 503 }),
+    });
+    await h.run(MESSAGE);
+    expect(h.sent[0]?.subject).toMatch(/: cost unpriced$/);
+    expect(h.sent[0]?.text).toContain("Azure prices unavailable");
+    expect(h.lines).toContain(
+      "evalReport: azure-openai prices unavailable: Azure Retail Prices API answered 503",
+    );
   });
 
   it("takes the message as JSON text too, as a trigger may hand it over", async () => {
@@ -302,6 +338,7 @@ describe("the post-deploy smoke test (#134)", () => {
           env: ENV,
           config: async () => CONFIG,
           records: runRecordReader(fakeContainer(blobs)),
+          azurePrices: retailPrices(PRICED().fetch, REPORT_TIME),
           latency: async () => (failEmail ? null : LATENCY),
           requeue: async () => {},
           sent: sentMarks(fakeMarks(new Set())),

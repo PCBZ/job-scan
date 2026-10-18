@@ -193,6 +193,10 @@ suggest_variant = true      # name the best-fitting resume variant per posting
 # After each cloud run, an evaluation email (#127) follows, once the run's
 # telemetry is in Application Insights. It waits this many minutes (1-60).
 # evaluation_delay_minutes = 15
+# Jev's price for that email's cost estimate, USD per 1M tokens. TypeSafe
+# publishes no pricing page or API; check the price you're billed. Azure
+# OpenAI's prices come from the Azure Retail Prices API on each email.
+# jev_usd_per_1m = { input = 0.042, output = 0 }
 
 # The cloud run also sends a short Telegram summary with Approve / Skip buttons
 # to this chat. The bot token stays out of this file (Key Vault in Azure,

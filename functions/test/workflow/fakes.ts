@@ -218,6 +218,12 @@ export function fakes(o: FakeOptions = {}) {
     records,
     evalQueue,
     version: "test",
+    models: {
+      extract_postings: { provider: "azure-openai", model: "nano-test" },
+      judge: { provider: "azure-openai", model: "mini-test" },
+      explain: { provider: "azure-openai", model: "mini-test" },
+      screen: { provider: "jev", model: "jev-test" },
+    },
     log,
     llmInputs,
     counters,

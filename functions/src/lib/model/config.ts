@@ -12,10 +12,14 @@
 // The same keys prefixed MODEL_FALLBACK_ configure an optional fallback, which
 // is paced to its own MODEL_FALLBACK_TPM. MODEL_MAX_RETRIES and
 // MODEL_TIMEOUT_MS apply to both.
+//
+// MODEL_EXTRACT_NAME gives extraction its own deployment (#148), paced to
+// MODEL_EXTRACT_TPM; its other MODEL_EXTRACT_ keys default to the MODEL_ ones.
 
 import { getBearerTokenProvider, type TokenCredential } from "@azure/identity";
 import OpenAI, { AzureOpenAI } from "openai";
 import { type AppError, appError } from "../errors.js";
+import type { NodeModel } from "../eval/prices.js";
 import { FallbackClient } from "./fallback.js";
 import { OpenAIChatClient } from "./openai-chat.js";
 import { RateLimitedClient } from "./rate-limit.js";
@@ -132,4 +136,43 @@ export function modelClientFromEnv(
     options,
   );
   return new FallbackClient(primary, fallback, options.onFallback);
+}
+
+/** The keys an extract slot takes from the main one unless it sets its own. */
+const SHARED_KEYS = ["PROVIDER", "ENDPOINT", "API_VERSION", "API_KEY"];
+
+/**
+ * The client extraction calls (#148): its own deployment when
+ * MODEL_EXTRACT_NAME is set, otherwise `main` itself.
+ */
+export function extractClientFromEnv(
+  env: Env,
+  credential: TokenCredential,
+  main: ModelClient,
+  options: ModelClientOptions = {},
+): ModelClient {
+  if (!env.MODEL_EXTRACT_NAME?.trim()) return main;
+  const merged: Env = { ...env };
+  for (const key of SHARED_KEYS) {
+    if (!env[`MODEL_EXTRACT_${key}`]?.trim()) merged[`MODEL_EXTRACT_${key}`] = env[`MODEL_${key}`];
+  }
+  return paced(
+    slot(merged, "MODEL_EXTRACT", "extract", credential, options),
+    merged,
+    "MODEL_EXTRACT",
+    options,
+  );
+}
+
+/** Who serves each node this module configures, and with which model (#148). */
+export function nodeModels(env: Env): Record<string, NodeModel> {
+  const main = { provider: env.MODEL_PROVIDER?.trim() ?? "", model: env.MODEL_NAME?.trim() ?? "" };
+  const extractName = env.MODEL_EXTRACT_NAME?.trim();
+  return {
+    extract_postings: extractName
+      ? { provider: env.MODEL_EXTRACT_PROVIDER?.trim() || main.provider, model: extractName }
+      : main,
+    judge: main,
+    explain: main,
+  };
 }

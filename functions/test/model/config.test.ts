@@ -2,7 +2,11 @@ import type { TokenCredential } from "@azure/identity";
 import { APIUserAbortError } from "openai";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { modelClientFromEnv } from "../../src/lib/model/config.js";
+import {
+  extractClientFromEnv,
+  modelClientFromEnv,
+  nodeModels,
+} from "../../src/lib/model/config.js";
 import { FallbackClient } from "../../src/lib/model/fallback.js";
 import { OpenAIChatClient } from "../../src/lib/model/openai-chat.js";
 import { RateLimitedClient } from "../../src/lib/model/rate-limit.js";
@@ -102,7 +106,8 @@ describe("modelClientFromEnv", () => {
     });
     expect(out).toEqual({
       value: { title: "Engineer" },
-      usage: { input: 50, output: 10 },
+      // The version that answered, as the provider names it (#148).
+      usage: { input: 50, output: 10, models: ["m"] },
       served_by: "primary",
     });
     expect(seen).toHaveLength(2);
@@ -188,6 +193,74 @@ describe("modelClientFromEnv", () => {
       }),
     ).rejects.toBeInstanceOf(APIUserAbortError);
     expect(n).toBe(0);
+  });
+});
+
+describe("extractClientFromEnv (#148)", () => {
+  const schema = z.object({ title: z.string() });
+  const ask = (model: ReturnType<typeof modelClientFromEnv>) =>
+    model.structured({ name: "posting", system: "Extract.", user: "Engineer", schema });
+  /** The SDK's HTTP layer: records each deployment called; `failing` ones answer 500. */
+  function http(failing: string[] = []) {
+    const calls: string[] = [];
+    const fetch = (async (url: string | URL | Request) => {
+      const deployment = /\/deployments\/([^/]+)\//.exec(String(url))?.[1] ?? "";
+      calls.push(deployment);
+      if (failing.includes(deployment)) {
+        return new Response(JSON.stringify({ error: { message: "down" } }), {
+          status: 500,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(okBody({ title: "Engineer" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof globalThis.fetch;
+    return { calls, fetch };
+  }
+
+  it("is the main client when MODEL_EXTRACT_NAME isn't set", () => {
+    const main = modelClientFromEnv(AZURE, credential);
+    expect(extractClientFromEnv(AZURE, credential, main)).toBe(main);
+  });
+
+  it("calls its own deployment on the main endpoint, signed in the same way", async () => {
+    const h = http();
+    const env = { ...AZURE, MODEL_EXTRACT_NAME: "gpt-5.4-nano", MODEL_EXTRACT_TPM: "150000" };
+    const main = modelClientFromEnv(env, credential, { fetch: h.fetch });
+    const out = await ask(extractClientFromEnv(env, credential, main, { fetch: h.fetch }));
+    expect(out).toMatchObject({ value: { title: "Engineer" }, served_by: "extract" });
+    expect(h.calls).toEqual(["gpt-5.4-nano"]);
+  });
+
+  it("doesn't fall back: a provider error on its deployment fails the call", async () => {
+    const h = http(["gpt-5.4-nano"]);
+    const env = { ...AZURE, MODEL_EXTRACT_NAME: "gpt-5.4-nano", MODEL_MAX_RETRIES: "0" };
+    const main = modelClientFromEnv(env, credential, { fetch: h.fetch });
+    await expect(
+      ask(extractClientFromEnv(env, credential, main, { fetch: h.fetch })),
+    ).rejects.toThrow();
+    expect(h.calls).toEqual(["gpt-5.4-nano"]);
+  });
+
+  it("paces to MODEL_EXTRACT_TPM", () => {
+    const env = { ...AZURE, MODEL_EXTRACT_NAME: "gpt-5.4-nano" };
+    const main = modelClientFromEnv(env, credential);
+    expect(
+      extractClientFromEnv({ ...env, MODEL_EXTRACT_TPM: "150000" }, credential, main),
+    ).toBeInstanceOf(RateLimitedClient);
+    expect(extractClientFromEnv(env, credential, main)).toBeInstanceOf(OpenAIChatClient);
+  });
+
+  it("names who serves each node it configures, and with which model", () => {
+    const mini = { provider: "azure-openai", model: "gpt-5.4-mini" };
+    expect(nodeModels({ ...AZURE, MODEL_EXTRACT_NAME: "gpt-5.4-nano" })).toEqual({
+      extract_postings: { provider: "azure-openai", model: "gpt-5.4-nano" },
+      judge: mini,
+      explain: mini,
+    });
+    expect(nodeModels(AZURE).extract_postings).toEqual(mini);
   });
 });
 

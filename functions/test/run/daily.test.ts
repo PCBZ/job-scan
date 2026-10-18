@@ -174,7 +174,16 @@ describe("runDaily", () => {
         "run",
       ]);
       const run = records.at(-1);
-      expect(run).toMatchObject({ kind: "run", version: "v0.1.6", throttled_ms: 7, top: 1 });
+      expect(run).toMatchObject({
+        kind: "run",
+        version: "v0.1.6",
+        throttled_ms: 7,
+        top: 1,
+        models: {
+          extract_postings: { provider: "azure-openai", model: "nano-test" },
+          screen: { provider: "jev", model: "jev-test" },
+        },
+      });
       expect(run && "node_ms" in run && Object.keys(run.node_ms)).toContain("judge");
       expect(r.lines).toContain("daily: run records 2026-10-13/run.jsonl (5)");
     });
