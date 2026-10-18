@@ -9,6 +9,7 @@ import { randomBytes } from "node:crypto";
 import type { TokenCredential } from "@azure/identity";
 import { ContainerClient, RestError } from "@azure/storage-blob";
 import { runDay } from "../day.js";
+import type { NodeModel } from "../eval/prices.js";
 import { postingId } from "../judge/verify.js";
 import type { FetchedMessage } from "../mail/types.js";
 import type { TokenUsage } from "../model/types.js";
@@ -76,10 +77,10 @@ export interface RunMeta {
   /** 429s the provider answered, retries included. */
   rate_limited: number;
   /**
-   * The model behind each Azure OpenAI node, so the evaluation prices it at its
-   * own rates (#148); absent before, when every node was gpt-5.4-mini.
+   * Who served each model node, with which model, so the evaluation prices it
+   * at that model's rates (#148); absent before.
    */
-  models?: Record<string, string>;
+  models?: Record<string, NodeModel>;
 }
 
 export interface RunStatsRecord extends RunMeta {

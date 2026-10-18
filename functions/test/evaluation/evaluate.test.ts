@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { evaluate } from "../../src/lib/eval/evaluate.js";
 import { costOf } from "../../src/lib/eval/prices.js";
-import { PRICES, records, runLine } from "./records.js";
+import { JEV_PRICE, MINI_PRICE, NANO_PRICE, PRICES, records, runLine } from "./records.js";
 
 describe("costOf", () => {
   it("prices cached input at the cached rate, the rest at full", () => {
     // 200K full input, 800K cached, 100K output.
-    const mini = PRICES.azure["gpt-5.4-mini"];
-    expect(
-      mini && costOf({ input: 1_000_000, output: 100_000, cached: 800_000 }, mini),
-    ).toBeCloseTo(0.2 * 0.75 + 0.8 * 0.075 + 0.1 * 4.5);
+    expect(costOf({ input: 1_000_000, output: 100_000, cached: 800_000 }, MINI_PRICE)).toBeCloseTo(
+      0.2 * 1 + 0.8 * 0.1 + 0.1 * 10,
+    );
   });
 });
 
@@ -29,40 +28,43 @@ describe("evaluate", () => {
     });
   });
 
-  it("splits tokens and cost per model, Azure's first, Jev's last", () => {
-    expect(e.cost.map((c) => c.model)).toEqual(["gpt-5.4-mini", "Jev"]);
+  it("splits tokens and cost per model, in the order the nodes ran", () => {
+    expect(e.cost.map((c) => `${c.provider}/${c.model}`)).toEqual([
+      "azure-openai/gpt-5.4-mini",
+      "jev/jev-1.13.0",
+    ]);
     expect(e.cost[0]).toMatchObject({ input: 1_090_000, output: 116_800, cached: 800_000 });
     expect(e.cost[1]).toMatchObject({ input: 30_000, output: 0, cached: 0 });
-    expect(e.cost[1]?.usd).toBeCloseTo(0.03 * 0.042);
+    expect(e.cost[1]?.usd).toBeCloseTo(0.03 * JEV_PRICE.input);
     expect(e.usd).toBeCloseTo((e.cost[0]?.usd ?? 0) + (e.cost[1]?.usd ?? 0));
-    expect(e.pricedBy).toEqual({ azureOn: "2026-10-17", jev: true });
+    expect(e.priceSources).toEqual(PRICES.sources);
   });
 
-  it("prices each Azure node at its model's rates; a record naming none used mini (#148)", () => {
+  it("prices each node at its model's rates; a record naming none ran as before #148", () => {
+    const azure = (model: string) => ({ provider: "azure-openai", model });
     const nano = evaluate(
       records({
         models: {
-          extract_postings: "gpt-5.4-nano",
-          judge: "gpt-5.4-mini",
-          explain: "gpt-5.4-mini",
+          extract_postings: azure("gpt-5.4-nano"),
+          judge: azure("gpt-5.4-mini"),
+          explain: azure("gpt-5.4-mini"),
+          screen: { provider: "jev", model: "jev-1.13.0" },
         },
       }),
       [],
       null,
       PRICES,
     );
-    expect(nano.cost.map((c) => c.model)).toEqual(["gpt-5.4-nano", "gpt-5.4-mini", "Jev"]);
+    expect(nano.cost.map((c) => c.model)).toEqual(["gpt-5.4-nano", "gpt-5.4-mini", "jev-1.13.0"]);
     const extract = runLine().usage.extract_postings ?? { input: 0, output: 0 };
-    const nanoPrice = PRICES.azure["gpt-5.4-nano"];
-    expect(nano.cost[0]?.usd).toBeCloseTo(nanoPrice ? costOf(extract, nanoPrice) : Number.NaN);
+    expect(nano.cost[0]?.usd).toBeCloseTo(costOf(extract, NANO_PRICE));
   });
 
   it("leaves a cost unpriced, never guessed, when its price is missing", () => {
-    const none = evaluate(records(), [], null, { azure: {}, jev: null, azureOn: null });
+    const none = evaluate(records(), [], null, { byModel: {}, sources: [] });
     expect(none.cost.map((c) => c.usd)).toEqual([null, null]);
     expect(none.usd).toBeNull();
     expect(none.trend.at(-1)?.usd).toBeNull();
-    expect(none.pricedBy).toEqual({ azureOn: null, jev: false });
   });
 
   it("times the run from start to end, with the TPM wait", () => {

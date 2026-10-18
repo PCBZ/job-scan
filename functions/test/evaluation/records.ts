@@ -84,12 +84,21 @@ export function records(over: Partial<RunStatsRecord> = {}): RunRecord[] {
   ] as RunRecord[];
 }
 
-/** Synthetic prices: what a report would have read. */
+/**
+ * Prices for tests, not real ones: round numbers, so a figure in a test is
+ * plainly the fixture's. Production reads them from the Retail Prices API
+ * and config (#148).
+ */
+export const MINI_PRICE = { input: 1, cached: 0.1, output: 10 };
+export const NANO_PRICE = { input: 0.5, cached: 0.05, output: 2 };
+export const JEV_PRICE = { input: 0.1, cached: 0.1, output: 0 };
+
+/** What a report would have read for these test runs. */
 export const PRICES: Prices = {
-  azure: {
-    "gpt-5.4-mini": { input: 0.75, cached: 0.075, output: 4.5 },
-    "gpt-5.4-nano": { input: 0.2, cached: 0.02, output: 1.25 },
+  byModel: {
+    "azure-openai/gpt-5.4-mini": MINI_PRICE,
+    "azure-openai/gpt-5.4-nano": NANO_PRICE,
+    "jev/jev-1.13.0": JEV_PRICE,
   },
-  jev: { input: 0.042, cached: 0.042, output: 0 },
-  azureOn: "2026-10-17",
+  sources: ["Azure Retail Prices API, 2026-10-15", "Jev from config"],
 };

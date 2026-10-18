@@ -67,10 +67,9 @@ describe("the evaluation email", () => {
 
   it("names each model in the cost table, and where its prices came from", () => {
     const text = renderText(e);
-    expect(text).toContain("Azure gpt-5.4-mini");
-    expect(text).toContain("prices: Azure Retail Prices API, 2026-10-17; Jev from config");
-    expect(renderText(evaluate(records(), []))).toContain(
-      "prices: Azure prices unavailable; no Jev price in config",
-    );
+    expect(text).toContain("Azure OpenAI gpt-5.4-mini");
+    expect(text).toContain("Jev jev-1.13.0");
+    expect(text).toContain("prices: Azure Retail Prices API, 2026-10-15; Jev from config");
+    expect(renderText(evaluate(records(), []))).toContain("prices: none");
   });
 });

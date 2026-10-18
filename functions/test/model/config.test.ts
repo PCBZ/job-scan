@@ -5,7 +5,7 @@ import { z } from "zod";
 import {
   extractClientFromEnv,
   modelClientFromEnv,
-  modelNames,
+  nodeModels,
 } from "../../src/lib/model/config.js";
 import { FallbackClient } from "../../src/lib/model/fallback.js";
 import { OpenAIChatClient } from "../../src/lib/model/openai-chat.js";
@@ -253,13 +253,14 @@ describe("extractClientFromEnv (#148)", () => {
     expect(extractClientFromEnv(env, credential, main)).toBeInstanceOf(OpenAIChatClient);
   });
 
-  it("names the model behind each Azure node", () => {
-    expect(modelNames({ ...AZURE, MODEL_EXTRACT_NAME: "gpt-5.4-nano" })).toEqual({
-      extract_postings: "gpt-5.4-nano",
-      judge: "gpt-5.4-mini",
-      explain: "gpt-5.4-mini",
+  it("names who serves each node it configures, and with which model", () => {
+    const mini = { provider: "azure-openai", model: "gpt-5.4-mini" };
+    expect(nodeModels({ ...AZURE, MODEL_EXTRACT_NAME: "gpt-5.4-nano" })).toEqual({
+      extract_postings: { provider: "azure-openai", model: "gpt-5.4-nano" },
+      judge: mini,
+      explain: mini,
     });
-    expect(modelNames(AZURE).extract_postings).toBe("gpt-5.4-mini");
+    expect(nodeModels(AZURE).extract_postings).toEqual(mini);
   });
 });
 

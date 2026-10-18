@@ -6,13 +6,13 @@ import { retailPrices } from "../../src/lib/eval/prices.js";
 import { runEvalReport } from "../../src/lib/eval/report.js";
 import type { SmokeResult } from "../../src/lib/run/eval-queue.js";
 import { type RunRecord, runRecordReader, sentMarks, toJsonl } from "../../src/lib/run/records.js";
-import { records, runLine } from "./records.js";
+import { JEV_PRICE, MINI_PRICE, records, runLine } from "./records.js";
 import { modelRows, retailApi } from "./retail.js";
 
-const NOW = () => new Date("2026-10-17T15:00:00Z");
-/** The Retail Prices API with gpt-5.4-mini listed. */
-const PRICED = () =>
-  retailApi(modelRows("gpt-5.4-mini", { input: 0.75, cached: 0.075, output: 4.5 }));
+/** When the report runs: 15 minutes after its run, as the queue delays it. */
+const REPORT_TIME = () => new Date("2026-10-15T15:15:00Z");
+/** The Retail Prices API with gpt-5.4-mini listed, at the test's prices. */
+const PRICED = () => retailApi(modelRows("gpt-5.4-mini", MINI_PRICE));
 
 const NAME = "2026-10-15/2026-10-15T15:00:00.000Z-aaaa0000.jsonl";
 const MESSAGE = {
@@ -52,7 +52,7 @@ const CONFIG = {
   report: {
     email_account: "personal",
     email_to: "me@example.test",
-    jev_usd_per_1m: { input: 0.042, output: 0 },
+    jev_usd_per_1m: { input: JEV_PRICE.input, output: JEV_PRICE.output },
   },
 } as unknown as AppConfig;
 const ENV = { GMAIL_USER: "sender@example.test", GMAIL_PASSWORD: "app-password" };
@@ -113,8 +113,8 @@ function harness(
         env: ENV,
         config: async () => config,
         records: runRecordReader(fakeContainer(blobs)),
-        azurePrices: retailPrices(api.fetch, NOW),
-        now: NOW,
+        azurePrices: retailPrices(api.fetch, REPORT_TIME),
+        now: REPORT_TIME,
         latency,
         sent: sentMarks(fakeMarks(marks)),
         smokeResult: async (r) => {
@@ -162,7 +162,9 @@ describe("runEvalReport", () => {
     await h.run(MESSAGE);
     expect(h.priceUrls).toHaveLength(1);
     expect(h.sent[0]?.subject).toMatch(/: ≈ \$\d+\.\d{2}$/);
-    expect(h.sent[0]?.text).toContain("prices: Azure Retail Prices API, 2026-10-17");
+    expect(h.sent[0]?.text).toContain(
+      "prices: Azure Retail Prices API, 2026-10-15; Jev from config",
+    );
   });
 
   it("still sends, with the cost unpriced, when the Retail Prices API fails", async () => {
@@ -173,7 +175,7 @@ describe("runEvalReport", () => {
     expect(h.sent[0]?.subject).toMatch(/: cost unpriced$/);
     expect(h.sent[0]?.text).toContain("Azure prices unavailable");
     expect(h.lines).toContain(
-      "evalReport: Azure prices unavailable: Azure Retail Prices API answered 503",
+      "evalReport: azure-openai prices unavailable: Azure Retail Prices API answered 503",
     );
   });
 
@@ -336,7 +338,7 @@ describe("the post-deploy smoke test (#134)", () => {
           env: ENV,
           config: async () => CONFIG,
           records: runRecordReader(fakeContainer(blobs)),
-          azurePrices: retailPrices(PRICED().fetch, NOW),
+          azurePrices: retailPrices(PRICED().fetch, REPORT_TIME),
           latency: async () => (failEmail ? null : LATENCY),
           requeue: async () => {},
           sent: sentMarks(fakeMarks(new Set())),

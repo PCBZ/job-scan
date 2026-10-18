@@ -15,21 +15,36 @@ export interface Price {
   output: number;
 }
 
-/** What a report prices: each Azure OpenAI model it found, and Jev when config gives it. */
-export interface Prices {
-  azure: Readonly<Record<string, Price>>;
-  jev: Price | null;
-  /** The day Azure's were read, for the report's footer; null when they weren't. */
-  azureOn: string | null;
+/** Who served a node, and with which model: "azure-openai" gpt-5.4-nano, "jev" jev-1.13.0. */
+export interface NodeModel {
+  provider: string;
+  model: string;
 }
 
-export const NO_PRICES: Prices = { azure: {}, jev: null, azureOn: null };
+/** A model's key in a price list: "azure-openai/gpt-5.4-nano". */
+export const modelKey = (m: NodeModel) => `${m.provider}/${m.model}`;
 
-/** The nodes whose tokens Jev serves; the rest are Azure OpenAI's. */
-export const JEV_NODES: ReadonlySet<string> = new Set(["screen"]);
+/** What a report prices with: a price per model key, and where each provider's came from. */
+export interface Prices {
+  byModel: Readonly<Record<string, Price>>;
+  /** One line per provider, for the report's footer. */
+  sources: string[];
+}
 
-/** Every Azure node's model before run records named them (#148). */
-export const LEGACY_AZURE_MODEL = "gpt-5.4-mini";
+export const NO_PRICES: Prices = { byModel: {}, sources: [] };
+
+/** One provider's prices for the models given, keyed by model name. */
+export type PriceSource = (models: string[]) => Promise<Record<string, Price>>;
+
+/**
+ * Each node's model before run records named them (#148): Jev's screen and
+ * gpt-5.4-mini for the rest, as every release until then ran.
+ */
+export function legacyModel(node: string): NodeModel {
+  return node === "screen"
+    ? { provider: "jev", model: "jev-1.13.0" }
+    : { provider: "azure-openai", model: "gpt-5.4-mini" };
+}
 
 /** USD for one node's usage: cached input at the cached rate, the rest at full. */
 export function costOf(usage: TokenUsage, price: Price): number {
@@ -72,8 +87,6 @@ const page = z.object({
 });
 type Item = z.infer<typeof page>["Items"][number];
 
-export type AzurePriceSource = (models: string[]) => Promise<Record<string, Price>>;
-
 /**
  * Azure OpenAI's list prices from the Retail Prices API, which needs no sign-in.
  * Global meters are listed under many regions, not the account's, so they're
@@ -84,7 +97,7 @@ export type AzurePriceSource = (models: string[]) => Promise<Record<string, Pric
 export function retailPrices(
   fetchFn: typeof fetch = fetch,
   now: () => Date = () => new Date(),
-): AzurePriceSource {
+): PriceSource {
   return async (models) => {
     const out: Record<string, Price> = {};
     for (const model of new Set(models)) {
@@ -133,7 +146,13 @@ export function retailPrices(
   };
 }
 
-/** Jev's price from config; it caches nothing, so cached input costs as much as input. */
-export const jevPrice = (
-  configured: { input: number; output: number } | undefined,
-): Price | null => (configured === undefined ? null : { ...configured, cached: configured.input });
+/**
+ * A provider whose price no API publishes, from config: every model gets it,
+ * with cached input at the input rate, as such a provider caches nothing.
+ */
+export const configPrices =
+  (configured: { input: number; output: number } | undefined): PriceSource =>
+  async (models) =>
+    configured === undefined
+      ? {}
+      : Object.fromEntries(models.map((m) => [m, { ...configured, cached: configured.input }]));

@@ -15,9 +15,9 @@ import { runDay } from "../day.js";
 import { type EmailSettings, emailEvaluation, emailSettings } from "../delivery/email.js";
 import type { EvalMessage, SmokeResult } from "../run/eval-queue.js";
 import type { RunRecord, RunRecordReader, RunStatsRecord, SentMarks } from "../run/records.js";
-import { azureModels, evaluate } from "./evaluate.js";
+import { evaluate, modelOf, modelsUsed } from "./evaluate.js";
 import type { Latency, LatencySource } from "./latency.js";
-import { type AzurePriceSource, JEV_NODES, jevPrice, type Prices } from "./prices.js";
+import { configPrices, modelKey, type Price, type PriceSource, type Prices } from "./prices.js";
 
 /** The runs before this one that the trend shows. */
 export const TREND_RUNS = 6;
@@ -55,7 +55,7 @@ export interface EvalReportDeps {
   /** Where a smoke test's outcome goes, for CD to wait on (#134). */
   smokeResult: (result: SmokeResult) => Promise<void>;
   /** Azure OpenAI's list prices, read on each report (#148). */
-  azurePrices: AzurePriceSource;
+  azurePrices: PriceSource;
   now?: () => Date;
 }
 
@@ -117,10 +117,34 @@ export async function runEvalReport(
   );
 }
 
+/** A provider's price source, and how the footer names it with and without prices. */
+interface PriceSourceOf {
+  read: PriceSource;
+  found: string;
+  missing: string;
+}
+
+/** Where each provider's prices come from: an API when one publishes them, config otherwise. */
+function priceSources(config: AppConfig, d: EvalReportDeps): Record<string, PriceSourceOf> {
+  const day = runDay(d.now?.() ?? new Date());
+  return {
+    "azure-openai": {
+      read: d.azurePrices,
+      found: `Azure Retail Prices API, ${day}`,
+      missing: "Azure prices unavailable",
+    },
+    jev: {
+      read: configPrices(config.report.jev_usd_per_1m),
+      found: "Jev from config",
+      missing: "no Jev price in config",
+    },
+  };
+}
+
 /**
- * The prices a report uses: Azure's for every model these runs used, read
- * now; Jev's from config. A failed read leaves Azure's costs unpriced rather
- * than failing the report.
+ * The prices a report uses: each provider's, for every model these runs used,
+ * read now. A source that fails leaves its models unpriced rather than
+ * failing the report.
  */
 async function pricesFor(
   records: RunRecord[],
@@ -128,21 +152,44 @@ async function pricesFor(
   d: EvalReportDeps,
   log: EvalReportLog,
 ): Promise<Prices> {
-  const jev = jevPrice(config.report.jev_usd_per_1m);
   const runs = records.filter((r): r is RunStatsRecord => r.kind === "run");
-  try {
-    const azure = await d.azurePrices(azureModels(runs));
-    return { azure, jev, azureOn: runDay(d.now?.() ?? new Date()) };
-  } catch (err) {
-    log.log(`evalReport: Azure prices unavailable: ${errorText(err)}`);
-    return { azure: {}, jev, azureOn: null };
+  const byProvider = new Map<string, string[]>();
+  for (const m of modelsUsed(runs))
+    byProvider.set(m.provider, [...(byProvider.get(m.provider) ?? []), m.model]);
+  const known = priceSources(config, d);
+  const byModel: Record<string, Price> = {};
+  const sources: string[] = [];
+  for (const [provider, models] of byProvider) {
+    const source = known[provider];
+    if (!source) {
+      sources.push(`no price source for ${provider}`);
+      continue;
+    }
+    try {
+      const prices = Object.entries(await source.read(models));
+      for (const [model, price] of prices) byModel[modelKey({ provider, model })] = price;
+      sources.push(prices.length > 0 ? source.found : source.missing);
+    } catch (err) {
+      log.log(`evalReport: ${provider} prices unavailable: ${errorText(err)}`);
+      sources.push(source.missing);
+    }
   }
+  return { byModel, sources };
 }
 
-/** Whether an Azure node used tokens: then the run's trace isn't complete without its calls. */
+/**
+ * The providers whose calls the run's trace holds: OpenInference instruments
+ * the OpenAI SDK (#101), which these two use.
+ */
+const TRACED_PROVIDERS: ReadonlySet<string> = new Set(["azure-openai", "openai-compatible"]);
+
+/** Whether a traced node used tokens: then the run's trace isn't complete without its calls. */
 function madeModelCalls(records: RunRecord[]): boolean {
   const run = records.find((r): r is RunStatsRecord => r.kind === "run");
-  return Object.entries(run?.usage ?? {}).some(([node, u]) => !JEV_NODES.has(node) && u.input > 0);
+  if (!run) return false;
+  return Object.entries(run.usage).some(
+    ([node, u]) => TRACED_PROVIDERS.has(modelOf(run, node).provider) && u.input > 0,
+  );
 }
 
 /**

@@ -6,7 +6,7 @@ import type { TokenUsage } from "../model/types.js";
 import type { FilteredRecord, PickRecord, RunRecord, RunStatsRecord } from "../run/records.js";
 import type { Loop } from "../workflow/state.js";
 import type { Latency } from "./latency.js";
-import { costOf, JEV_NODES, LEGACY_AZURE_MODEL, NO_PRICES, type Prices } from "./prices.js";
+import { costOf, legacyModel, modelKey, NO_PRICES, type NodeModel, type Prices } from "./prices.js";
 
 /** Tokens and their estimated cost in USD; null when there's no price for them. */
 export interface Spend extends TokenUsage {
@@ -14,10 +14,8 @@ export interface Spend extends TokenUsage {
   usd: number | null;
 }
 
-/** One model's tokens and cost: an Azure OpenAI model, or "Jev". */
-export interface CostRow extends Spend {
-  model: string;
-}
+/** One model's tokens and cost. */
+export interface CostRow extends Spend, NodeModel {}
 
 export interface ScreenedOut {
   title: string;
@@ -56,8 +54,8 @@ export interface Evaluation {
   };
   /** Tokens and cost per model, at the prices the report found. */
   cost: CostRow[];
-  /** Where the prices came from, for the footer. */
-  pricedBy: { azureOn: string | null; jev: boolean };
+  /** Where each provider's prices came from, for the footer. */
+  priceSources: string[];
   /** The run's cost; null when a part of it has no price. */
   usd: number | null;
   /** Start to end of the workflow; null for records from before #129. */
@@ -85,36 +83,31 @@ const JEV_REASON = /\(Jev (\d(?:\.\d+)?)\)$/;
 
 const LOOPS: Loop[] = ["extract", "judge", "explain"];
 
-/** The model behind an Azure node; records before #148 name none. */
-export const modelOf = (run: RunStatsRecord, node: string) =>
-  run.models?.[node] ?? LEGACY_AZURE_MODEL;
+/** Who served a node, with which model; records before #148 name none. */
+export const modelOf = (run: RunStatsRecord, node: string): NodeModel =>
+  run.models?.[node] ?? legacyModel(node);
 
-/** Every Azure OpenAI model these runs used, to look up their prices. */
-export const azureModels = (runs: RunStatsRecord[]) => [
-  ...new Set(
-    runs.flatMap((r) =>
-      Object.keys(r.usage)
-        .filter((n) => !JEV_NODES.has(n))
-        .map((n) => modelOf(r, n)),
-    ),
-  ),
-];
+/** Every model these runs used, once each, to look up their prices. */
+export function modelsUsed(runs: RunStatsRecord[]): NodeModel[] {
+  const all = runs.flatMap((r) => Object.keys(r.usage).map((n) => modelOf(r, n)));
+  return [...new Map(all.map((m) => [modelKey(m), m])).values()];
+}
 
-/** A run's tokens and cost per model, Azure's first and Jev's last. */
+/** A run's tokens and cost per model, in the order its nodes ran. */
 function costRows(run: RunStatsRecord, prices: Prices): CostRow[] {
   const rows = new Map<string, CostRow>();
   for (const [node, u] of Object.entries(run.usage)) {
-    const jev = JEV_NODES.has(node);
-    const model = jev ? "Jev" : modelOf(run, node);
-    const price = jev ? prices.jev : (prices.azure[model] ?? null);
-    const row = rows.get(model) ?? { model, input: 0, output: 0, cached: 0, usd: 0 };
+    const m = modelOf(run, node);
+    const key = modelKey(m);
+    const price = prices.byModel[key] ?? null;
+    const row = rows.get(key) ?? { ...m, input: 0, output: 0, cached: 0, usd: 0 };
     row.input += u.input;
     row.output += u.output;
     row.cached += u.cached ?? 0;
     row.usd = row.usd === null || price === null ? null : row.usd + costOf(u, price);
-    rows.set(model, row);
+    rows.set(key, row);
   }
-  return [...rows.values()].sort((a, b) => Number(a.model === "Jev") - Number(b.model === "Jev"));
+  return [...rows.values()];
 }
 
 /** The sum, or null when any part has no price. */
@@ -197,7 +190,7 @@ export function evaluate(
       top: run.top,
     },
     cost,
-    pricedBy: { azureOn: prices.azureOn, jev: prices.jev !== null },
+    priceSources: prices.sources,
     usd: total(cost),
     runMs: Number.isNaN(ended) ? null : ended - Date.parse(run.started_at),
     throttledMs: run.throttled_ms,

@@ -25,6 +25,12 @@ const CENTS = new Intl.NumberFormat("en", {
 const DURATION = new Intl.DurationFormat("en", { style: "narrow" });
 const PERCENT = new Intl.NumberFormat("en", { style: "percent" });
 
+/** How the cost table names a provider. */
+const PROVIDERS: Readonly<Record<string, string>> = {
+  "azure-openai": "Azure OpenAI",
+  jev: "Jev",
+};
+
 /** 1.52M, 122.4K, 950. */
 export const tokens = (n: number) => COMPACT.format(n);
 
@@ -63,18 +69,13 @@ export function view(e: Evaluation) {
       `${f.messages} emails → ${f.extracted} postings (${f.duplicates} duplicates, ${f.repeats} repeats) → ` +
       `${f.codeFiltered} filtered by code → ${f.screenFiltered} by Jev → ${f.judged} judged → ${f.top} picks`,
     cost: e.cost.map((c) => ({
-      model: c.model === "Jev" ? "Jev" : `Azure ${c.model}`,
+      model: `${PROVIDERS[c.provider] ?? c.provider} ${c.model}`,
       input: tokens(c.input),
       cached: tokens(c.cached),
       output: tokens(c.output),
       usd: usd(c.usd),
     })),
-    prices: [
-      e.pricedBy.azureOn
-        ? `Azure Retail Prices API, ${e.pricedBy.azureOn}`
-        : "Azure prices unavailable",
-      e.pricedBy.jev ? "Jev from config" : "no Jev price in config",
-    ].join("; "),
+    prices: e.priceSources.join("; ") || "none",
     total: usd(e.usd),
     time: [
       e.runMs === null ? "Run time not recorded" : `Run ${duration(e.runMs)}`,

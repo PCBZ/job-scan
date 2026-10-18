@@ -19,6 +19,7 @@
 import { getBearerTokenProvider, type TokenCredential } from "@azure/identity";
 import OpenAI, { AzureOpenAI } from "openai";
 import { type AppError, appError } from "../errors.js";
+import type { NodeModel } from "../eval/prices.js";
 import { FallbackClient } from "./fallback.js";
 import { OpenAIChatClient } from "./openai-chat.js";
 import { RateLimitedClient } from "./rate-limit.js";
@@ -163,11 +164,14 @@ export function extractClientFromEnv(
   );
 }
 
-/** The model behind each Azure OpenAI node, so the evaluation prices it (#148). */
-export function modelNames(env: Env): Record<string, string> {
-  const main = env.MODEL_NAME?.trim() ?? "";
+/** Who serves each node this module configures, and with which model (#148). */
+export function nodeModels(env: Env): Record<string, NodeModel> {
+  const main = { provider: env.MODEL_PROVIDER?.trim() ?? "", model: env.MODEL_NAME?.trim() ?? "" };
+  const extractName = env.MODEL_EXTRACT_NAME?.trim();
   return {
-    extract_postings: env.MODEL_EXTRACT_NAME?.trim() || main,
+    extract_postings: extractName
+      ? { provider: env.MODEL_EXTRACT_PROVIDER?.trim() || main.provider, model: extractName }
+      : main,
     judge: main,
     explain: main,
   };

@@ -15,8 +15,9 @@
 
 import type { TokenCredential } from "@azure/identity";
 import { blobConfigSource, loadConfig } from "../config/load.js";
-import { decisionClientFromEnv } from "../decision/config.js";
+import { DEFAULT_JEV_MODEL, decisionClientFromEnv } from "../decision/config.js";
 import { type AppError, appError } from "../errors.js";
+import type { NodeModel } from "../eval/prices.js";
 import { explainStep } from "../explain/explain.js";
 import { verifyExplanations } from "../explain/verify.js";
 import { judgeStep } from "../judge/judge.js";
@@ -30,7 +31,7 @@ import {
   extractClientFromEnv,
   type ModelClientOptions,
   modelClientFromEnv,
-  modelNames,
+  nodeModels,
 } from "../model/config.js";
 import { dedupeStep } from "../postings/dedupe.js";
 import { extractStep } from "../postings/extract.js";
@@ -83,8 +84,8 @@ export interface Pipeline {
   evalQueue: EvalQueue;
   /** The deployed release, for the run records. */
   version: string;
-  /** The model behind each Azure OpenAI node, for the run records (#148). */
-  models: Record<string, string>;
+  /** Who serves each model node, with which model, for the run records (#148). */
+  models: Record<string, NodeModel>;
 }
 
 export function composePipeline(
@@ -164,6 +165,9 @@ export function composePipeline(
     records: runRecordStoreFromUrl(setting("RUN_RECORDS_URL"), credential),
     evalQueue: evalQueueFromUrl(setting("EVAL_QUEUE_URL"), credential),
     version: env.APP_VERSION?.trim() || "local",
-    models: modelNames(env),
+    models: {
+      ...nodeModels(env),
+      screen: { provider: "jev", model: env.JEV_MODEL?.trim() || DEFAULT_JEV_MODEL },
+    },
   };
 }
