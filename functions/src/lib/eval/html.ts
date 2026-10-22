@@ -67,7 +67,7 @@ export function view(e: Evaluation) {
     outcome: e.outcome,
     funnel:
       `${f.messages} emails → ${f.extracted} postings (${f.duplicates} duplicates, ${f.repeats} repeats) → ` +
-      `${f.codeFiltered} filtered by code → ${f.screenFiltered} by Jev → ${f.judged} judged → ${f.top} picks`,
+      `${f.codeFiltered} filtered by code → ${f.screenFiltered} by Jev → ${f.judged} judged${f.reused > 0 ? ` (${f.reused} reused)` : ""} → ${f.top} picks`,
     cost: e.cost.map((c) => ({
       model: `${PROVIDERS[c.provider] ?? c.provider} ${c.model}`,
       input: tokens(c.input),

@@ -35,12 +35,14 @@ function harness(
     telegramFails?: boolean;
     env?: Record<string, string>;
     now?: Date;
+    judgements?: Parameters<typeof productionEffects>[0]["judgements"];
   } = {},
 ) {
   const calls: string[] = [];
   const stream = nodemailer.createTransport({ streamTransport: true, buffer: true });
   const effects = productionEffects({
     env: over.env ?? ENV,
+    judgements: over.judgements ?? null,
     publisher: {
       async publish(html, day) {
         calls.push(`publish ${day} ${html.length > 0}`);
@@ -125,6 +127,38 @@ describe("productionEffects.deliver", () => {
       "Error: smtp down",
       "telegram: chat not found",
     ]);
+  });
+});
+
+describe("productionEffects.rememberJudgements (#150)", () => {
+  const input = {
+    judged: [],
+    recalled: [],
+    problems: [],
+    profile: { locations: [], seniority: "mid" as const, needs_sponsorship: false },
+    resumes: [],
+  };
+
+  it("hands the run's answers to the judgement cache, and returns what it warned about", async () => {
+    const seen: unknown[] = [];
+    const { effects } = harness({
+      judgements: {
+        remember: async (i) => {
+          seen.push(i);
+          return ["judgement cache: 1 of 1 writes failed"];
+        },
+      },
+    });
+    const signal = AbortSignal.timeout(1000);
+    expect(await effects.rememberJudgements(input, signal)).toEqual([
+      "judgement cache: 1 of 1 writes failed",
+    ]);
+    expect(seen).toEqual([{ ...input, signal }]);
+  });
+
+  it("does nothing, and warns of nothing, without a cache", async () => {
+    const { effects } = harness();
+    expect(await effects.rememberJudgements(input)).toEqual([]);
   });
 });
 

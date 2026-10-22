@@ -1,4 +1,5 @@
 import type { AppConfig } from "../../src/lib/config/load.js";
+import type { Judgement } from "../../src/lib/judge/verify.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
 import type { ResumeSet } from "../../src/lib/resume/load.js";
 import type { EvalQueue } from "../../src/lib/run/eval-queue.js";
@@ -49,6 +50,11 @@ export interface FakeOptions {
   screenWarnings?: string[];
   /** Jev screens every posting out (#121). */
   screenAll?: boolean;
+  /** Answers kept from earlier runs, and what finding them warned about (#150). */
+  recalled?: Judgement[];
+  recallWarnings?: string[];
+  /** What keeping this run's answers warned about. */
+  rememberWarnings?: string[];
 }
 
 /** Nodes that record every call, in order, with their arguments. */
@@ -58,6 +64,8 @@ export function fakes(o: FakeOptions = {}) {
   const counters = { extract: 0, judge: 0, explain: 0 };
   /** What render_report was given: everything the run carried to the report. */
   const reported: ReportInput[] = [];
+  const recallInputs: Parameters<DeterministicSteps["recallJudgements"]>[0][] = [];
+  const remembered: Parameters<Effects["rememberJudgements"]>[0][] = [];
   const take = (lists: string[][] | undefined, n: number) => lists?.[n] ?? [];
   const llmCall = (node: string, args: unknown[]) => {
     log.push(node);
@@ -102,6 +110,11 @@ export function fakes(o: FakeOptions = {}) {
             filtered: [{ posting: posting({ title: "far away" }), gate: "location", reason: "x" }],
             notes: ["salary not compared for 1 posting(s): currency unknown"],
           };
+    },
+    async recallJudgements(input) {
+      log.push("recall_judgements");
+      recallInputs.push(input);
+      return { recalled: o.recalled ?? [], warnings: o.recallWarnings ?? [] };
     },
     verifyJudgements() {
       log.push("verify_judgements");
@@ -197,6 +210,11 @@ export function fakes(o: FakeOptions = {}) {
   };
 
   const effects: Effects = {
+    async rememberJudgements(input) {
+      log.push("remember_judgements");
+      remembered.push(input);
+      return o.rememberWarnings ?? [];
+    },
     async deliver() {
       log.push("deliver");
       if (o.deliverFails) throw new Error("smtp down");
@@ -228,5 +246,7 @@ export function fakes(o: FakeOptions = {}) {
     llmInputs,
     counters,
     reported,
+    recallInputs,
+    remembered,
   };
 }

@@ -6,6 +6,7 @@
 // only deterministic nodes reached by graph edges ever call.
 
 import type { AppConfig } from "../config/load.js";
+import type { ProfileConfig } from "../config/schema.js";
 import type { ExplainInput } from "../explain/explain.js";
 import type { Explanation } from "../explain/schema.js";
 import type { JudgeInput } from "../judge/judge.js";
@@ -17,7 +18,7 @@ import type { Filtered } from "../postings/gates.js";
 import type { SuspiciousFlag } from "../postings/schema.js";
 import type { Posting, Source } from "../postings/types.js";
 import type { Report } from "../report/types.js";
-import type { ResumeSet } from "../resume/load.js";
+import type { ResumeSet, ResumeVariant } from "../resume/load.js";
 
 export type { Explanation, Filtered, Judgement, Posting, Ranked, Report, SuspiciousFlag };
 
@@ -79,6 +80,11 @@ export interface DeterministicSteps {
     postings: Posting[],
     config: AppConfig,
   ): Promise<{ kept: Posting[]; filtered: Filtered[]; notes: string[] }>;
+  /** The answers kept from earlier runs for these postings (#150); never throws. */
+  recallJudgements(
+    input: { postings: Posting[]; profile: ProfileConfig; resumes: ResumeVariant[] },
+    signal?: AbortSignal,
+  ): Promise<{ recalled: Judgement[]; warnings: string[] }>;
   verifyJudgements(judged: Judgement[], resumes: ResumeSet): string[];
   /** Each evidence phrase, verified, becomes the whole resume line it came from. */
   fullLines(judged: Judgement[], resumes: ResumeSet): Judgement[];
@@ -92,6 +98,21 @@ export interface DeterministicSteps {
 export interface Effects {
   /** Publish and send the report; the config names the recipients. */
   deliver(report: Report, config: AppConfig, signal?: AbortSignal): Promise<void>;
+  /**
+   * After judge's repair loop: keep the verified answers for later runs (#150).
+   * Returns warnings; never throws.
+   */
+  rememberJudgements(
+    input: {
+      judged: Judgement[];
+      recalled: Judgement[];
+      problems: string[];
+      profile: ProfileConfig;
+      resumes: ResumeVariant[];
+      models?: string[];
+    },
+    signal?: AbortSignal,
+  ): Promise<string[]>;
   /** After delivery: record the seen messages and the recommended postings. */
   markSeen(input: { mail: FetchPayload; top: Ranked[] }, signal?: AbortSignal): Promise<void>;
 }

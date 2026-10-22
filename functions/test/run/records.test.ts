@@ -44,6 +44,7 @@ function state(over: Partial<State> = {}): State {
     config: null,
     resumes: null,
     mail: null,
+    recalled: [],
     extracted: [],
     postings: [],
     repeats: 0,

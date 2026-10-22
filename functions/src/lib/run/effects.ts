@@ -7,6 +7,7 @@ import type { AppConfig } from "../config/load.js";
 import { addDays, runDay } from "../day.js";
 import { emailReport, emailSettings, gmailTransport } from "../delivery/email.js";
 import { telegramReport, telegramSettings } from "../delivery/telegram.js";
+import type { JudgementCache } from "../judge/cache.js";
 import { isPruneDay, SEEN_MESSAGE_DAYS, type SeenStore } from "../mail/seen-store.js";
 import type { TableSeenJobsStore } from "../postings/seen-jobs.js";
 import { renderHtml } from "../report/html.js";
@@ -20,6 +21,8 @@ export interface EffectsServices {
   publisher: ReportPublisher;
   seen: Pick<SeenStore, "markSeen" | "pruneOlderThan">;
   seenJobs: Pick<TableSeenJobsStore, "recordRecommended">;
+  /** The judge's answers kept across runs (#150); none until the account exists. */
+  judgements?: Pick<JudgementCache, "remember"> | null;
   fetch: typeof fetch;
   /** Builds the SMTP transport; nodemailer's own in production. */
   transport?: (
@@ -52,6 +55,10 @@ export function productionEffects(d: EffectsServices): Effects {
       }
       if (failures.length === 1) throw failures[0];
       if (failures.length > 1) throw new AggregateError(failures, "deliver: every channel failed");
+    },
+
+    async rememberJudgements(input, signal) {
+      return d.judgements ? d.judgements.remember({ ...input, ...(signal ? { signal } : {}) }) : [];
     },
 
     async markSeen({ mail, top }) {

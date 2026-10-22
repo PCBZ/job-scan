@@ -37,6 +37,7 @@ describe("composePipeline", () => {
         "loadConfig",
         "loadResumes",
         "rank",
+        "recallJudgements",
         "renderReport",
         "validatePostings",
         "verifyExplanations",
@@ -49,7 +50,11 @@ describe("composePipeline", () => {
       "judge",
       "screen",
     ]);
-    expect(Object.keys(pipeline.effects).sort()).toEqual(["deliver", "markSeen"]);
+    expect(Object.keys(pipeline.effects).sort()).toEqual([
+      "deliver",
+      "markSeen",
+      "rememberJudgements",
+    ]);
   });
 
   it("needs the model settings too", () => {

@@ -160,6 +160,22 @@ describe("runDaily", () => {
       return { records, writes };
     }
 
+    it("records what the run did with the judgement cache, when it has one (#150)", async () => {
+      const stats = {
+        reused: 12,
+        written: 30,
+        failed_reads: 0,
+        failed_writes: 1,
+        request_charge: 214.5,
+      };
+      const withCache = store();
+      await runDaily({ ...fakes(), ...withCache, judgementCache: () => stats }, recorder().log);
+      expect(withCache.writes[0]?.records.at(-1)).toMatchObject({ judgement_cache: stats });
+      const without = store();
+      await runDaily({ ...fakes(), ...without }, recorder().log);
+      expect(without.writes[0]?.records.at(-1)).not.toHaveProperty("judgement_cache");
+    });
+
     it("writes the run's records after it, with the version, node times and wait", async () => {
       const s = store();
       const r = recorder();

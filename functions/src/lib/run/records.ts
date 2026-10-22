@@ -10,6 +10,7 @@ import type { TokenCredential } from "@azure/identity";
 import { ContainerClient, RestError } from "@azure/storage-blob";
 import { runDay } from "../day.js";
 import type { NodeModel } from "../eval/prices.js";
+import type { JudgementCacheStats } from "../judge/cache.js";
 import { postingId } from "../judge/verify.js";
 import type { FetchedMessage } from "../mail/types.js";
 import type { TokenUsage } from "../model/types.js";
@@ -81,6 +82,8 @@ export interface RunMeta {
    * at that model's rates (#148); absent before.
    */
   models?: Record<string, NodeModel>;
+  /** What the run did with the judgement cache (#150); absent without one. */
+  judgement_cache?: JudgementCacheStats;
 }
 
 export interface RunStatsRecord extends RunMeta {

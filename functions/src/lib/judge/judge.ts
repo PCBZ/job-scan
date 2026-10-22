@@ -17,6 +17,12 @@ export interface JudgeInput {
   postings: Posting[];
   resumes: ResumeVariant[];
   profile: ProfileConfig;
+  /**
+   * Answers kept from earlier runs for some of these postings (#150). The first
+   * pass uses them in place of a model call; a repair turn asks the model, so
+   * a kept answer that fails verification is replaced, not repeated.
+   */
+  recalled?: Judgement[];
 }
 
 export interface JudgeOptions {
@@ -59,7 +65,7 @@ export function withoutUnstatedGaps(posting: Posting, answer: JudgeAnswer): Judg
 export function judgeStep(client: ModelClient, options: JudgeOptions = {}) {
   const concurrency = options.concurrency ?? 4;
   return async (
-    { postings, resumes, profile }: JudgeInput,
+    { postings, resumes, profile, recalled = [] }: JudgeInput,
     repairs: RepairTurn[],
     signal?: AbortSignal,
   ): Promise<LlmResult<Judgement[]>> => {
@@ -67,11 +73,14 @@ export function judgeStep(client: ModelClient, options: JudgeOptions = {}) {
     let usage: TokenUsage = { input: 0, output: 0 };
     const warnings: string[] = [];
 
+    const earlier = new Map(recalled.map((j) => [postingId(j.posting), j]));
     const judged = await mapWithLimit(postings, concurrency, async (posting) => {
       const id = postingId(posting);
       const kept = judgementOf(last?.previous, id);
       // On a repair, a posting whose judgement passed keeps it as it is.
       if (last && problemsAbout(last.problems, id).length === 0) return kept ? [kept] : [];
+      const remembered = last ? undefined : earlier.get(id);
+      if (remembered) return [remembered];
       try {
         const r = await client.structured({
           name: "judgement",

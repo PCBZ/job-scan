@@ -1,8 +1,8 @@
 // The daily run as a LangGraph state graph (plan §3, #55).
 //
 //   load_config ─┬─ fetch_mail ─ extract_postings ⇄ validate ─ dedupe ─ hard_gates ─ screen ─ await_resumes ─┐
-//                └─ load_resumes ───────────────────────────────────────────────────────────────────────────┴─ check_resumes ─ judge ⇄ verify_judgements
-//   ─ rank ─ explain ⇄ verify_explanations ─ render_report ─ deliver ─ mark_seen
+//                └─ load_resumes ───────────────────────────────────────────────────────────────────────────┴─ check_resumes ─ recall_judgements ─ judge ⇄ verify_judgements
+//   ─ remember_judgements ─ rank ─ explain ⇄ verify_explanations ─ render_report ─ deliver ─ mark_seen
 //
 // No new mail, nothing past the gates, or no resumes to judge against
 // skips straight to render_report. Without resumes, nothing is marked seen, so
@@ -113,12 +113,26 @@ export function buildWorkflow(
       .join(["await_resumes", "load_resumes"], "check_resumes")
       .node("check_resumes", () => ({}))
       .branch("check_resumes", (s) => (resumes(s).variants.length > 0 ? "judge" : "no_resumes"), {
-        judge: "judge",
+        judge: "recall_judgements",
         no_resumes: "short_no_resumes",
       })
+      // What an earlier run already judged (#150): judge's first pass reuses it.
+      .node("recall_judgements", async (s, signal) => {
+        const r = await steps.recallJudgements(
+          { postings: s.postings, profile: config(s).profile, resumes: resumes(s).variants },
+          signal,
+        );
+        return { recalled: r.recalled, ...(r.warnings.length ? { warnings: r.warnings } : {}) };
+      })
+      .edge("recall_judgements", "judge")
       .node("judge", async (s, signal) => {
         const r = await model.judge(
-          { postings: s.postings, resumes: resumes(s).variants, profile: config(s).profile },
+          {
+            postings: s.postings,
+            resumes: resumes(s).variants,
+            profile: config(s).profile,
+            recalled: s.recalled,
+          },
           s.loops.judge.turns,
           signal,
         );
@@ -131,10 +145,26 @@ export function buildWorkflow(
       .repairLoop("judge", {
         generate: "judge",
         check: "verify_judgements",
-        next: "rank",
+        next: "remember_judgements",
         output: (s) => s.judged,
         run: (s) => ({ problems: steps.verifyJudgements(s.judged, resumes(s)) }),
       })
+      // Keep what passed verification, before whole resume lines replace its phrases.
+      .node("remember_judgements", async (s, signal) => {
+        const warnings = await effects.rememberJudgements(
+          {
+            judged: s.judged,
+            recalled: s.recalled,
+            problems: s.loops.judge.problems,
+            profile: config(s).profile,
+            resumes: resumes(s).variants,
+            ...(s.usage.judge?.models ? { models: s.usage.judge.models } : {}),
+          },
+          signal,
+        );
+        return warnings.length ? { warnings } : {};
+      })
+      .edge("remember_judgements", "rank")
       .node("rank", (s) => {
         // After verification: a repair sees the phrases the model wrote.
         const judged = steps.fullLines(s.judged, resumes(s));

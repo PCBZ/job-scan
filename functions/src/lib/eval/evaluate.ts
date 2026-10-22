@@ -50,6 +50,8 @@ export interface Evaluation {
     codeFiltered: number;
     screenFiltered: number;
     judged: number;
+    /** Of those, answers kept from earlier runs, which cost no tokens (#150). */
+    reused: number;
     top: number;
   };
   /** Tokens and cost per model, at the prices the report found. */
@@ -187,6 +189,7 @@ export function evaluate(
       codeFiltered: filtered.length - screened.length,
       screenFiltered: screened.length,
       judged: run.judged,
+      reused: run.judgement_cache?.reused ?? 0,
       top: run.top,
     },
     cost,
