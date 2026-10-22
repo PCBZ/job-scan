@@ -20,7 +20,7 @@ import { type AppError, appError } from "../errors.js";
 import type { NodeModel } from "../eval/prices.js";
 import { explainStep } from "../explain/explain.js";
 import { verifyExplanations } from "../explain/verify.js";
-import type { JudgementCacheStats } from "../judge/cache.js";
+import type { JudgementCacheStats } from "../judge/cache-stats.js";
 import { judgementCacheFromEnv } from "../judge/cosmos-store.js";
 import { judgeStep } from "../judge/judge.js";
 import { rank } from "../judge/rank.js";
@@ -123,7 +123,7 @@ export function composePipeline(
   const extractClient = extractClientFromEnv(env, credential, client, clientOptions);
 
   // The judge's answers kept across runs (#150); none until the account exists.
-  const judgements = judgementCacheFromEnv(env, credential, now);
+  const judgements = judgementCacheFromEnv(env, credential);
 
   const deterministicSteps: DeterministicSteps = {
     loadConfig: () => loadConfig(configSource),

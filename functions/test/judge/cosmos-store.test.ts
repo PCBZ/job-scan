@@ -8,7 +8,7 @@ import {
 } from "../../src/lib/judge/cosmos-store.js";
 import { answer } from "./helpers.js";
 
-const ITEM = { id: "abc", format: CACHE_FORMAT, answer: answer(), judgedOn: "2026-10-22" };
+const ITEM = { id: "abc", format: CACHE_FORMAT, answer: answer() };
 
 /** The SDK's container as far as the store uses it, answering like the SDK does. */
 function container(

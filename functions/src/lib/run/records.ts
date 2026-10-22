@@ -10,7 +10,7 @@ import type { TokenCredential } from "@azure/identity";
 import { ContainerClient, RestError } from "@azure/storage-blob";
 import { runDay } from "../day.js";
 import type { NodeModel } from "../eval/prices.js";
-import type { JudgementCacheStats } from "../judge/cache.js";
+import type { JudgementCacheStats } from "../judge/cache-stats.js";
 import { postingId } from "../judge/verify.js";
 import type { FetchedMessage } from "../mail/types.js";
 import type { TokenUsage } from "../model/types.js";

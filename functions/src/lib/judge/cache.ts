@@ -11,10 +11,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { ProfileConfig } from "../config/schema.js";
-import { runDay } from "../day.js";
 import type { Posting } from "../postings/types.js";
 import type { ResumeVariant } from "../resume/load.js";
-import { mapWithLimit } from "../workflow/limit.js";
+import { JudgementCacheCounts, type JudgementCacheStats } from "./cache-stats.js";
 import { JUDGE_SYSTEM, judgeUser } from "./prompt.js";
 import { judgeAnswer } from "./schema.js";
 import { type Judgement, postingId, problemsAbout } from "./verify.js";
@@ -22,19 +21,11 @@ import { type Judgement, postingId, problemsAbout } from "./verify.js";
 /** Bumped when an item changes shape or meaning, so older items are misses. */
 export const CACHE_FORMAT = 1;
 
-/** How long a read or write may take before it counts as failed. */
-export const CACHE_TIMEOUT_MS = 5_000;
-
-/** Lookups and writes in flight at once. */
-const CONCURRENCY = 8;
-
 /** What is kept under a key: the verified answer, before whole resume lines replace its phrases. */
 export const cachedJudgement = z.object({
   id: z.string().min(1),
   format: z.number(),
   answer: judgeAnswer,
-  /** The day it was judged. */
-  judgedOn: z.string(),
   /** The models that answered, with their versions, e.g. "gpt-5.4-mini-2026-03-17". */
   models: z.array(z.string()).optional(),
 });
@@ -47,17 +38,6 @@ export interface JudgementStore {
   put(item: CachedJudgement, signal?: AbortSignal): Promise<void>;
   /** The request units charged so far. */
   requestCharge(): number;
-}
-
-/** What a run did with the cache, for its run record. */
-export interface JudgementCacheStats {
-  /** Answers reused: kept after verification, so the model wasn't asked. */
-  reused: number;
-  written: number;
-  failed_reads: number;
-  failed_writes: number;
-  /** Request units Cosmos charged. */
-  request_charge: number;
 }
 
 /**
@@ -86,7 +66,7 @@ export function judgementKey(
 export interface JudgementCacheOptions {
   /** The judge's deployment name: another model's answers aren't reused. */
   model: string;
-  now?: () => Date;
+  /** How long a read or write may take before it counts as failed. */
   timeoutMs?: number;
 }
 
@@ -96,18 +76,16 @@ const within = (signal: AbortSignal | undefined, ms: number) =>
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 export class JudgementCache {
-  private reused = 0;
-  private written = 0;
-  private failedReads = 0;
-  private failedWrites = 0;
+  private readonly counts = new JudgementCacheCounts();
+  private readonly model: string;
+  private readonly timeoutMs: number;
 
   constructor(
     private readonly store: JudgementStore,
-    private readonly options: JudgementCacheOptions,
-  ) {}
-
-  private get timeoutMs() {
-    return this.options.timeoutMs ?? CACHE_TIMEOUT_MS;
+    { model, timeoutMs = 5_000 }: JudgementCacheOptions,
+  ) {
+    this.model = model;
+    this.timeoutMs = timeoutMs;
   }
 
   /**
@@ -122,20 +100,23 @@ export class JudgementCache {
     signal?: AbortSignal,
   ): Promise<{ recalled: Judgement[]; warnings: string[] }> {
     const failures: string[] = [];
-    const found = await mapWithLimit(postings, CONCURRENCY, async (posting) => {
-      const key = judgementKey(posting, profile, resumes, this.options.model);
-      try {
-        const item = await this.store.get(key, within(signal, this.timeoutMs));
-        const parsed = cachedJudgement.safeParse(item);
-        if (parsed.success && parsed.data.id === key && parsed.data.format === CACHE_FORMAT) {
-          return [{ posting, answer: parsed.data.answer }];
+    // Point reads of one request unit each: no reason to queue them.
+    const found = await Promise.all(
+      postings.map(async (posting): Promise<Judgement[]> => {
+        const key = judgementKey(posting, profile, resumes, this.model);
+        try {
+          const item = await this.store.get(key, within(signal, this.timeoutMs));
+          const parsed = cachedJudgement.safeParse(item);
+          if (parsed.success && parsed.data.id === key && parsed.data.format === CACHE_FORMAT) {
+            return [{ posting, answer: parsed.data.answer }];
+          }
+        } catch (err) {
+          this.counts.failedReads++;
+          failures.push(errorText(err));
         }
-      } catch (err) {
-        this.failedReads++;
-        failures.push(errorText(err));
-      }
-      return [];
-    });
+        return [];
+      }),
+    );
     return { recalled: found.flat(), warnings: this.warn("read", failures, postings.length) };
   }
 
@@ -161,41 +142,35 @@ export class JudgementCache {
     for (const j of input.judged) {
       const id = postingId(j.posting);
       if (problemsAbout(input.problems, id).length > 0) continue;
-      if (earlier.get(id) === JSON.stringify(j.answer)) this.reused++;
+      if (earlier.get(id) === JSON.stringify(j.answer)) this.counts.reused++;
       else fresh.push(j);
     }
-    const judgedOn = runDay((this.options.now ?? (() => new Date()))());
     const failures: string[] = [];
-    await mapWithLimit(fresh, CONCURRENCY, async ({ posting, answer }) => {
-      const id = judgementKey(posting, input.profile, input.resumes, this.options.model);
-      try {
-        await this.store.put(
-          {
-            id,
-            format: CACHE_FORMAT,
-            answer,
-            judgedOn,
-            ...(input.models?.length ? { models: input.models } : {}),
-          },
-          within(input.signal, this.timeoutMs),
-        );
-        this.written++;
-      } catch (err) {
-        this.failedWrites++;
-        failures.push(errorText(err));
-      }
-    });
+    await Promise.all(
+      fresh.map(async ({ posting, answer }) => {
+        const id = judgementKey(posting, input.profile, input.resumes, this.model);
+        try {
+          await this.store.put(
+            {
+              id,
+              format: CACHE_FORMAT,
+              answer,
+              ...(input.models?.length ? { models: input.models } : {}),
+            },
+            within(input.signal, this.timeoutMs),
+          );
+          this.counts.written++;
+        } catch (err) {
+          this.counts.failedWrites++;
+          failures.push(errorText(err));
+        }
+      }),
+    );
     return this.warn("write", failures, fresh.length);
   }
 
   stats(): JudgementCacheStats {
-    return {
-      reused: this.reused,
-      written: this.written,
-      failed_reads: this.failedReads,
-      failed_writes: this.failedWrites,
-      request_charge: Math.round(this.store.requestCharge() * 100) / 100,
-    };
+    return this.counts.snapshot(this.store.requestCharge());
   }
 
   /** One warning for a step's failures, quoting the first. */

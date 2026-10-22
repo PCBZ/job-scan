@@ -57,7 +57,6 @@ type Env = Record<string, string | undefined>;
 export function judgementCacheFromEnv(
   env: Env,
   credential: TokenCredential,
-  now?: () => Date,
 ): JudgementCache | null {
   const endpoint = env.COSMOS_ENDPOINT?.trim();
   if (!endpoint) return null;
@@ -71,15 +70,8 @@ export function judgementCacheFromEnv(
   }
   const model = env.MODEL_NAME?.trim();
   if (!model) throw appError("config", "MODEL_NAME is not set");
-  const client = new CosmosClient({
-    endpoint,
-    aadCredentials: credential,
-    connectionPolicy: { requestTimeout: 5_000 },
-  });
+  const client = new CosmosClient({ endpoint, aadCredentials: credential });
   // The SDK's own Container must fit JudgementContainer, or this stops compiling.
   const sdk: Container = client.database(database).container(container);
-  return new JudgementCache(cosmosJudgementStore(sdk), {
-    model,
-    ...(now ? { now } : {}),
-  });
+  return new JudgementCache(cosmosJudgementStore(sdk), { model });
 }

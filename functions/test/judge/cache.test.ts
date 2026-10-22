@@ -57,14 +57,12 @@ function store(
   return { s, items, reads, writes };
 }
 
-const cache = (s: JudgementStore, extra = {}) =>
-  new JudgementCache(s, { model: MODEL, now: () => new Date("2026-10-22T15:00:00Z"), ...extra });
+const cache = (s: JudgementStore, extra = {}) => new JudgementCache(s, { model: MODEL, ...extra });
 
 const kept = (k: string, over: Partial<CachedJudgement> = {}): CachedJudgement => ({
   id: k,
   format: CACHE_FORMAT,
   answer: answer(),
-  judgedOn: "2026-10-20",
   ...over,
 });
 
@@ -150,14 +148,13 @@ describe("JudgementCache.remember", () => {
     ...over,
   });
 
-  it("keeps each fresh answer under its key, with the day and the models that answered", async () => {
+  it("keeps each fresh answer under its key, with the models that answered", async () => {
     const { s, writes } = store();
     const c = cache(s);
     expect(await c.remember(input({ models: ["gpt-5.4-mini-2026-03-17"] }))).toEqual([]);
     expect(writes.map((w) => w.id).sort()).toEqual([key(A), key(B)].sort());
     expect(writes[0]).toMatchObject({
       format: CACHE_FORMAT,
-      judgedOn: "2026-10-22",
       models: ["gpt-5.4-mini-2026-03-17"],
       answer: answer(),
     });
