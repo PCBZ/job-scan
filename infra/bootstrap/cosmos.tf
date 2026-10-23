@@ -4,13 +4,14 @@
 # once the account does, and every role assignment is bootstrap's. Beside the
 # Key Vault, it survives a destroy of the main stack.
 #
-# Serverless only, billed per request unit and GB stored: about half a cent a
-# month. Provisioned throughput bills a 400 RU/s minimum, about $26 a month,
+# In its own region (var.cosmos_location): Canada Central had no Cosmos DB
+# capacity for this subscription. Serverless only, billed per request unit and
+# GB stored: about half a cent a month. Provisioned throughput bills a 400 RU/s minimum, about $26 a month,
 # and is what an account is created with unless it says otherwise.
 resource "azurerm_cosmosdb_account" "judgements" {
   name                = "${var.name}-cosmos-${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.platform.name
-  location            = azurerm_resource_group.platform.location
+  location            = var.cosmos_location
   offer_type          = "Standard"
   kind                = "GlobalDocumentDB"
   minimal_tls_version = "Tls12"
@@ -29,7 +30,7 @@ resource "azurerm_cosmosdb_account" "judgements" {
   }
 
   geo_location {
-    location          = azurerm_resource_group.platform.location
+    location          = var.cosmos_location
     failover_priority = 0
   }
 }

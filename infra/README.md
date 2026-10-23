@@ -109,6 +109,11 @@ doesn't matter: the same request is the same question.
   a child of the account (`sqlRoleAssignments`, not Microsoft.Authorization), so
   it can only be assigned once the account exists, and CD grants no roles. The
   account sits beside the vault, so a destroy of the main stack keeps it.
+- **Its own region**: `cosmos_location`, West US 2 by default, not Canada Central
+  like the rest: Azure had no Cosmos DB capacity there for this subscription. The
+  account can sit in any region, so only it moved; the app's calls to it cross
+  regions, tens of milliseconds each, run together. What it holds (short phrases
+  the judge quoted from the resume) is therefore stored in the US.
 - **Entra ID only**: local authentication is off, so there is no key, and the
   portal's Data Explorer won't open it. The app's identity has Cosmos DB Built-in
   Data Contributor over the one container.
