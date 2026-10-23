@@ -29,5 +29,6 @@ provider "azurerm" {
     "Microsoft.AlertsManagement",    # Application Insights
     "Microsoft.OperationalInsights", # Log Analytics
     "Microsoft.CognitiveServices",   # Azure OpenAI
+    "Microsoft.DocumentDB",          # Cosmos DB, for the judge's answers (#150)
   ]
 }
