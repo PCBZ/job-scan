@@ -20,11 +20,9 @@ const PROFILE: ProfileConfig = {
   seniority: "mid",
   needs_sponsorship: false,
 };
-const MODEL = "gpt-5.4-mini";
 const A = posting({ title: "Backend Engineer", message_id: "<m@x>", row: 0, posted: "4d" });
 const B = posting({ title: "Data Engineer", message_id: "<m@x>", row: 1 });
-const key = (p = A, profile = PROFILE, resumes = RESUMES, model = MODEL) =>
-  judgementKey(p, profile, resumes, model);
+const key = (p = A, profile = PROFILE, resumes = RESUMES) => judgementKey(p, profile, resumes);
 
 /** A store that holds items in a Map and says what was asked of it. */
 function store(
@@ -57,7 +55,36 @@ function store(
   return { s, items, reads, writes };
 }
 
-const cache = (s: JudgementStore, extra = {}) => new JudgementCache(s, { model: MODEL, ...extra });
+const cache = (s: JudgementStore, extra = {}) => new JudgementCache(s, extra);
+
+/**
+ * A store whose reads and writes each wait until `n` of them are under way at
+ * once, so a test passes only if they were started together: one at a time,
+ * the first would wait for the rest forever and the barrier gives up.
+ */
+function togetherStore(n: number, items: Map<string, unknown> = new Map()) {
+  const arrived = { get: 0, put: 0 };
+  const waiting = { get: [] as (() => void)[], put: [] as (() => void)[] };
+  const barrier = (kind: "get" | "put") =>
+    new Promise<void>((resolve, reject) => {
+      arrived[kind]++;
+      waiting[kind].push(resolve);
+      if (arrived[kind] === n) for (const go of waiting[kind]) go();
+      setTimeout(() => reject(new Error(`${kind}s weren't started together`)), 1000).unref();
+    });
+  const s: JudgementStore = {
+    async get(k) {
+      await barrier("get");
+      return items.get(k) ?? null;
+    },
+    async put(item) {
+      await barrier("put");
+      items.set(item.id, item);
+    },
+    requestCharge: () => 0,
+  };
+  return { s, items, arrived };
+}
 
 const kept = (k: string, over: Partial<CachedJudgement> = {}): CachedJudgement => ({
   id: k,
@@ -85,7 +112,6 @@ describe("judgementKey (#150)", () => {
       () => key(A, PROFILE, [{ ...RESUMES[0], text: "Built Rust services" } as ResumeVariant]),
     ],
     ["the profile", () => key(A, { ...PROFILE, seniority: "senior" })],
-    ["the model", () => key(A, PROFILE, RESUMES, "gpt-5.4-nano")],
   ])("changes with %s", (_what, other) => {
     expect(other()).not.toBe(key());
   });
@@ -117,6 +143,18 @@ describe("JudgementCache.recall", () => {
     items.set(key(A), item(key(A)));
     const out = await cache(s).recall([A], PROFILE, RESUMES);
     expect(out).toEqual({ recalled: [], warnings: [] });
+  });
+
+  it("reads every posting's key together, not one after another", async () => {
+    const many = Array.from({ length: 5 }, (_, i) =>
+      posting({ ...A, title: `Engineer ${i}`, row: i }),
+    );
+    const items = new Map(many.map((p) => [key(p), kept(key(p))]));
+    const { s, arrived } = togetherStore(many.length, items);
+    const out = await cache(s).recall(many, PROFILE, RESUMES);
+    expect(arrived.get).toBe(5);
+    expect(out.warnings).toEqual([]);
+    expect(out.recalled).toHaveLength(5);
   });
 
   it("counts a failed read as a miss and says so once", async () => {
@@ -159,6 +197,16 @@ describe("JudgementCache.remember", () => {
       answer: answer(),
     });
     expect(c.stats()).toMatchObject({ written: 2, reused: 0 });
+  });
+
+  it("writes every fresh answer together, not one after another", async () => {
+    const many = Array.from({ length: 4 }, (_, i) =>
+      mine(posting({ ...A, title: `Engineer ${i}`, row: i })),
+    );
+    const { s, items, arrived } = togetherStore(many.length);
+    expect(await cache(s).remember(input({ judged: many }))).toEqual([]);
+    expect(arrived.put).toBe(4);
+    expect(items.size).toBe(4);
   });
 
   it("doesn't write an answer that was just reused, and counts it", async () => {

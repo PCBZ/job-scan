@@ -99,7 +99,8 @@ before the next apply.
 A posting seen again isn't judged again (#150): the app keeps each verified
 answer in an Azure Cosmos DB account for 14 days, under a hash of the whole
 request that earned it (`functions/src/lib/judge/cache.ts`), so a change to the
-prompt, the resume, the profile, the posting or the model is a miss.
+prompt, the resume, the profile or the posting is a miss. Which model answered
+doesn't matter: the same request is the same question.
 
 - **Serverless only** (`EnableServerless`): billed per request unit and per GB
   stored, about half a cent a month. An account created without it bills a

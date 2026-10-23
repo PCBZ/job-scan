@@ -81,20 +81,17 @@ describe("judgementCacheFromEnv", () => {
   const credential: TokenCredential = { getToken: async () => null };
 
   it("is no cache without COSMOS_ENDPOINT, so the app judges everything as before", () => {
-    expect(judgementCacheFromEnv({ MODEL_NAME: "gpt-5.4-mini" }, credential)).toBeNull();
+    expect(judgementCacheFromEnv({}, credential)).toBeNull();
     expect(judgementCacheFromEnv({ COSMOS_ENDPOINT: " " }, credential)).toBeNull();
   });
 
-  it("refuses an endpoint without its database and container, or without a model", () => {
-    const env = { COSMOS_ENDPOINT: "https://acct.documents.azure.com:443/", MODEL_NAME: "m" };
+  it("refuses an endpoint without its database and container", () => {
+    const env = { COSMOS_ENDPOINT: "https://acct.documents.azure.com:443/" };
     expect(() => judgementCacheFromEnv(env, credential)).toThrow(
       "COSMOS_ENDPOINT is set but COSMOS_DATABASE or COSMOS_CONTAINER isn't",
     );
-    expect(() =>
-      judgementCacheFromEnv(
-        { ...env, COSMOS_DATABASE: "d", COSMOS_CONTAINER: "c", MODEL_NAME: "" },
-        credential,
-      ),
-    ).toThrow("MODEL_NAME is not set");
+    expect(() => judgementCacheFromEnv({ ...env, COSMOS_DATABASE: "d" }, credential)).toThrow(
+      "COSMOS_ENDPOINT is set but COSMOS_DATABASE or COSMOS_CONTAINER isn't",
+    );
   });
 });

@@ -2,7 +2,10 @@
 // days, and only recommended postings are remembered as seen, so a posting
 // passed over was judged again each day. An answer is reused only when the
 // whole request that earned it is the same, so a change to the prompt, the
-// resume, the profile, the posting or the model is a miss.
+// resume, the profile or the posting is a miss. Which model answered doesn't
+// matter: the same request is the same question. After changing the judge's
+// model, add one to CACHE_FORMAT to leave the old model's answers behind
+// rather than wait for them to expire.
 //
 // recall runs before judge, remember after the repair loop. Neither ever fails
 // the run: a read that fails or times out is a miss, a write that fails is a
@@ -49,13 +52,11 @@ export function judgementKey(
   posting: Posting,
   profile: ProfileConfig,
   resumes: ResumeVariant[],
-  model: string,
 ): string {
   return createHash("sha256")
     .update(
       JSON.stringify([
         CACHE_FORMAT,
-        model,
         JUDGE_SYSTEM,
         judgeUser({ ...posting, posted: "" }, profile, resumes),
       ]),
@@ -64,8 +65,6 @@ export function judgementKey(
 }
 
 export interface JudgementCacheOptions {
-  /** The judge's deployment name: another model's answers aren't reused. */
-  model: string;
   /** How long a read or write may take before it counts as failed. */
   timeoutMs?: number;
 }
@@ -77,14 +76,12 @@ const errorText = (err: unknown) => (err instanceof Error ? err.message : String
 
 export class JudgementCache {
   private readonly counts = new JudgementCacheCounts();
-  private readonly model: string;
   private readonly timeoutMs: number;
 
   constructor(
     private readonly store: JudgementStore,
-    { model, timeoutMs = 5_000 }: JudgementCacheOptions,
+    { timeoutMs = 5_000 }: JudgementCacheOptions = {},
   ) {
-    this.model = model;
     this.timeoutMs = timeoutMs;
   }
 
@@ -103,7 +100,7 @@ export class JudgementCache {
     // Point reads of one request unit each: no reason to queue them.
     const found = await Promise.all(
       postings.map(async (posting): Promise<Judgement[]> => {
-        const key = judgementKey(posting, profile, resumes, this.model);
+        const key = judgementKey(posting, profile, resumes);
         try {
           const item = await this.store.get(key, within(signal, this.timeoutMs));
           const parsed = cachedJudgement.safeParse(item);
@@ -148,7 +145,7 @@ export class JudgementCache {
     const failures: string[] = [];
     await Promise.all(
       fresh.map(async ({ posting, answer }) => {
-        const id = judgementKey(posting, input.profile, input.resumes, this.model);
+        const id = judgementKey(posting, input.profile, input.resumes);
         try {
           await this.store.put(
             {

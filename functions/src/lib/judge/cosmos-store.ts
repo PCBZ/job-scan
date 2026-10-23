@@ -68,10 +68,8 @@ export function judgementCacheFromEnv(
       "COSMOS_ENDPOINT is set but COSMOS_DATABASE or COSMOS_CONTAINER isn't",
     );
   }
-  const model = env.MODEL_NAME?.trim();
-  if (!model) throw appError("config", "MODEL_NAME is not set");
   const client = new CosmosClient({ endpoint, aadCredentials: credential });
   // The SDK's own Container must fit JudgementContainer, or this stops compiling.
   const sdk: Container = client.database(database).container(container);
-  return new JudgementCache(cosmosJudgementStore(sdk), { model });
+  return new JudgementCache(cosmosJudgementStore(sdk));
 }
