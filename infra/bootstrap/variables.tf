@@ -9,6 +9,17 @@ variable "name" {
   default     = "job-scan"
 }
 
+# Not var.location: Azure had no Cosmos DB capacity for this subscription in
+# Canada Central ("high demand", ServiceUnavailable on create). The account
+# can sit in any region, so only it moves; the app's calls to it cross regions,
+# tens of milliseconds each. If a region says the same, try another, e.g.
+# cosmos_location = "westus3" in terraform.tfvars.
+variable "cosmos_location" {
+  description = "Region of the Cosmos DB account for the judge's answers (#150)."
+  type        = string
+  default     = "westus2"
+}
+
 variable "tags" {
   type    = map(string)
   default = { project = "job-scan" }
