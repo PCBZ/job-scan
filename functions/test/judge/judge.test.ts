@@ -114,6 +114,36 @@ describe("judgeStep", () => {
     expect(aboutGaps(postingId(listed))).not.toEqual([]);
   });
 
+  it("uses an answer kept from an earlier run in place of a model call, on the first pass (#150)", async () => {
+    const { c, calls } = client(() => answer({ unknowns: ["asked"] }));
+    const kept = { posting: a, answer: answer({ unknowns: ["kept"] }) };
+    const out = await judgeStep(c)(
+      { postings: [a, b], resumes: RESUMES, profile: PROFILE, recalled: [kept] },
+      [],
+    );
+    // Only the posting without a kept answer reached the model, and cost tokens.
+    expect(calls.map((x) => JSON.parse(x.user).posting.title)).toEqual(["Data Engineer"]);
+    expect(out.usage).toEqual({ input: 1000, output: 100 });
+    expect(out.value.map((j) => [j.posting.title, j.answer.unknowns])).toEqual([
+      ["Backend Engineer", ["kept"]],
+      ["Data Engineer", ["asked"]],
+    ]);
+  });
+
+  it("asks the model on a repair, so a kept answer that fails verification is replaced (#150)", async () => {
+    const { c, calls } = client(() => answer({ unknowns: ["asked"] }));
+    const kept = { posting: a, answer: answer({ unknowns: ["kept"] }) };
+    const step = judgeStep(c);
+    const input = { postings: [a, b], resumes: RESUMES, profile: PROFILE, recalled: [kept] };
+    const first = await step(input, []);
+    const problems = [problemAbout(postingId(a), "Backend skills: evidence is not a line")];
+    const second = await step(input, [{ previous: first.value, problems }]);
+    // The flagged posting was asked, though an answer was kept for it; the other kept what it had.
+    expect(calls).toHaveLength(2);
+    expect(JSON.parse(calls[1]?.user ?? "{}").posting.title).toBe("Backend Engineer");
+    expect(second.value.map((j) => j.answer.unknowns)).toEqual([["asked"], ["asked"]]);
+  });
+
   it("on a repair, re-asks only the flagged posting, with its own history", async () => {
     let round = 0;
     const { c, calls } = client(() => answer({ unknowns: [`round ${round}`] }));

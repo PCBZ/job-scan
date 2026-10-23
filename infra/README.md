@@ -5,7 +5,7 @@ wiki's [Azure Functions Plan](https://github.com/PCBZ/job-scan/wiki/Azure-Functi
 
 | Stack | Applied by | Holds |
 |---|---|---|
-| `bootstrap/` | you, by hand, rarely | the state backend; the main and platform resource groups; the Key Vault and its secrets; the app's and CD's identities, CD's OIDC trust; **every role assignment** |
+| `bootstrap/` | you, by hand, rarely | the state backend; the main and platform resource groups; the Key Vault and its secrets; the app's and CD's identities, CD's OIDC trust; the Cosmos DB account for the judge's answers; **every role assignment** |
 | `infra/` (main) | CD, on every release tag | storage, OpenAI, App Insights, the plan and the Function App, the config blob. **No role assignments** |
 
 The split lets CD, which holds only Contributor, build the app from an empty
@@ -25,7 +25,9 @@ Once, by hand, in this order:
 2. **Secrets.** Add every secret in the table below to the Key Vault
    (`terraform -chdir=bootstrap output key_vault_uri`), with `config-toml`.
 3. **GitHub.** Run `infra/set-github-vars.sh`. It sets the repository
-   variables CD reads, the OIDC subject template and the tag ruleset.
+   variables CD reads, the OIDC subject template and the tag ruleset. Run it
+   again whenever bootstrap's outputs change, as when it gained the Cosmos DB
+   account: the main stack learns its endpoint from `TF_VAR_platform`.
 4. **Release.** Push a tag (below). CD builds everything else.
 
 To apply the main stack locally instead, write bootstrap's output where
@@ -91,6 +93,31 @@ the same config. Terraform copies the secret into the blob on every apply.
 The file carries no credentials by design; its text does pass through
 Terraform state. After editing your config, update the secret (a new version)
 before the next apply.
+
+## The judge's answers
+
+A posting seen again isn't judged again (#150): the app keeps each verified
+answer in an Azure Cosmos DB account for 14 days, under a hash of the whole
+request that earned it (`functions/src/lib/judge/cache.ts`), so a change to the
+prompt, the resume, the profile or the posting is a miss. Which model answered
+doesn't matter: the same request is the same question.
+
+- **Serverless only** (`EnableServerless`): billed per request unit and per GB
+  stored, about half a cent a month. An account created without it bills a
+  400 RU/s minimum, about $26 a month.
+- **In `bootstrap/cosmos.tf`**, not the main stack, because a data-plane role is
+  a child of the account (`sqlRoleAssignments`, not Microsoft.Authorization), so
+  it can only be assigned once the account exists, and CD grants no roles. The
+  account sits beside the vault, so a destroy of the main stack keeps it.
+- **Entra ID only**: local authentication is off, so there is no key, and the
+  portal's Data Explorer won't open it. The app's identity has Cosmos DB Built-in
+  Data Contributor over the one container.
+- **To turn it on**: apply `bootstrap/`, run `infra/set-github-vars.sh` again,
+  then release. The platform fields are optional: a release before that runs
+  without the cache and judges everything, as before.
+- **To see it work**: the run record's `judgement_cache` line counts the answers
+  reused and written and the request units charged, and the evaluation email's
+  funnel shows "N judged (M reused)".
 
 ## Releasing
 

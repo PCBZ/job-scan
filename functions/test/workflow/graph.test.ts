@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildWorkflow } from "../../src/lib/workflow/graph.js";
 import type { NodeEvent } from "../../src/lib/workflow/types.js";
+import { judgement } from "../judge/helpers.js";
 import { posting } from "../postings/helpers.js";
 import { fakes } from "./fakes.js";
 
@@ -24,10 +25,12 @@ describe("workflow graph", () => {
       ["validate", "dedupe"],
       ["dedupe", "hard_gates"],
       ["hard_gates", "screen"],
-      ["screen", "judge"],
-      ["load_resumes:end", "judge"],
+      ["screen", "recall_judgements"],
+      ["load_resumes:end", "recall_judgements"],
+      ["recall_judgements", "judge"],
       ["judge", "verify_judgements"],
-      ["verify_judgements", "rank"],
+      ["verify_judgements", "remember_judgements"],
+      ["remember_judgements", "rank"],
       ["rank", "explain"],
       ["explain", "verify_explanations"],
       ["verify_explanations", "render_report"],
@@ -73,6 +76,61 @@ describe("workflow graph", () => {
     // judge runs once, after the slower resume branch finished.
     expect(f.log.filter((n) => n === "judge")).toHaveLength(1);
     expect(ranBefore(f.log, "load_resumes:end", "judge")).toBe(true);
+  });
+
+  describe("the judgement cache (#150)", () => {
+    const kept = judgement({ posting: { title: "kept from an earlier run" } });
+
+    it("recalls before judge, gives judge what it found, and remembers once the loop has passed", async () => {
+      const f = fakes({
+        recalled: [kept],
+        judgeProblems: [["posting x: evidence is not a line"], []],
+      });
+      const out = await run(f);
+      expect(ranBefore(f.log, "recall_judgements", "judge")).toBe(true);
+      expect(f.log.filter((n) => n === "recall_judgements")).toHaveLength(1);
+      // Both of judge's turns ran, then the answers were kept, once, before rank.
+      expect(f.log.filter((n) => n === "judge")).toHaveLength(2);
+      expect(f.log.filter((n) => n === "remember_judgements")).toHaveLength(1);
+      expect(f.log.lastIndexOf("judge")).toBeLessThan(f.log.indexOf("remember_judgements"));
+      expect(ranBefore(f.log, "remember_judgements", "rank")).toBe(true);
+      // Judge was given what was recalled, as data.
+      const input = f.llmInputs.find((c) => c.node === "judge")?.args[0] as { recalled: unknown };
+      expect(input.recalled).toEqual([kept]);
+      // What was kept is what the loop ended with, and what was recalled.
+      expect(f.remembered).toHaveLength(1);
+      expect(f.remembered[0]?.recalled).toEqual([kept]);
+      expect(f.remembered[0]?.judged).toEqual(out.judged);
+      expect(f.remembered[0]?.problems).toEqual([]);
+      expect(f.remembered[0]?.models).toBeUndefined();
+    });
+
+    it("hands remember the problems left when the loop gave up", async () => {
+      const always = [["posting x: evidence is not a line"]];
+      const f = fakes({ judgeProblems: [...always, ...always, ...always, ...always] });
+      await run(f);
+      expect(f.remembered[0]?.problems).toEqual(["posting x: evidence is not a line"]);
+    });
+
+    it("reports what finding and keeping answers warned about, and carries on", async () => {
+      const f = fakes({
+        recallWarnings: ["judgement cache: 2 of 2 reads failed"],
+        rememberWarnings: ["judgement cache: 1 of 1 writes failed"],
+      });
+      const out = await run(f);
+      expect(out.outcome).toBe("report");
+      expect(f.reported.at(-1)?.warnings).toEqual([
+        "judgement cache: 2 of 2 reads failed",
+        "judgement cache: 1 of 1 writes failed",
+      ]);
+    });
+
+    it("looks for answers only when there is something to judge", async () => {
+      const f = fakes({ noResumes: true });
+      await run(f);
+      expect(f.log).not.toContain("recall_judgements");
+      expect(f.log).not.toContain("remember_judgements");
+    });
   });
 
   it("sends each failed check back with its problems, oldest repair first", async () => {

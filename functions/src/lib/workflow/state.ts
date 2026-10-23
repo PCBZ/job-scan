@@ -52,6 +52,8 @@ export const WorkflowState = Annotation.Root({
   // Code gates (#16), then model gates (#17).
   filtered: appended<Filtered>(),
   dropped: last<Partial<Record<Source, number>>>({}),
+  /** Answers kept from earlier runs, found before judge (#150). */
+  recalled: last<Judgement[]>([]),
   judged: last<Judgement[]>([]),
   top: last<Ranked[]>([]),
   rest: last<Ranked[]>([]),

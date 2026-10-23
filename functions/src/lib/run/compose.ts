@@ -20,6 +20,8 @@ import { type AppError, appError } from "../errors.js";
 import type { NodeModel } from "../eval/prices.js";
 import { explainStep } from "../explain/explain.js";
 import { verifyExplanations } from "../explain/verify.js";
+import type { JudgementCacheStats } from "../judge/cache-stats.js";
+import { judgementCacheFromEnv } from "../judge/cosmos-store.js";
 import { judgeStep } from "../judge/judge.js";
 import { rank } from "../judge/rank.js";
 import { screenStep } from "../judge/screen.js";
@@ -78,6 +80,8 @@ export interface Pipeline {
   throttledMs?: () => number;
   /** 429s the provider has answered so far, retries included. */
   rateLimited?: () => number;
+  /** What the run did with the judgement cache (#150); absent without one. */
+  judgementCache?: () => JudgementCacheStats;
   /** Where the run's records go (#97). */
   records: RunRecordStore;
   /** Where the run's evaluation report is queued (#128). */
@@ -118,6 +122,9 @@ export function composePipeline(
   const client = modelClientFromEnv(env, credential, clientOptions);
   const extractClient = extractClientFromEnv(env, credential, client, clientOptions);
 
+  // The judge's answers kept across runs (#150); none until the account exists.
+  const judgements = judgementCacheFromEnv(env, credential);
+
   const deterministicSteps: DeterministicSteps = {
     loadConfig: () => loadConfig(configSource),
     loadResumes: (config) =>
@@ -132,6 +139,10 @@ export function composePipeline(
     validatePostings,
     dedupe: dedupeStep(seenJobs, now),
     hardGates: hardGatesStep(),
+    recallJudgements: async ({ postings, profile, resumes }, signal) =>
+      judgements
+        ? judgements.recall(postings, profile, resumes, signal)
+        : { recalled: [], warnings: [] },
     verifyJudgements,
     fullLines,
     rank,
@@ -149,6 +160,7 @@ export function composePipeline(
 
   const effects = productionEffects({
     env,
+    judgements,
     publisher: reportPublisherFromUrl(setting("REPORTS_URL"), credential),
     seen,
     seenJobs,
@@ -162,6 +174,7 @@ export function composePipeline(
     effects,
     throttledMs: () => throttledMs,
     rateLimited: () => rateLimited,
+    ...(judgements ? { judgementCache: () => judgements.stats() } : {}),
     records: runRecordStoreFromUrl(setting("RUN_RECORDS_URL"), credential),
     evalQueue: evalQueueFromUrl(setting("EVAL_QUEUE_URL"), credential),
     version: env.APP_VERSION?.trim() || "local",

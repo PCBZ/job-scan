@@ -12,7 +12,7 @@ module "function_app" {
 
   application_insights_connection_string = module.monitoring.connection_string
 
-  app_settings = {
+  app_settings = merge({
     # Secrets, read by the app at start (functions/src/lib/run/secrets.ts):
     # each listed setting from the secret named after it. Flex Consumption
     # can't resolve Key Vault references as a user-assigned identity.
@@ -51,5 +51,14 @@ module "function_app" {
     # Jev, read by functions/src/lib/decision/config.ts. The model is pinned:
     # confidence thresholds are tuned against one version.
     "JEV_MODEL" = "jev-1.13.0"
-  }
+    },
+    # The judge's answers, in the bootstrap's Cosmos account (#150). Unset until
+    # bootstrap has been applied and infra/set-github-vars.sh run again: the app
+    # then judges everything, as before.
+    var.platform.cosmos_endpoint == null ? {} : {
+      "COSMOS_ENDPOINT"  = var.platform.cosmos_endpoint
+      "COSMOS_DATABASE"  = var.platform.cosmos_database
+      "COSMOS_CONTAINER" = var.platform.cosmos_container
+    },
+  )
 }

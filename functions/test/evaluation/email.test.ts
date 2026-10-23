@@ -43,6 +43,21 @@ describe("the evaluation email", () => {
     expect(renderHtml(e)).toContain("glassdoor 1&#x2F;2");
   });
 
+  it("says how many of the judged were reused from the cache, only when some were (#150)", () => {
+    const stats = {
+      reused: 12,
+      written: 30,
+      failed_reads: 0,
+      failed_writes: 0,
+      request_charge: 200,
+    };
+    const reused = evaluate(records({ judgement_cache: stats }), [], null, PRICES);
+    for (const part of [renderHtml(reused), renderText(reused)]) {
+      expect(part).toContain("1 judged (12 reused) → 1 picks");
+    }
+    for (const part of [renderHtml(e), renderText(e)]) expect(part).not.toContain("reused");
+  });
+
   it("escapes what came from the mail in the HTML", () => {
     const html = renderHtml(
       evaluate(

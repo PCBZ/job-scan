@@ -18,6 +18,10 @@ locals {
     app_identity_id     = azurerm_user_assigned_identity.app.id
     app_client_id       = azurerm_user_assigned_identity.app.client_id
     secret_settings     = local.secret_settings
+    # The judge's answers (#150): names, no keys, as Cosmos has local auth off.
+    cosmos_endpoint  = azurerm_cosmosdb_account.judgements.endpoint
+    cosmos_database  = azurerm_cosmosdb_sql_database.job_scan.name
+    cosmos_container = azurerm_cosmosdb_sql_container.judgements.name
   }
 }
 

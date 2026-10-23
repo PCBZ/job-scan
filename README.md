@@ -3,7 +3,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?logo=typescript&logoColor=white) ![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white) ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![Azure Functions](https://img.shields.io/badge/Azure_Functions-v4_Flex_Consumption-0078D4) ![Managed Identity](https://img.shields.io/badge/Managed_Identity-user--assigned-0078D4)
 ![Azure AI Foundry](https://img.shields.io/badge/Azure_AI_Foundry-AIServices_project-0078D4) ![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-gpt--5.4--mini,_nano-0078D4)
-![Blob Storage](https://img.shields.io/badge/Blob_Storage-run_records,_reports-0078D4) ![Storage Queues](https://img.shields.io/badge/Storage_Queues-eval--reports-0078D4) ![Table Storage](https://img.shields.io/badge/Table_Storage-seen_jobs-0078D4) ![Key Vault](https://img.shields.io/badge/Key_Vault-secrets,_config-0078D4)
+![Blob Storage](https://img.shields.io/badge/Blob_Storage-run_records,_reports-0078D4) ![Storage Queues](https://img.shields.io/badge/Storage_Queues-eval--reports-0078D4) ![Table Storage](https://img.shields.io/badge/Table_Storage-seen_jobs-0078D4) ![Cosmos DB](https://img.shields.io/badge/Cosmos_DB-serverless-0078D4) ![Key Vault](https://img.shields.io/badge/Key_Vault-secrets,_config-0078D4)
 ![Application Insights](https://img.shields.io/badge/Application_Insights-traces-0078D4) ![Log Analytics](https://img.shields.io/badge/Log_Analytics-KQL-0078D4) ![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-2.10-425CC7?logo=opentelemetry&logoColor=white)
 ![LangGraph](https://img.shields.io/badge/LangGraph-1.4-1C3C3C?logo=langchain&logoColor=white) ![Jev](https://img.shields.io/badge/Jev-1.13.0-5B5BD6) ![Zod](https://img.shields.io/badge/Zod-4.6-3E67B1?logo=zod&logoColor=white) ![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757?logo=claude&logoColor=white)
 ![Gmail](https://img.shields.io/badge/Gmail-IMAP,_SMTP-EA4335?logo=gmail&logoColor=white) ![Telegram](https://img.shields.io/badge/Telegram-Bot_API-26A5E4?logo=telegram&logoColor=white)
@@ -49,6 +49,7 @@ flowchart TB
     vault[(Key Vault<br/>secrets, config)]
     blob[(Blob Storage<br/>run records, reports)]
     table[(Table Storage<br/>seen messages, jobs)]
+    cosmos[(Cosmos DB<br/>judge's answers, 14 days)]
     logs[("Application Insights,<br/>Log Analytics: traces")]
   end
 
@@ -73,7 +74,7 @@ flowchart TB
   timer([timer, 15:00 UTC]) --> config[load config<br/>Blob, Key Vault]
   config --> fetch[fetch mail<br/>Gmail IMAP] & resumes[load resumes<br/>GitHub]
   fetch --> extract[extract<br/>Azure OpenAI] --> dedupe[dedupe<br/>Table Storage] --> gates[hard gates<br/>code] --> screen[screen<br/>Jev]
-  screen & resumes --> judge[judge<br/>Azure OpenAI] --> rank[rank<br/>code] --> explain[explain<br/>Azure OpenAI]
+  screen & resumes --> recall[recall answers<br/>Cosmos DB] --> judge[judge<br/>Azure OpenAI] --> remember[keep answers<br/>Cosmos DB] --> rank[rank<br/>code] --> explain[explain<br/>Azure OpenAI]
   explain --> report[report<br/>Blob] --> deliver[email, Telegram] --> seen[mark seen<br/>Table Storage]
   seen --> record[run record<br/>Blob] --> queue[[eval-reports queue<br/>visible in 15 min]]
   extract -. "repair: a row not in its message" .-> extract
@@ -87,7 +88,7 @@ flowchart TB
 | extract | model | Each alert into postings; every row is checked against the message |
 | dedupe, hard gates | code | Seen jobs (survives rewording), location, salary, excluded keywords |
 | screen | [Jev](https://typesafe.ai) | Yes/no with a confidence: sponsorship, seniority, keywords, location, title near `target_titles` |
-| judge | model | Each posting against every resume variant; levels quote the resume, gaps quote the posting, both checked by code |
+| judge | model | Each posting against the resume; levels quote it, gaps quote the posting, both checked by code. A posting judged before, with the same request, reuses its answer (kept 14 days) |
 | rank, explain | code, model | A weighted score and the best variant; Fit and Gap for each top pick |
 
 That is the cloud run, on Azure OpenAI: gpt-5.4-nano extracts, gpt-5.4-mini judges and explains.

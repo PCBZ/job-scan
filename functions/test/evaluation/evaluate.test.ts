@@ -24,8 +24,21 @@ describe("evaluate", () => {
       codeFiltered: 1,
       screenFiltered: 1,
       judged: 1,
+      reused: 0,
       top: 1,
     });
+  });
+
+  it("counts the judgements reused from the cache, which cost no tokens (#150)", () => {
+    const stats = {
+      reused: 12,
+      written: 30,
+      failed_reads: 0,
+      failed_writes: 0,
+      request_charge: 200,
+    };
+    expect(evaluate(records({ judgement_cache: stats }), [], null, PRICES).funnel.reused).toBe(12);
+    expect(e.funnel.reused).toBe(0);
   });
 
   it("splits tokens and cost per model, in the order the nodes ran", () => {
