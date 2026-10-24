@@ -8,6 +8,10 @@
 //
 //   MODEL_TPM          the deployment's tokens per minute; calls are paced to
 //                      it (rate-limit.ts). Unset or 0: no pacing.
+//   MODEL_REASONING_EFFORT  none | minimal | low | medium | high | xhigh | max,
+//                      sent as reasoning_effort (#156). Unset: the model's own
+//                      default. Each model accepts its own values, so the
+//                      extract slot never takes the main one.
 //
 // The same keys prefixed MODEL_FALLBACK_ configure an optional fallback, which
 // is paced to its own MODEL_FALLBACK_TPM. MODEL_MAX_RETRIES and
@@ -18,6 +22,7 @@
 
 import { getBearerTokenProvider, type TokenCredential } from "@azure/identity";
 import OpenAI, { AzureOpenAI } from "openai";
+import type { ReasoningEffort } from "openai/resources/shared";
 import { type AppError, appError } from "../errors.js";
 import type { NodeModel } from "../eval/prices.js";
 import { FallbackClient } from "./fallback.js";
@@ -43,6 +48,17 @@ function positiveInt(env: Env, key: string, fallback: number): number {
   if (!Number.isInteger(n) || n < 0)
     throw appError("config", `${key} must be a whole number, got "${raw}"`);
   return n;
+}
+
+const REASONING_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+function reasoningEffort(env: Env, key: string): ReasoningEffort | undefined {
+  const raw = env[key]?.trim();
+  if (!raw) return undefined;
+  const found = REASONING_EFFORTS.find((e) => e === raw);
+  if (!found)
+    throw appError("config", `${key} must be one of ${REASONING_EFFORTS.join(", ")}, got "${raw}"`);
+  return found;
 }
 
 export interface ModelClientOptions {
@@ -88,6 +104,7 @@ function slot(
   const maxRetries = positiveInt(env, "MODEL_MAX_RETRIES", 3);
   const timeout = positiveInt(env, "MODEL_TIMEOUT_MS", 60_000);
   const name = required(env, `${prefix}_NAME`);
+  const effort = reasoningEffort(env, `${prefix}_REASONING_EFFORT`);
   const http = httpLayer(options);
   switch (provider) {
     case "azure-openai": {
@@ -101,7 +118,7 @@ function slot(
         timeout,
         ...(http ? { fetch: http } : {}),
       });
-      return new OpenAIChatClient(client.chat.completions, name, label);
+      return new OpenAIChatClient(client.chat.completions, name, label, effort);
     }
     case "openai-compatible": {
       const client = new OpenAI({
@@ -111,7 +128,7 @@ function slot(
         timeout,
         ...(http ? { fetch: http } : {}),
       });
-      return new OpenAIChatClient(client.chat.completions, name, label);
+      return new OpenAIChatClient(client.chat.completions, name, label, effort);
     }
     default:
       throw appError(

@@ -6,9 +6,10 @@ module "openai" {
   tags                = var.tags
   project_name        = "${var.name}-eval"
 
-  # Option A from the plan (#1). gpt-5.4-mini is on Global Standard in Canada Central.
-  model_name    = "gpt-5.4-mini"
-  model_version = "2026-03-17"
+  # Judge and explain on gpt-5-mini (#156), about a third of gpt-5.4-mini's
+  # price, at minimal reasoning (function_app.tf). Global Standard.
+  model_name    = "gpt-5-mini"
+  model_version = "2025-08-07"
   # The first run's backlog hit 50K TPM's 429s (#91). The subscription's quota
   # is 1000K; capacity is a ceiling on that quota, and billing stays per token.
   capacity_k_tpm = 250

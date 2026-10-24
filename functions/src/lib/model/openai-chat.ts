@@ -8,6 +8,7 @@ import { APIError, APIUserAbortError } from "openai";
 import { ContentFilterFinishReasonError, LengthFinishReasonError } from "openai/core/error";
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import type { ReasoningEffort } from "openai/resources/shared";
 import { ZodError } from "zod";
 import { appError } from "../errors.js";
 import type { ModelClient, RepairTurn, StructuredRequest, StructuredResult } from "./types.js";
@@ -21,6 +22,8 @@ export class OpenAIChatClient implements ModelClient {
     /** Model id, or the deployment name on Azure. */
     private readonly model: string,
     private readonly label = "primary",
+    /** How hard a reasoning model thinks; unset sends none and leaves the model's default. */
+    private readonly reasoningEffort?: ReasoningEffort,
   ) {}
 
   async structured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
@@ -31,6 +34,7 @@ export class OpenAIChatClient implements ModelClient {
           model: this.model,
           messages: messagesFor(req),
           response_format: zodResponseFormat(req.schema, req.name),
+          ...(this.reasoningEffort ? { reasoning_effort: this.reasoningEffort } : {}),
         },
         req.signal ? { signal: req.signal } : undefined,
       );

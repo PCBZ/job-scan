@@ -70,6 +70,10 @@ describe("modelClientFromEnv", () => {
       'MODEL_MAX_RETRIES must be a whole number, got "three"',
     ],
     [{ ...AZURE, MODEL_FALLBACK_PROVIDER: "openai-compatible" }, "MODEL_FALLBACK_NAME is not set"],
+    [
+      { ...AZURE, MODEL_REASONING_EFFORT: "tiny" },
+      'MODEL_REASONING_EFFORT must be one of none, minimal, low, medium, high, xhigh, max, got "tiny"',
+    ],
   ])("rejects %j", (env, message) => {
     expect(() => modelClientFromEnv(env as Record<string, string>, credential)).toThrow(
       expect.objectContaining({ code: "config" }),
@@ -115,6 +119,33 @@ describe("modelClientFromEnv", () => {
       "/openai/deployments/gpt-5.4-mini/chat/completions?api-version=2024-10-21",
     );
     expect(seen[0]?.auth).toBe("Bearer entra-token");
+  });
+
+  it("sends the main slot's reasoning effort, and never to the extract slot (#156)", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const recording = (async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(okBody({ title: "Engineer" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    const env = {
+      ...AZURE,
+      MODEL_REASONING_EFFORT: "minimal",
+      MODEL_EXTRACT_NAME: "gpt-5.4-nano",
+    };
+    const request = {
+      name: "posting",
+      system: "Extract.",
+      user: "Engineer",
+      schema: z.object({ title: z.string() }),
+    };
+    const main = modelClientFromEnv(env, credential, { fetch: recording });
+    await main.structured(request);
+    await extractClientFromEnv(env, credential, main, { fetch: recording }).structured(request);
+    expect(bodies[0]).toMatchObject({ reasoning_effort: "minimal" });
+    expect(bodies[1]).not.toHaveProperty("reasoning_effort");
   });
 
   it("counts every 429, the SDK's own retries included", async () => {

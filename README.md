@@ -2,7 +2,7 @@
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?logo=typescript&logoColor=white) ![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white) ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![Azure Functions](https://img.shields.io/badge/Azure_Functions-v4_Flex_Consumption-0078D4) ![Managed Identity](https://img.shields.io/badge/Managed_Identity-user--assigned-0078D4)
-![Azure AI Foundry](https://img.shields.io/badge/Azure_AI_Foundry-AIServices_project-0078D4) ![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-gpt--5.4--mini,_nano-0078D4)
+![Azure AI Foundry](https://img.shields.io/badge/Azure_AI_Foundry-AIServices_project-0078D4) ![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-gpt--5--mini,_gpt--5.4--nano-0078D4)
 ![Blob Storage](https://img.shields.io/badge/Blob_Storage-run_records,_reports-0078D4) ![Storage Queues](https://img.shields.io/badge/Storage_Queues-eval--reports-0078D4) ![Table Storage](https://img.shields.io/badge/Table_Storage-seen_jobs-0078D4) ![Cosmos DB](https://img.shields.io/badge/Cosmos_DB-serverless-0078D4) ![Key Vault](https://img.shields.io/badge/Key_Vault-secrets,_config-0078D4)
 ![Application Insights](https://img.shields.io/badge/Application_Insights-traces-0078D4) ![Log Analytics](https://img.shields.io/badge/Log_Analytics-KQL-0078D4) ![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-2.10-425CC7?logo=opentelemetry&logoColor=white)
 ![LangGraph](https://img.shields.io/badge/LangGraph-1.4-1C3C3C?logo=langchain&logoColor=white) ![Jev](https://img.shields.io/badge/Jev-1.13.0-5B5BD6) ![Zod](https://img.shields.io/badge/Zod-4.6-3E67B1?logo=zod&logoColor=white) ![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757?logo=claude&logoColor=white)
@@ -40,7 +40,7 @@ flowchart TB
 
   subgraph apis [Model APIs]
     direction LR
-    openai(["Azure AI Foundry · Azure OpenAI<br/>gpt-5.4-nano: extract<br/>gpt-5.4-mini: judge, explain"])
+    openai(["Azure AI Foundry · Azure OpenAI<br/>gpt-5.4-nano: extract<br/>gpt-5-mini: judge, explain"])
     jev([Jev · jev-1.13.0<br/>screen])
   end
 
@@ -91,7 +91,7 @@ flowchart TB
 | judge | model | Each posting against the resume; levels quote it, gaps quote the posting, both checked by code. A posting judged before, with the same request, reuses its answer (kept 14 days) |
 | rank, explain | code, model | A weighted score and the best variant; Fit and Gap for each top pick |
 
-That is the cloud run, on Azure OpenAI: gpt-5.4-nano extracts, gpt-5.4-mini judges and explains.
+That is the cloud run, on Azure OpenAI: gpt-5.4-nano extracts, gpt-5-mini judges and explains.
 Locally, Claude does the model and Jev steps and scripts do the rest. A
 filtered posting is listed in the report with its gate and reason, never scored.
 
@@ -144,7 +144,7 @@ fill forms, upload a resume, or submit applications. Links land in the report fo
 | Runtime | Python 3.14+, no packages; [Claude Code](https://claude.com/claude-code) | Node.js 24, on Azure Functions (Flex Consumption) |
 | Mail | An IMAP mailbox per alert inbox; Gmail needs an [App Password](https://myaccount.google.com/apppasswords) | The same; the report mailbox also sends over Gmail SMTP |
 | Resumes | A local directory of `.tex`, `.md` or `.pdf` variants | The same, in a GitHub repo, read with a read-only fine-grained PAT |
-| Models | Claude, in Claude Code | Azure OpenAI deployments of gpt-5.4-mini and gpt-5.4-nano; a [TypeSafe](https://typesafe.ai) API key for Jev |
+| Models | Claude, in Claude Code | Azure OpenAI deployments of gpt-5-mini and gpt-5.4-nano; a [TypeSafe](https://typesafe.ai) API key for Jev |
 | Deploy | — | An Azure subscription, Terraform 1.13+, a GitHub repo for CD; a Telegram bot, optional |
 
 ## Quick start (local)

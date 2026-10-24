@@ -23,6 +23,9 @@ module "function_app" {
     "MODEL_PROVIDER" = "azure-openai"
     "MODEL_ENDPOINT" = module.openai.endpoint
     "MODEL_NAME"     = module.openai.deployment_name
+    # gpt-5-mini reasons at medium unless told otherwise (#156); extraction's
+    # gpt-5.4-nano takes no minimal, so it is not given one.
+    "MODEL_REASONING_EFFORT" = "minimal"
     # Calls are paced to the deployment's TPM (functions/src/lib/model/rate-limit.ts, #93).
     "MODEL_TPM" = tostring(module.openai.tokens_per_minute)
     # Extraction's own deployment (#148); the other MODEL_ keys are shared.

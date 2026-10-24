@@ -22,7 +22,7 @@ import { judgeAnswer } from "./schema.js";
 import { type Judgement, postingId, problemsAbout } from "./verify.js";
 
 /** Bumped when an item changes shape or meaning, so older items are misses. */
-export const CACHE_FORMAT = 1;
+export const CACHE_FORMAT = 2;
 
 /** What is kept under a key: the verified answer, before whole resume lines replace its phrases. */
 export const cachedJudgement = z.object({
