@@ -21,7 +21,9 @@ variable "model_name" {
 }
 
 variable "model_version" {
-  type = string
+  description = "A version to pin the main deployment to; null follows the model's default version."
+  type        = string
+  default     = null
 }
 
 variable "capacity_k_tpm" {

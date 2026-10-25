@@ -6,10 +6,10 @@ module "openai" {
   tags                = var.tags
   project_name        = "${var.name}-eval"
 
-  # Judge and explain on gpt-5-mini (#156), about a third of gpt-5.4-mini's
-  # price, at minimal reasoning (function_app.tf). Global Standard.
-  model_name    = "gpt-5-mini"
-  model_version = "2025-08-07"
+  # Judge and explain on gpt-5.6-luna (#158), at its default reasoning effort and
+  # version, to see what it does before tuning either. gpt-5-mini has no Global
+  # Standard in Canada Central (#156).
+  model_name = "gpt-5.6-luna"
   # The first run's backlog hit 50K TPM's 429s (#91). The subscription's quota
   # is 1000K; capacity is a ceiling on that quota, and billing stays per token.
   capacity_k_tpm = 250

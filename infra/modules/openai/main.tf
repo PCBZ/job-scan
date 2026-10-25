@@ -51,8 +51,14 @@ resource "azurerm_cognitive_deployment" "this" {
     capacity = var.capacity_k_tpm
   }
 
-  # Stay on the pinned version until it is retired.
-  version_upgrade_option = "OnceCurrentVersionExpired"
+  # A pinned version stays until it is retired; without one, Azure assigns the
+  # default version and upgrades it, so Terraform doesn't track it, and each
+  # run records the version that answered.
+  version_upgrade_option = var.model_version == null ? "OnceNewDefaultVersionAvailable" : "OnceCurrentVersionExpired"
+
+  lifecycle {
+    ignore_changes = [model[0].version]
+  }
 }
 
 # A second deployment, for extraction alone (#148): it copies fields from
