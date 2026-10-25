@@ -60,11 +60,25 @@ export const RETAIL_PRICES_URL = "https://prices.azure.com/api/retail/prices";
 const API_VERSION = "2023-01-01-preview";
 
 /**
+ * Meter names the 5.x naming below doesn't give: the GPT-5 family's original
+ * models (#156) are named in the older style.
+ */
+const METER_NAMES: Readonly<Record<string, Record<keyof Price, string>>> = {
+  "gpt-5-mini": {
+    input: "GPT 5 Mini Inpt Glbl 1M Tokens",
+    cached: "GPT 5 Mini cchd Inpt Glbl 1M Tokens",
+    output: "GPT 5 Mini outpt Glbl 1M Tokens",
+  },
+};
+
+/**
  * A deployment's Global Standard meters, as the Retail Prices API names them:
  * gpt-5.4-nano is "5.4 nano Inp Gl", "5.4 nano cd Inp Gl" (cached input) and
  * "5.4 nano Opt Gl", each per 1M tokens.
  */
 export function meterNames(model: string): Record<keyof Price, string> {
+  const named = METER_NAMES[model];
+  if (named) return named;
   const base = model.replace(/^gpt-/, "").replaceAll("-", " ");
   return {
     input: `${base} Inp Gl 1M Tokens`,

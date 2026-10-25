@@ -16,6 +16,14 @@ describe("meterNames", () => {
       output: "5.4 nano Opt Gl 1M Tokens",
     });
   });
+
+  it("uses the older names for gpt-5-mini, whose meters don't follow that pattern (#156)", () => {
+    expect(meterNames("gpt-5-mini")).toEqual({
+      input: "GPT 5 Mini Inpt Glbl 1M Tokens",
+      cached: "GPT 5 Mini cchd Inpt Glbl 1M Tokens",
+      output: "GPT 5 Mini outpt Glbl 1M Tokens",
+    });
+  });
 });
 
 describe("retailPrices (#148)", () => {

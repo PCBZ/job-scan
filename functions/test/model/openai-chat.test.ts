@@ -54,6 +54,16 @@ describe("OpenAIChatClient", () => {
     expect(plain.usage).toEqual({ input: 120, output: 30 });
   });
 
+  it("sends reasoning_effort when one is set, and none otherwise (#156)", async () => {
+    const answer = completion({ parsed: { title: "Engineer", company: "Northwind" } });
+    const set = parser(answer);
+    await new OpenAIChatClient(set, "gpt-5-mini", "primary", "minimal").structured(REQ);
+    expect(set.calls[0]).toMatchObject({ reasoning_effort: "minimal" });
+    const unset = parser(answer);
+    await new OpenAIChatClient(unset, "gpt-5.4-nano").structured(REQ);
+    expect(unset.calls[0]).not.toHaveProperty("reasoning_effort");
+  });
+
   it("sends system and user messages with a strict json_schema response format", async () => {
     const p = parser(completion({ parsed: { title: "Engineer", company: "Northwind" } }));
     const out = await new OpenAIChatClient(p, "gpt-5.4-mini").structured(REQ);
