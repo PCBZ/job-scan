@@ -61,13 +61,19 @@ const API_VERSION = "2023-01-01-preview";
 
 /**
  * Meter names the 5.x naming below doesn't give: the GPT-5 family's original
- * models (#156) are named in the older style.
+ * models are named in the older style, and gpt-5.6 prices a short and a long
+ * context apart (#158), a run's prompts being the short one.
  */
 const METER_NAMES: Readonly<Record<string, Record<keyof Price, string>>> = {
   "gpt-5-mini": {
     input: "GPT 5 Mini Inpt Glbl 1M Tokens",
     cached: "GPT 5 Mini cchd Inpt Glbl 1M Tokens",
     output: "GPT 5 Mini outpt Glbl 1M Tokens",
+  },
+  "gpt-5.6-luna": {
+    input: "5.6 luna ShortCo Inp Std Gl 1M Tokens",
+    cached: "5.6 luna ShortCo Cd Inp Std Gl 1M Tokens",
+    output: "5.6 luna ShortCo Opt Std Gl 1M Tokens",
   },
 };
 
