@@ -39,9 +39,8 @@ resource "azurerm_cognitive_deployment" "this" {
   cognitive_account_id = azurerm_cognitive_account.this.id
 
   model {
-    format  = "OpenAI"
-    name    = var.model_name
-    version = var.model_version
+    format = "OpenAI"
+    name   = var.model_name
   }
 
   # Global Standard: data at rest stays in the account's region; requests may
@@ -51,10 +50,9 @@ resource "azurerm_cognitive_deployment" "this" {
     capacity = var.capacity_k_tpm
   }
 
-  # A pinned version stays until it is retired; without one, Azure assigns the
-  # default version and upgrades it, so Terraform doesn't track it, and each
-  # run records the version that answered.
-  version_upgrade_option = var.model_version == null ? "OnceNewDefaultVersionAvailable" : "OnceCurrentVersionExpired"
+  # It follows the model's default version: Azure assigns it and upgrades it, so
+  # Terraform doesn't track it, and each run records the version that answered.
+  version_upgrade_option = "OnceNewDefaultVersionAvailable"
 
   lifecycle {
     ignore_changes = [model[0].version]

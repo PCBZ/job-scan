@@ -20,12 +20,6 @@ variable "model_name" {
   type = string
 }
 
-variable "model_version" {
-  description = "A version to pin the main deployment to; null follows the model's default version."
-  type        = string
-  default     = null
-}
-
 variable "capacity_k_tpm" {
   description = "Deployment capacity in thousands of tokens per minute. Draws on quota, not money."
   type        = number
