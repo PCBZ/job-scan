@@ -70,10 +70,6 @@ describe("modelClientFromEnv", () => {
       'MODEL_MAX_RETRIES must be a whole number, got "three"',
     ],
     [{ ...AZURE, MODEL_FALLBACK_PROVIDER: "openai-compatible" }, "MODEL_FALLBACK_NAME is not set"],
-    [
-      { ...AZURE, MODEL_REASONING_EFFORT: "tiny" },
-      'MODEL_REASONING_EFFORT must be one of none, minimal, low, medium, high, xhigh, max, got "tiny"',
-    ],
   ])("rejects %j", (env, message) => {
     expect(() => modelClientFromEnv(env as Record<string, string>, credential)).toThrow(
       expect.objectContaining({ code: "config" }),

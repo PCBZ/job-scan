@@ -2,10 +2,9 @@
 // days, and only recommended postings are remembered as seen, so a posting
 // passed over was judged again each day. An answer is reused only when the
 // whole request that earned it is the same, so a change to the prompt, the
-// resume, the profile or the posting is a miss. Which model answered doesn't
-// matter: the same request is the same question. After changing the judge's
-// model, add one to CACHE_FORMAT to leave the old model's answers behind
-// rather than wait for them to expire.
+// resume, the profile or the posting is a miss. Which model answered, and with
+// which settings (its reasoning effort, #156), doesn't matter: the same request
+// is the same question, so a change of model keeps the answers it was given.
 //
 // recall runs before judge, remember after the repair loop. Neither ever fails
 // the run: a read that fails or times out is a miss, a write that fails is a
@@ -22,7 +21,7 @@ import { judgeAnswer } from "./schema.js";
 import { type Judgement, postingId, problemsAbout } from "./verify.js";
 
 /** Bumped when an item changes shape or meaning, so older items are misses. */
-export const CACHE_FORMAT = 2;
+export const CACHE_FORMAT = 1;
 
 /** What is kept under a key: the verified answer, before whole resume lines replace its phrases. */
 export const cachedJudgement = z.object({

@@ -8,10 +8,9 @@
 //
 //   MODEL_TPM          the deployment's tokens per minute; calls are paced to
 //                      it (rate-limit.ts). Unset or 0: no pacing.
-//   MODEL_REASONING_EFFORT  none | minimal | low | medium | high | xhigh | max,
-//                      sent as reasoning_effort (#156). Unset: the model's own
-//                      default. Each model accepts its own values, so the
-//                      extract slot never takes the main one.
+//   MODEL_REASONING_EFFORT  sent as reasoning_effort (#156), as written; each model
+//                      accepts its own values. Unset: the model's own default.
+//                      The extract slot never takes the main one's.
 //
 // The same keys prefixed MODEL_FALLBACK_ configure an optional fallback, which
 // is paced to its own MODEL_FALLBACK_TPM. MODEL_MAX_RETRIES and
@@ -50,15 +49,9 @@ function positiveInt(env: Env, key: string, fallback: number): number {
   return n;
 }
 
-const REASONING_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
-
+/** Passed on as given: which values a model takes is the provider's to say. */
 function reasoningEffort(env: Env, key: string): ReasoningEffort | undefined {
-  const raw = env[key]?.trim();
-  if (!raw) return undefined;
-  const found = REASONING_EFFORTS.find((e) => e === raw);
-  if (!found)
-    throw appError("config", `${key} must be one of ${REASONING_EFFORTS.join(", ")}, got "${raw}"`);
-  return found;
+  return (env[key]?.trim() || undefined) as ReasoningEffort | undefined;
 }
 
 export interface ModelClientOptions {
