@@ -83,6 +83,7 @@ describe("OpenAIChatClient", () => {
       cacheWrite: 5800,
       reasoning: 700,
     });
+  });
 
   it("marks the shared prefix reusable when the slot caches explicitly (#160)", async () => {
     const answer = completion({ parsed: { title: "Engineer", company: "Northwind" } });
