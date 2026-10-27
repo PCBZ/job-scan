@@ -25,6 +25,10 @@ module "function_app" {
     "MODEL_NAME"     = module.openai.deployment_name
     # Calls are paced to the deployment's TPM (functions/src/lib/model/rate-limit.ts, #93).
     "MODEL_TPM" = tostring(module.openai.tokens_per_minute)
+    # gpt-5.6 writes the prompt cache where the last message ends unless told
+    # where the shared prefix does (#160); earlier models answer 400, so the
+    # extract deployment never gets this.
+    "MODEL_PROMPT_CACHE" = "explicit"
     # Extraction's own deployment (#148); the other MODEL_ keys are shared.
     "MODEL_EXTRACT_NAME" = module.openai.extract_deployment_name
     "MODEL_EXTRACT_TPM"  = tostring(module.openai.extract_tokens_per_minute)
