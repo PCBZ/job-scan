@@ -11,6 +11,9 @@
 //   MODEL_REASONING_EFFORT  sent as reasoning_effort (#156), as written; each model
 //                      accepts its own values. Unset: the model's own default.
 //                      The extract slot never takes the main one's.
+//   MODEL_PROMPT_CACHE "explicit": mark the prompt's shared prefix reusable (#160).
+//                      gpt-5.6+ only (earlier models answer 400); unset sends nothing.
+//                      The extract slot never takes the main one's.
 //
 // The same keys prefixed MODEL_FALLBACK_ configure an optional fallback, which
 // is paced to its own MODEL_FALLBACK_TPM. MODEL_MAX_RETRIES and
@@ -52,6 +55,13 @@ function positiveInt(env: Env, key: string, fallback: number): number {
 /** Passed on as given: which values a model takes is the provider's to say. */
 function reasoningEffort(env: Env, key: string): ReasoningEffort | undefined {
   return (env[key]?.trim() || undefined) as ReasoningEffort | undefined;
+}
+
+function promptCache(env: Env, key: string): "explicit" | undefined {
+  const value = env[key]?.trim();
+  if (!value) return undefined;
+  if (value !== "explicit") throw appError("config", `${key} must be "explicit", got "${value}"`);
+  return value;
 }
 
 export interface ModelClientOptions {
@@ -98,6 +108,7 @@ function slot(
   const timeout = positiveInt(env, "MODEL_TIMEOUT_MS", 60_000);
   const name = required(env, `${prefix}_NAME`);
   const effort = reasoningEffort(env, `${prefix}_REASONING_EFFORT`);
+  const cache = promptCache(env, `${prefix}_PROMPT_CACHE`);
   const http = httpLayer(options);
   switch (provider) {
     case "azure-openai": {
@@ -111,7 +122,7 @@ function slot(
         timeout,
         ...(http ? { fetch: http } : {}),
       });
-      return new OpenAIChatClient(client.chat.completions, name, label, effort);
+      return new OpenAIChatClient(client.chat.completions, name, label, effort, cache);
     }
     case "openai-compatible": {
       const client = new OpenAI({
@@ -121,7 +132,7 @@ function slot(
         timeout,
         ...(http ? { fetch: http } : {}),
       });
-      return new OpenAIChatClient(client.chat.completions, name, label, effort);
+      return new OpenAIChatClient(client.chat.completions, name, label, effort, cache);
     }
     default:
       throw appError(

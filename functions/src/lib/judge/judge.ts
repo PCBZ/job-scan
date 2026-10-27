@@ -9,7 +9,7 @@ import type { Posting } from "../postings/types.js";
 import type { ResumeVariant } from "../resume/load.js";
 import { mapWithLimit } from "../workflow/limit.js";
 import type { LlmResult } from "../workflow/types.js";
-import { JUDGE_SYSTEM, judgeUser } from "./prompt.js";
+import { JUDGE_SYSTEM, judgeShared, judgeUser } from "./prompt.js";
 import { type JudgeAnswer, judgeAnswer } from "./schema.js";
 import { type Judgement, postingId, problemsAbout } from "./verify.js";
 
@@ -82,10 +82,12 @@ export function judgeStep(client: ModelClient, options: JudgeOptions = {}) {
       const remembered = last ? undefined : earlier.get(id);
       if (remembered) return [remembered];
       try {
+        const user = judgeUser(posting, profile, resumes);
         const r = await client.structured({
           name: "judgement",
           system: JUDGE_SYSTEM,
-          user: judgeUser(posting, profile, resumes),
+          user,
+          sharedPrefix: judgeShared(user),
           schema: judgeAnswer,
           repairs: historyOf(repairs, id),
           ...(signal ? { signal } : {}),

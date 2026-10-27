@@ -144,6 +144,33 @@ describe("modelClientFromEnv", () => {
     expect(bodies[1]).not.toHaveProperty("reasoning_effort");
   });
 
+  it("sends the main slot's explicit prompt cache, never to the extract slot, and rejects other values (#160)", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const recording = (async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(okBody({ title: "Engineer" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    const env = { ...AZURE, MODEL_PROMPT_CACHE: "explicit", MODEL_EXTRACT_NAME: "gpt-5.4-nano" };
+    const request = {
+      name: "postings",
+      system: "s",
+      user: "shared posting",
+      sharedPrefix: "shared ",
+      schema: z.object({ title: z.string() }),
+    };
+    const main = modelClientFromEnv(env, credential, { fetch: recording });
+    await main.structured(request);
+    await extractClientFromEnv(env, credential, main, { fetch: recording }).structured(request);
+    expect(bodies[0]).toMatchObject({ prompt_cache_options: { mode: "explicit" } });
+    expect(bodies[1]).not.toHaveProperty("prompt_cache_options");
+    expect(() =>
+      modelClientFromEnv({ ...AZURE, MODEL_PROMPT_CACHE: "implicit" }, credential),
+    ).toThrow(/MODEL_PROMPT_CACHE must be "explicit"/);
+  });
+
   it("counts every 429, the SDK's own retries included", async () => {
     let n = 0;
     const busyTwice = (async () => {

@@ -17,6 +17,12 @@ export interface StructuredRequest<T> {
   name: string;
   system: string;
   user: string;
+  /**
+   * The start of `user` that every call of this kind shares. A model that
+   * caches explicitly (#160) is told the prompt is reusable up to its end;
+   * others ignore it.
+   */
+  sharedPrefix?: string;
   schema: ZodType<T>;
   /** Earlier attempts and their problems, oldest first. */
   repairs?: RepairTurn[];

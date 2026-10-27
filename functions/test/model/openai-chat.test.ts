@@ -83,6 +83,40 @@ describe("OpenAIChatClient", () => {
       cacheWrite: 5800,
       reasoning: 700,
     });
+
+  it("marks the shared prefix reusable when the slot caches explicitly (#160)", async () => {
+    const answer = completion({ parsed: { title: "Engineer", company: "Northwind" } });
+    const req = {
+      ...REQ,
+      user: "profile and resumes\nposting A",
+      sharedPrefix: "profile and resumes\n",
+    };
+    const explicit = parser(answer);
+    await new OpenAIChatClient(explicit, "m", "primary", undefined, "explicit").structured(req);
+    const body = explicit.calls[0] as { messages: { content: unknown }[] };
+    expect(explicit.calls[0]).toMatchObject({ prompt_cache_options: { mode: "explicit" } });
+    // The same text, cut where the shared part ends.
+    expect(body.messages[1]?.content).toEqual([
+      {
+        type: "text",
+        text: "profile and resumes\n",
+        prompt_cache_breakpoint: { mode: "explicit" },
+      },
+      { type: "text", text: "posting A" },
+    ]);
+    // Not set: a plain string and no cache options, as earlier models need.
+    const plain = parser(answer);
+    await new OpenAIChatClient(plain, "m").structured(req);
+    expect(plain.calls[0]).not.toHaveProperty("prompt_cache_options");
+    expect((plain.calls[0] as { messages: { content: unknown }[] }).messages[1]?.content).toBe(
+      req.user,
+    );
+    // Set but nothing shared: still a plain message, nothing to mark.
+    const bare = parser(answer);
+    await new OpenAIChatClient(bare, "m", "primary", undefined, "explicit").structured(REQ);
+    expect((bare.calls[0] as { messages: { content: unknown }[] }).messages[1]?.content).toBe(
+      REQ.user,
+    );
   });
 
   it("sends system and user messages with a strict json_schema response format", async () => {
