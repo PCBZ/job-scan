@@ -14,6 +14,16 @@ export const JUDGE_SYSTEM = readFileSync(
 ).trimEnd();
 
 /**
+ * The start of `judgeUser`'s message that every posting shares: the profile
+ * and the resumes, up to where the posting begins (#160). Resume text can't
+ * hold the posting's key at a line start, as JSON writes a newline escaped.
+ */
+export function judgeShared(user: string): string {
+  const at = user.indexOf('\n  "posting":');
+  return at < 0 ? "" : user.slice(0, at + 1);
+}
+
+/**
  * The profile fields the judgement uses, the resumes and the posting, as JSON.
  * What every call shares comes first and the posting last, so Azure's prompt
  * cache serves the shared prefix (#115): a cache hit needs the prompt's start

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { judgeUser } from "../../src/lib/judge/prompt.js";
+import { judgeShared, judgeUser } from "../../src/lib/judge/prompt.js";
 import type { ResumeVariant } from "../../src/lib/resume/load.js";
 import { posting } from "../postings/helpers.js";
 
@@ -24,6 +24,17 @@ describe("judgeUser", () => {
   it("puts what every call shares first and the posting last, so the prompt cache can serve it", () => {
     const user = judgeUser(posting(), PROFILE, RESUMES);
     expect(Object.keys(JSON.parse(user))).toEqual(["candidate", "resumes", "posting"]);
+  });
+
+  it("names what every posting shares: everything before the posting (#160)", () => {
+    const a = judgeUser(posting({ title: "Backend Engineer" }), PROFILE, RESUMES);
+    const b = judgeUser(posting({ title: "Data Engineer", row: 1 }), PROFILE, RESUMES);
+    const shared = judgeShared(a);
+    expect(judgeShared(b)).toBe(shared);
+    expect(a.startsWith(shared)).toBe(true);
+    expect(shared).toContain("Built Spark pipelines");
+    expect(shared).not.toContain("posting");
+    expect(a.slice(shared.length)).toMatch(/^ {2}"posting":/);
   });
 
   it("gives two postings the same prompt up to the posting", () => {
