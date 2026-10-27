@@ -16,8 +16,8 @@
 
     <h2 style="margin: 16px 0 6px; font-size: 16px;">Cost (estimated)</h2>
     <table role="presentation" style="border-collapse: collapse; width: 100%;">
-      <tr style="color: #475467; text-align: left;"><th style="padding: 4px 8px 4px 0;">Model</th><th style="padding: 4px 8px;">Input</th><th style="padding: 4px 8px;">Cached</th><th style="padding: 4px 8px;">Output</th><th style="padding: 4px 0 4px 8px; text-align: right;">≈ USD</th></tr>
-      {{#cost}}<tr style="border-top: 1px solid #eaecf0;"><td style="padding: 4px 8px 4px 0;">{{model}}</td><td style="padding: 4px 8px;">{{input}}</td><td style="padding: 4px 8px;">{{cached}}</td><td style="padding: 4px 8px;">{{output}}</td><td style="padding: 4px 0 4px 8px; text-align: right;">{{usd}}</td></tr>{{/cost}}
+      <tr style="color: #475467; text-align: left;"><th style="padding: 4px 8px 4px 0;">Model</th><th style="padding: 4px 8px;">Input</th><th style="padding: 4px 8px;">Cached</th><th style="padding: 4px 8px;">Cache writes</th><th style="padding: 4px 8px;">Output</th><th style="padding: 4px 8px;">of it reasoning</th><th style="padding: 4px 0 4px 8px; text-align: right;">≈ USD</th></tr>
+      {{#cost}}<tr style="border-top: 1px solid #eaecf0;"><td style="padding: 4px 8px 4px 0;">{{model}}</td><td style="padding: 4px 8px;">{{input}}</td><td style="padding: 4px 8px;">{{cached}}</td><td style="padding: 4px 8px;">{{written}}</td><td style="padding: 4px 8px;">{{output}}</td><td style="padding: 4px 8px;">{{reasoning}}</td><td style="padding: 4px 0 4px 8px; text-align: right;">{{usd}}</td></tr>{{/cost}}
       <tr style="border-top: 1px solid #d0d5dd; font-weight: bold;"><td style="padding: 4px 8px 4px 0;" colspan="4">Total</td><td style="padding: 4px 0 4px 8px; text-align: right;">{{total}}</td></tr>
     </table>
 

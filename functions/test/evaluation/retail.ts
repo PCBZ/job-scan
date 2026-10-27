@@ -17,10 +17,18 @@ export function meterRow(
   };
 }
 
-/** Rows for a model's three Global meters at these prices. */
-export const modelRows = (model: string, p: { input: number; cached: number; output: number }) => {
+/** Rows for a model's Global meters at these prices. */
+export const modelRows = (
+  model: string,
+  p: { input: number; cached: number; output: number; cacheWrite?: number },
+) => {
   const m = meterNames(model);
-  return [meterRow(m.input, p.input), meterRow(m.cached, p.cached), meterRow(m.output, p.output)];
+  return [
+    meterRow(m.input, p.input),
+    meterRow(m.cached, p.cached),
+    meterRow(m.output, p.output),
+    ...(m.cacheWrite && p.cacheWrite !== undefined ? [meterRow(m.cacheWrite, p.cacheWrite)] : []),
+  ];
 };
 
 /**

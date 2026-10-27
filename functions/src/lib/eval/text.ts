@@ -17,8 +17,8 @@ export function renderText(e: Evaluation): string {
     "",
     "Cost (estimated)",
     table(
-      ["Model", "Input", "Cached", "Output", "≈ USD"],
-      v.cost.map((c) => [c.model, c.input, c.cached, c.output, c.usd]),
+      ["Model", "Input", "Cached", "Cache writes", "Output", "of it reasoning", "≈ USD"],
+      v.cost.map((c) => [c.model, c.input, c.cached, c.written, c.output, c.reasoning, c.usd]),
     ),
     `Total ${v.total}`,
     "",

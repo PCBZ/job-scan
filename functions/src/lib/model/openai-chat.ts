@@ -57,6 +57,12 @@ export class OpenAIChatClient implements ModelClient {
         ...(completion.usage?.prompt_tokens_details?.cached_tokens !== undefined
           ? { cached: completion.usage.prompt_tokens_details.cached_tokens }
           : {}),
+        ...(completion.usage?.prompt_tokens_details?.cache_write_tokens !== undefined
+          ? { cacheWrite: completion.usage.prompt_tokens_details.cache_write_tokens }
+          : {}),
+        ...(completion.usage?.completion_tokens_details?.reasoning_tokens !== undefined
+          ? { reasoning: completion.usage.completion_tokens_details.reasoning_tokens }
+          : {}),
         ...(completion.model ? { models: [completion.model] } : {}),
       },
       served_by: this.label,

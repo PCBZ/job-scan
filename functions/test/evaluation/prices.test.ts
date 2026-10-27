@@ -30,6 +30,7 @@ describe("meterNames", () => {
       input: "5.6 luna ShortCo Inp Std Gl 1M Tokens",
       cached: "5.6 luna ShortCo Cd Inp Std Gl 1M Tokens",
       output: "5.6 luna ShortCo Opt Std Gl 1M Tokens",
+      cacheWrite: "5.6 luna ShortCo Cd Wr Std Gl 1M Tokens",
     });
   });
 });
@@ -47,6 +48,16 @@ describe("retailPrices (#148)", () => {
       "prices.azure.com/api/retail/prices?api-version=2023-01-01-preview",
     );
     expect(api.urls[0]).not.toContain("armRegionName");
+  });
+
+  it("reads gpt-5.6-luna's cache-write meter too, and leaves the model out without it (#160)", async () => {
+    const LUNA = { input: 0.2, cached: 0.02, output: 1.2, cacheWrite: 0.25 };
+    const api = retailApi(modelRows("gpt-5.6-luna", LUNA));
+    expect(await retailPrices(api.fetch, REPORT_TIME)(["gpt-5.6-luna"])).toEqual({
+      "gpt-5.6-luna": LUNA,
+    });
+    const without = retailApi(modelRows("gpt-5.6-luna", LUNA).slice(0, 3));
+    expect(await retailPrices(without.fetch, REPORT_TIME)(["gpt-5.6-luna"])).toEqual({});
   });
 
   it("follows the next page", async () => {
