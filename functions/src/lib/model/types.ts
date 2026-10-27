@@ -39,6 +39,16 @@ export interface TokenUsage {
    */
   cached?: number;
   /**
+   * Of the input, tokens Azure wrote to its prompt cache (#160): gpt-5.6 bills
+   * a write above the input price. Absent when the provider doesn't say.
+   */
+  cacheWrite?: number;
+  /**
+   * Of the output, tokens the model spent reasoning (#160), billed as output.
+   * Absent when the provider doesn't say.
+   */
+  reasoning?: number;
+  /**
    * The models that answered, as the provider names them with their version,
    * e.g. "gpt-5.4-nano-2026-03-17" (#148): a deployment that follows the
    * default version shows here when it moves. Absent when it doesn't say.
@@ -46,11 +56,12 @@ export interface TokenUsage {
   models?: string[];
 }
 
-/** Two usages summed; cached is kept when either side reports it. */
+/** Two usages summed; an optional count is kept when either side reports it. */
 export function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
   const sum: TokenUsage = { input: a.input + b.input, output: a.output + b.output };
-  if (a.cached !== undefined || b.cached !== undefined)
-    sum.cached = (a.cached ?? 0) + (b.cached ?? 0);
+  for (const key of ["cached", "cacheWrite", "reasoning"] as const) {
+    if (a[key] !== undefined || b[key] !== undefined) sum[key] = (a[key] ?? 0) + (b[key] ?? 0);
+  }
   if (a.models || b.models)
     sum.models = [...new Set([...(a.models ?? []), ...(b.models ?? [])])].sort();
   return sum;

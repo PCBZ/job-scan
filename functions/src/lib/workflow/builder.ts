@@ -61,6 +61,12 @@ export class WorkflowBuilder {
               ...(usage.cached !== undefined
                 ? { "gen_ai.usage.cache_read.input_tokens": usage.cached }
                 : {}),
+              ...(usage.cacheWrite !== undefined
+                ? { "gen_ai.usage.cache_creation.input_tokens": usage.cacheWrite }
+                : {}),
+              ...(usage.reasoning !== undefined
+                ? { "gen_ai.usage.reasoning.output_tokens": usage.reasoning }
+                : {}),
             });
           }
           onNode?.({

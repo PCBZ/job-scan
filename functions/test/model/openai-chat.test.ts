@@ -64,6 +64,27 @@ describe("OpenAIChatClient", () => {
     expect(unset.calls[0]).not.toHaveProperty("reasoning_effort");
   });
 
+  it("reports cache writes and reasoning tokens (#160)", async () => {
+    const written = {
+      ...completion({ parsed: { title: "Engineer", company: "Northwind" } }),
+      usage: {
+        prompt_tokens: 6000,
+        completion_tokens: 900,
+        total_tokens: 6900,
+        prompt_tokens_details: { cached_tokens: 0, cache_write_tokens: 5800 },
+        completion_tokens_details: { reasoning_tokens: 700 },
+      },
+    };
+    const out = await new OpenAIChatClient(parser(written), "m").structured(REQ);
+    expect(out.usage).toEqual({
+      input: 6000,
+      output: 900,
+      cached: 0,
+      cacheWrite: 5800,
+      reasoning: 700,
+    });
+  });
+
   it("marks the shared prefix reusable when the slot caches explicitly (#160)", async () => {
     const answer = completion({ parsed: { title: "Engineer", company: "Northwind" } });
     const req = {

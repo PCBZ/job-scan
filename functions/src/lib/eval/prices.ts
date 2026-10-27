@@ -13,6 +13,8 @@ export interface Price {
   input: number;
   cached: number;
   output: number;
+  /** A write to the prompt cache, where the model bills one apart from input (#160). */
+  cacheWrite?: number;
 }
 
 /** Who served a node, and with which model: "azure-openai" gpt-5.4-nano, "jev" jev-1.13.0. */
@@ -46,11 +48,18 @@ export function legacyModel(node: string): NodeModel {
     : { provider: "azure-openai", model: "gpt-5.4-mini" };
 }
 
-/** USD for one node's usage: cached input at the cached rate, the rest at full. */
+/**
+ * USD for one node's usage: cached input at the cached rate, cache writes at
+ * the write rate where the model has one, the rest at full.
+ */
 export function costOf(usage: TokenUsage, price: Price): number {
   const cached = Math.min(usage.cached ?? 0, usage.input);
+  const written = Math.min(usage.cacheWrite ?? 0, usage.input - cached);
   return (
-    ((usage.input - cached) * price.input + cached * price.cached + usage.output * price.output) /
+    ((usage.input - cached - written) * price.input +
+      cached * price.cached +
+      written * (price.cacheWrite ?? price.input) +
+      usage.output * price.output) /
     1_000_000
   );
 }
@@ -59,12 +68,15 @@ export function costOf(usage: TokenUsage, price: Price): number {
 export const RETAIL_PRICES_URL = "https://prices.azure.com/api/retail/prices";
 const API_VERSION = "2023-01-01-preview";
 
+/** A model's meter names; cacheWrite only where the model bills one. */
+type Meters = Record<"input" | "cached" | "output", string> & { cacheWrite?: string };
+
 /**
  * Meter names the 5.x naming below doesn't give: the GPT-5 family's original
  * models are named in the older style, and gpt-5.6 prices a short and a long
  * context apart (#158), a run's prompts being the short one.
  */
-const METER_NAMES: Readonly<Record<string, Record<keyof Price, string>>> = {
+const METER_NAMES: Readonly<Record<string, Meters>> = {
   "gpt-5-mini": {
     input: "GPT 5 Mini Inpt Glbl 1M Tokens",
     cached: "GPT 5 Mini cchd Inpt Glbl 1M Tokens",
@@ -74,6 +86,7 @@ const METER_NAMES: Readonly<Record<string, Record<keyof Price, string>>> = {
     input: "5.6 luna ShortCo Inp Std Gl 1M Tokens",
     cached: "5.6 luna ShortCo Cd Inp Std Gl 1M Tokens",
     output: "5.6 luna ShortCo Opt Std Gl 1M Tokens",
+    cacheWrite: "5.6 luna ShortCo Cd Wr Std Gl 1M Tokens",
   },
 };
 
@@ -82,7 +95,7 @@ const METER_NAMES: Readonly<Record<string, Record<keyof Price, string>>> = {
  * gpt-5.4-nano is "5.4 nano Inp Gl", "5.4 nano cd Inp Gl" (cached input) and
  * "5.4 nano Opt Gl", each per 1M tokens.
  */
-export function meterNames(model: string): Record<keyof Price, string> {
+export function meterNames(model: string): Meters {
   const named = METER_NAMES[model];
   if (named) return named;
   const base = model.replace(/^gpt-/, "").replaceAll("-", " ");
@@ -159,8 +172,9 @@ export function retailPrices(
       const input = price(meters.input);
       const cached = price(meters.cached);
       const output = price(meters.output);
-      if (input !== null && cached !== null && output !== null)
-        out[model] = { input, cached, output };
+      const cacheWrite = meters.cacheWrite ? price(meters.cacheWrite) : undefined;
+      if (input !== null && cached !== null && output !== null && cacheWrite !== null)
+        out[model] = { input, cached, output, ...(cacheWrite !== undefined ? { cacheWrite } : {}) };
     }
     return out;
   };

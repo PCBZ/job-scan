@@ -11,6 +11,8 @@ import { costOf, legacyModel, modelKey, NO_PRICES, type NodeModel, type Prices }
 /** Tokens and their estimated cost in USD; null when there's no price for them. */
 export interface Spend extends TokenUsage {
   cached: number;
+  cacheWrite: number;
+  reasoning: number;
   usd: number | null;
 }
 
@@ -102,10 +104,20 @@ function costRows(run: RunStatsRecord, prices: Prices): CostRow[] {
     const m = modelOf(run, node);
     const key = modelKey(m);
     const price = prices.byModel[key] ?? null;
-    const row = rows.get(key) ?? { ...m, input: 0, output: 0, cached: 0, usd: 0 };
+    const row = rows.get(key) ?? {
+      ...m,
+      input: 0,
+      output: 0,
+      cached: 0,
+      cacheWrite: 0,
+      reasoning: 0,
+      usd: 0,
+    };
     row.input += u.input;
     row.output += u.output;
     row.cached += u.cached ?? 0;
+    row.cacheWrite += u.cacheWrite ?? 0;
+    row.reasoning += u.reasoning ?? 0;
     row.usd = row.usd === null || price === null ? null : row.usd + costOf(u, price);
     rows.set(key, row);
   }

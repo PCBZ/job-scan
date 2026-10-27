@@ -12,6 +12,16 @@ describe("costOf", () => {
   });
 });
 
+describe("costOf with cache writes (#160)", () => {
+  it("prices a write at the write rate where the model has one, at the input rate where not", () => {
+    // 100K full input, 600K cached, 300K written, 50K output.
+    const usage = { input: 1_000_000, output: 50_000, cached: 600_000, cacheWrite: 300_000 };
+    const luna = { input: 1, cached: 0.1, output: 10, cacheWrite: 1.25 };
+    expect(costOf(usage, luna)).toBeCloseTo(0.1 * 1 + 0.6 * 0.1 + 0.3 * 1.25 + 0.05 * 10);
+    expect(costOf(usage, MINI_PRICE)).toBeCloseTo(0.4 * 1 + 0.6 * 0.1 + 0.05 * 10);
+  });
+});
+
 describe("evaluate", () => {
   const e = evaluate(records(), [], null, PRICES);
 

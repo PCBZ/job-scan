@@ -20,6 +20,15 @@ describe("addUsage", () => {
     });
   });
 
+  it("sums cache writes and reasoning tokens the same way (#160)", () => {
+    expect(
+      addUsage(
+        { input: 10, output: 2, cacheWrite: 6, reasoning: 1 },
+        { input: 5, output: 1, cacheWrite: 2 },
+      ),
+    ).toEqual({ input: 15, output: 3, cacheWrite: 8, reasoning: 1 });
+  });
+
   it("keeps every model that answered, once each (#148)", () => {
     expect(
       addUsage(
