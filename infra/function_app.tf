@@ -31,9 +31,9 @@ module "function_app" {
     "MODEL_PROMPT_CACHE" = "explicit"
     # gpt-5.6 reasons at medium by default, and its reasoning tokens were 82% of
     # the judge's output on 2026-10-28 (#166); the extract deployment never gets
-    # this. reasoning_effort is not in the default 2024-10-21 API version.
+    # this. The default 2024-10-21 API version honours it (checked on luna: none
+    # spent 0 reasoning tokens, medium 486).
     "MODEL_REASONING_EFFORT" = "none"
-    "MODEL_API_VERSION"      = "2025-04-01-preview"
     # Extraction's own deployment (#148); the other MODEL_ keys are shared.
     "MODEL_EXTRACT_NAME" = module.openai.extract_deployment_name
     "MODEL_EXTRACT_TPM"  = tostring(module.openai.extract_tokens_per_minute)
