@@ -34,6 +34,14 @@ variable "extract_model" {
   default = null
 }
 
+variable "extra_models" {
+  description = "Deployments the app doesn't call yet, by model name, to try a model before it takes a slot. Each follows the model's default version."
+  type = map(object({
+    capacity_k_tpm = number
+  }))
+  default = {}
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

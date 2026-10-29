@@ -22,4 +22,10 @@ module "openai" {
     name           = "gpt-5.4-nano"
     capacity_k_tpm = 150
   }
+
+  # gpt-6-luna, half gpt-5.6-luna's price per token, to check it takes
+  # reasoning_effort "none" before a slot moves to it. Nothing calls it yet.
+  extra_models = {
+    "gpt-6-luna" = { capacity_k_tpm = 50 }
+  }
 }
