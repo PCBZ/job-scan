@@ -1,6 +1,6 @@
 # job-scan
 
-![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?logo=typescript&logoColor=white) ![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white) ![Azure Functions](https://img.shields.io/badge/Azure_Functions-v4_Flex_Consumption-0078D4) ![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-gpt--5.6--luna,_gpt--5.4--nano-0078D4)
+![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?logo=typescript&logoColor=white) ![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white) ![Azure Functions](https://img.shields.io/badge/Azure_Functions-v4_Flex_Consumption-0078D4) ![Azure AI Foundry](https://img.shields.io/badge/Azure_AI_Foundry-AIServices_project-0078D4) ![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-gpt--5.6--luna,_gpt--5.4--nano-0078D4)
 ![LangGraph](https://img.shields.io/badge/LangGraph-1.4-1C3C3C?logo=langchain&logoColor=white) ![Jev](https://img.shields.io/badge/Jev-1.13.0-5B5BD6) ![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757?logo=claude&logoColor=white) ![Terraform](https://img.shields.io/badge/Terraform-1.13-844FBA?logo=terraform&logoColor=white)
 
 Reads your job-alert emails, matches the postings against your actual resume,
