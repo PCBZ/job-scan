@@ -87,3 +87,33 @@ resource "azurerm_cognitive_deployment" "extract" {
   # Azure changes one deployment of an account at a time.
   depends_on = [azurerm_cognitive_deployment.this]
 }
+
+# Deployments to try a model on (the key is the model's name), not yet called by
+# the app. They follow the model's default version, like the two above.
+resource "azurerm_cognitive_deployment" "extra" {
+  for_each             = var.extra_models
+  name                 = each.key
+  cognitive_account_id = azurerm_cognitive_account.this.id
+
+  model {
+    format = "OpenAI"
+    name   = each.key
+  }
+
+  sku {
+    name     = "GlobalStandard"
+    capacity = each.value.capacity_k_tpm
+  }
+
+  version_upgrade_option = "OnceNewDefaultVersionAvailable"
+
+  lifecycle {
+    ignore_changes = [model[0].version]
+  }
+
+  # Azure changes one deployment of an account at a time.
+  depends_on = [
+    azurerm_cognitive_deployment.this,
+    azurerm_cognitive_deployment.extract,
+  ]
+}
