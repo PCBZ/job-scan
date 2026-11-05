@@ -73,8 +73,8 @@ type Meters = Record<"input" | "cached" | "output", string> & { cacheWrite?: str
 
 /**
  * Meter names the 5.x naming below doesn't give: the GPT-5 family's original
- * models are named in the older style, and gpt-5.6 prices a short and a long
- * context apart (#158), a run's prompts being the short one.
+ * models are named in the older style, and gpt-5.6 and gpt-6 price a short and
+ * a long context apart (#158), a run's prompts being the short one.
  */
 const METER_NAMES: Readonly<Record<string, Meters>> = {
   "gpt-5-mini": {
@@ -87,6 +87,13 @@ const METER_NAMES: Readonly<Record<string, Meters>> = {
     cached: "5.6 luna ShortCo Cd Inp Std Gl 1M Tokens",
     output: "5.6 luna ShortCo Opt Std Gl 1M Tokens",
     cacheWrite: "5.6 luna ShortCo Cd Wr Std Gl 1M Tokens",
+  },
+  // The GPT-6 meters drop the "5." of the 5.6 ones: "6-luna", under "Azure OpenAI GPT6".
+  "gpt-6-luna": {
+    input: "6-luna ShortCo Inp Std Gl 1M Tokens",
+    cached: "6-luna ShortCo Cd Inp Std Gl 1M Tokens",
+    output: "6-luna ShortCo Opt Std Gl 1M Tokens",
+    cacheWrite: "6-luna ShortCo Cd Wr Std Gl 1M Tokens",
   },
 };
 

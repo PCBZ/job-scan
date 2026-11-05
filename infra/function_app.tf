@@ -25,20 +25,15 @@ module "function_app" {
     "MODEL_NAME"     = module.openai.deployment_name
     # Calls are paced to the deployment's TPM (functions/src/lib/model/rate-limit.ts, #93).
     "MODEL_TPM" = tostring(module.openai.tokens_per_minute)
-    # gpt-5.6 writes the prompt cache where the last message ends unless told
-    # where the shared prefix does (#160); earlier models answer 400, so the
-    # extract deployment never gets this.
+    # gpt-6-luna and gpt-5.6 write the prompt cache where the last message ends
+    # unless told where the shared prefix does (#160); earlier models answer 400.
     "MODEL_PROMPT_CACHE" = "explicit"
-    # gpt-5.6 reasons at medium by default, and its reasoning tokens were 82% of
-    # the judge's output on 2026-10-28 (#166); the extract deployment never gets
-    # this. reasoning_effort is not in the default 2024-10-21 API version.
+    # They reason at medium by default, and gpt-5.6-luna's reasoning tokens were
+    # 82% of the judge's output on 2026-10-28 (#166). The default 2024-10-21 API
+    # version honours "none" (checked on both).
     "MODEL_REASONING_EFFORT" = "none"
-    "MODEL_API_VERSION"      = "2025-04-01-preview"
-    # Extraction's own deployment (#148); the other MODEL_ keys are shared.
-    "MODEL_EXTRACT_NAME" = module.openai.extract_deployment_name
-    "MODEL_EXTRACT_TPM"  = tostring(module.openai.extract_tokens_per_minute)
-    "CONFIG_BLOB_URL"    = module.config_blob.url
-    "RESUME_CACHE_URL"   = module.storage.container_endpoints["resume-cache"]
+    "CONFIG_BLOB_URL"        = module.config_blob.url
+    "RESUME_CACHE_URL"       = module.storage.container_endpoints["resume-cache"]
     # seenmessages and seenjobs (#9, #15).
     "TABLES_URL" = module.storage.table_endpoint
     # Private; reports are read through user delegation SAS links (#19).
@@ -64,6 +59,12 @@ module "function_app" {
     # The judge's answers, in the bootstrap's Cosmos account (#150). Unset until
     # bootstrap has been applied and infra/set-github-vars.sh run again: the app
     # then judges everything, as before.
+    # Extraction's own deployment (#148), when the module makes one; the other
+    # MODEL_ keys are shared. Without it extraction uses the main deployment.
+    module.openai.extract_deployment_name == null ? {} : {
+      "MODEL_EXTRACT_NAME" = module.openai.extract_deployment_name
+      "MODEL_EXTRACT_TPM"  = tostring(module.openai.extract_tokens_per_minute)
+    },
     var.platform.cosmos_endpoint == null ? {} : {
       "COSMOS_ENDPOINT"  = var.platform.cosmos_endpoint
       "COSMOS_DATABASE"  = var.platform.cosmos_database
