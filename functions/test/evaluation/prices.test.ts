@@ -25,6 +25,15 @@ describe("meterNames", () => {
     });
   });
 
+  it("prices gpt-6-luna's short context under its own meter names", () => {
+    expect(meterNames("gpt-6-luna")).toEqual({
+      input: "6-luna ShortCo Inp Std Gl 1M Tokens",
+      cached: "6-luna ShortCo Cd Inp Std Gl 1M Tokens",
+      output: "6-luna ShortCo Opt Std Gl 1M Tokens",
+      cacheWrite: "6-luna ShortCo Cd Wr Std Gl 1M Tokens",
+    });
+  });
+
   it("prices gpt-5.6-luna's short context, whose meters carry the tier (#158)", () => {
     expect(meterNames("gpt-5.6-luna")).toEqual({
       input: "5.6 luna ShortCo Inp Std Gl 1M Tokens",
