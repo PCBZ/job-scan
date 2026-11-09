@@ -2,7 +2,7 @@ import { type ContainerClient, RestError } from "@azure/storage-blob";
 import type { QueueClient } from "@azure/storage-queue";
 
 /** The ContainerClient calls the handoff store makes, over blobs held here. */
-export function fakePostingsContainer() {
+export function fakePostingsContainer(existsStatus: 409 | 412 = 409) {
   const blobs = new Map<string, Buffer>();
   const container = {
     getBlockBlobClient: (name: string) => ({
@@ -12,7 +12,9 @@ export function fakePostingsContainer() {
         options?: { conditions?: { ifNoneMatch?: string } },
       ) => {
         if (options?.conditions?.ifNoneMatch === "*" && blobs.has(name))
-          throw new RestError("BlobAlreadyExists", { statusCode: 409 });
+          throw new RestError(existsStatus === 409 ? "BlobAlreadyExists" : "ConditionNotMet", {
+            statusCode: existsStatus,
+          });
         blobs.set(name, Buffer.from(body));
         return {};
       },

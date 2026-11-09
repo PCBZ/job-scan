@@ -108,14 +108,18 @@ export function handoffStore(container: Container): HandoffStore {
       return names.sort().at(-1) ?? null;
     },
     async claim(day, files) {
-      const key = createHash("sha256").update([...files].sort().join("\n")).digest("hex");
+      const key = createHash("sha256")
+        .update([...files].sort().join("\n"))
+        .digest("hex");
       try {
         await container
           .getBlockBlobClient(`${day}/collected/${key.slice(0, 16)}`)
           .upload("", 0, { conditions: { ifNoneMatch: "*" } });
         return true;
       } catch (err) {
-        if (err instanceof RestError && err.statusCode === 409) return false;
+        // An existing marker answers 409 (BlobAlreadyExists) or 412 (ConditionNotMet).
+        if (err instanceof RestError && (err.statusCode === 409 || err.statusCode === 412))
+          return false;
         throw err;
       }
     },

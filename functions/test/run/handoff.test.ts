@@ -62,14 +62,18 @@ describe("handoffStore", () => {
     expect(await store.latest("2026-10-13", "collected")).toBeNull();
   });
 
-  it("lets exactly one caller claim a set of files, in any order", async () => {
-    const { container } = fakePostingsContainer();
-    const store = handoffStore(container);
-    expect(await store.claim("2026-10-13", ["a.json", "b.json"])).toBe(true);
-    expect(await store.claim("2026-10-13", ["b.json", "a.json"])).toBe(false);
-    // A different set of files is a different collect: a late source's rerun.
-    expect(await store.claim("2026-10-13", ["a.json", "b.json", "c.json"])).toBe(true);
-  });
+  // An existing marker answers 409 or 412 depending on the path through the service.
+  it.each([409, 412] as const)(
+    "lets exactly one caller claim a set of files, in any order (%i)",
+    async (status) => {
+      const { container } = fakePostingsContainer(status);
+      const store = handoffStore(container);
+      expect(await store.claim("2026-10-13", ["a.json", "b.json"])).toBe(true);
+      expect(await store.claim("2026-10-13", ["b.json", "a.json"])).toBe(false);
+      // A different set of files is a different collect: a late source's rerun.
+      expect(await store.claim("2026-10-13", ["a.json", "b.json", "c.json"])).toBe(true);
+    },
+  );
 
   it("does not take a claim marker for a source's file", async () => {
     const { container } = fakePostingsContainer();
@@ -134,7 +138,9 @@ describe("seedFrom and mergeMeta", () => {
     const mail = { messages: [] } as never;
     const seed = seedFrom([b, { ...a, mail, extract_loop: { ...NO_LOOP, problems: ["p"] } }]);
     expect(seed.mail).toBe(mail);
-    expect((seed.loops as { extract?: { problems: string[] } } | undefined)?.extract?.problems).toEqual(["p"]);
+    expect(
+      (seed.loops as { extract?: { problems: string[] } } | undefined)?.extract?.problems,
+    ).toEqual(["p"]);
     expect(seedFrom([b]).loops).toBeUndefined();
   });
 
