@@ -11,16 +11,20 @@ module "storage" {
     "resume-cache", # extracted resume text, keyed by content hash
     "config",       # config.toml for the cloud run
     "run-records",  # each run's postings, filters, picks and metrics (#97)
+    "postings",     # what each source hands to collect: its postings and mail text (#171)
   ]
 
   # Run records hold real mail and resume text: keep them 90 days only.
   expire_after_days = {
     "run-records" = 90
+    # Handoff files hold mail text too; collect reads one within the hour.
+    "postings" = 14
   }
 
   queues = [
-    "eval-reports", # one message per run, for its evaluation report (#127)
-    "eval-smoke",   # the post-deploy smoke test's outcome, for CD (#134)
+    "eval-reports",   # one message per run, for its evaluation report (#127)
+    "eval-smoke",     # the post-deploy smoke test's outcome, for CD (#134)
+    "postings-ready", # one message per finished source, which wakes collect (#171)
   ]
 
   tables = [
