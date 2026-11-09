@@ -42,10 +42,10 @@ module "function_app" {
     "RUN_RECORDS_URL" = module.storage.container_endpoints["run-records"]
     # Private; the daily run queues each run's evaluation report here (#128).
     "EVAL_QUEUE_URL" = module.storage.queue_urls["eval-reports"]
-    # Private; what a source hands to collect (#171), and the queue that wakes it.
+    # Private; what a source hands to collect, and the queue that wakes it.
     "POSTINGS_URL"       = module.storage.container_endpoints["postings"]
     "POSTINGS_QUEUE_URL" = module.storage.queue_urls["postings-ready"]
-    # collect's queue trigger (#171) connects as the app's identity, like evalReport's.
+    # collect's queue trigger connects as the app's identity, like evalReport's.
     "PostingsQueue__queueServiceUri" = module.storage.queue_endpoint
     "PostingsQueue__credential"      = "managedidentity"
     "PostingsQueue__clientId"        = var.platform.app_client_id
