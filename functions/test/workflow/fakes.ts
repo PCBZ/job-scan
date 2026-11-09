@@ -1,14 +1,9 @@
-import {
-  type HandoffMessage,
-  type HandoffQueue,
-  handoffStore,
-} from "../../src/lib/run/handoff.js";
-import { fakePostingsContainer } from "../run/fake-postings.js";
 import type { AppConfig } from "../../src/lib/config/load.js";
 import type { Judgement } from "../../src/lib/judge/verify.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
 import type { ResumeSet } from "../../src/lib/resume/load.js";
 import type { EvalQueue } from "../../src/lib/run/eval-queue.js";
+import { type HandoffMessage, type HandoffQueue, handoffStore } from "../../src/lib/run/handoff.js";
 import type { RunRecordStore } from "../../src/lib/run/records.js";
 import type {
   DeterministicSteps,
@@ -19,6 +14,7 @@ import type {
 } from "../../src/lib/workflow/types.js";
 import { judgement, rankedOf } from "../judge/helpers.js";
 import { posting } from "../postings/helpers.js";
+import { fakePostingsContainer } from "../run/fake-postings.js";
 
 export const CONFIG = { mail: {}, resume: {}, profile: {}, report: {} } as unknown as AppConfig;
 
