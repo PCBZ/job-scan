@@ -1,6 +1,6 @@
-// The daily run as two LangGraph state graphs (plan §3, #55): a source
-// graph for each source, then `collect`, joined by what a source hands over
-// (run/handoff.ts).
+// The daily run as two LangGraph state graphs (plan §3, #55), joined by
+// the files and queue in run/handoff.ts: a source graph for each source, then
+// `collect`.
 //
 //   mail:    load_config ─ fetch_mail ─ extract_postings ⇄ validate
 //

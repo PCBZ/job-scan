@@ -25,10 +25,13 @@ flowchart TB
 
   subgraph app [Azure Functions app]
     direction LR
-    daily["daily<br/>timer, 15:00 UTC"]
+    daily["daily<br/>timer, 15:00 UTC<br/>mail source"]
+    pqueue[[Storage Queue<br/>postings-ready]]
+    collect["collect<br/>queue trigger<br/>gate, judge, report"]
     queue[[Storage Queue<br/>eval-reports]]
     evalfn["evalReport<br/>queue trigger"]
-    daily -- "run done" --> queue --> evalfn
+    daily -- "postings handed over" --> pqueue --> collect
+    collect -- "run done" --> queue --> evalfn
   end
 
   subgraph apis [Model APIs]
@@ -40,7 +43,7 @@ flowchart TB
   subgraph data [Data]
     direction LR
     vault[(Key Vault<br/>secrets, config)]
-    blob[(Blob Storage<br/>run records, reports)]
+    blob[(Blob Storage<br/>postings, run records, reports)]
     table[(Table Storage<br/>seen messages, jobs)]
     cosmos[(Cosmos DB<br/>judge's answers, 14 days)]
     logs[("Application Insights,<br/>Log Analytics: traces")]
@@ -53,20 +56,25 @@ flowchart TB
   end
 
   inputs --> daily
+  inputs --> collect
   daily <--> apis
+  collect <--> apis
   data <--> daily
+  data <--> collect
   data --> evalfn
-  daily --> out
+  collect --> out
   evalfn --> out
 ```
 
-### The daily function
+### The daily run: two functions
 
 ```mermaid
 flowchart TB
-  timer([timer, 15:00 UTC]) --> config[load config<br/>Blob, Key Vault]
-  config --> fetch[fetch mail<br/>Gmail IMAP] & resumes[load resumes<br/>GitHub]
-  fetch --> extract[extract<br/>Azure OpenAI] --> dedupe[dedupe<br/>Table Storage] --> gates[hard gates<br/>code] --> screen[screen<br/>Jev]
+  timer([daily · timer, 15:00 UTC]) --> config[load config<br/>Blob, Key Vault]
+  config --> fetch[fetch mail<br/>Gmail IMAP] --> extract[extract<br/>Azure OpenAI] --> handover[[postings handed over<br/>Blob + postings-ready queue]]
+  handover --> cconfig([collect · queue trigger]) --> cfg2[load config<br/>Blob, Key Vault]
+  cfg2 --> dedupe[dedupe<br/>Table Storage] & resumes[load resumes<br/>GitHub]
+  dedupe --> gates[hard gates<br/>code] --> screen[screen<br/>Jev]
   screen & resumes --> recall[recall answers<br/>Cosmos DB] --> judge[judge<br/>Azure OpenAI] --> remember[keep answers<br/>Cosmos DB] --> rank[rank<br/>code] --> explain[explain<br/>Azure OpenAI]
   explain --> report[report<br/>Blob] --> deliver[email, Telegram] --> seen[mark seen<br/>Table Storage]
   seen --> record[run record<br/>Blob] --> queue[[eval-reports queue<br/>visible in 15 min]]
@@ -74,6 +82,11 @@ flowchart TB
   judge -. "repair: a quote not in the resume or posting" .-> judge
   explain -. "repair: a quote not in the resume" .-> explain
 ```
+
+`daily` reads the mail and extracts its postings, then hands them to `collect` as a
+file in a private Blob container and a message on a queue; `collect` runs the rest.
+`collect` runs once even if its message is delivered twice, and a failed run is not
+retried: its mail is reported again the next day.
 
 | Step | Decided by | |
 |---|---|---|
@@ -90,7 +103,7 @@ filtered posting is listed in the report with its gate and reason, never scored.
 
 ## Evaluation
 
-`evalReport` is a second function, started by the queue message `daily` sends
+`evalReport` is a third function, started by the queue message `collect` sends
 when its run ends:
 
 ```mermaid

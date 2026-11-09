@@ -4,7 +4,15 @@
 // and resume text, and the run records (#97) keep the content. Without a
 // registered provider (tests, local runs) these are no-ops.
 
-import { type Attributes, type Span, SpanStatusCode, trace } from "@opentelemetry/api";
+import {
+  type Attributes,
+  context,
+  ROOT_CONTEXT,
+  type Span,
+  SpanStatusCode,
+  TraceFlags,
+  trace,
+} from "@opentelemetry/api";
 
 export const tracer = trace.getTracer("job-scan");
 
@@ -27,4 +35,19 @@ export async function inSpan<T>(
       span.end();
     }
   });
+}
+
+/**
+ * Runs `fn` as a continuation of a trace another invocation started: spans
+ * opened inside it join that trace instead of beginning their own. How the
+ * collect run keeps one trace per day's run.
+ */
+export function inTrace<T>(parent: { trace_id: string; span_id: string }, fn: () => T): T {
+  const parentContext = trace.setSpanContext(ROOT_CONTEXT, {
+    traceId: parent.trace_id,
+    spanId: parent.span_id,
+    traceFlags: TraceFlags.SAMPLED,
+    isRemote: true,
+  });
+  return context.with(parentContext, fn);
 }
