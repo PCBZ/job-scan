@@ -1,12 +1,17 @@
-// The daily run as a LangGraph state graph (plan §3, #55).
+// The daily run as two LangGraph state graphs (plan §3, #55, #171): a source
+// graph for each source, then `collect`, joined by what a source hands over
+// (run/handoff.ts).
 //
-//   load_config ─┬─ fetch_mail ─ extract_postings ⇄ validate ─ dedupe ─ hard_gates ─ screen ─ await_resumes ─┐
-//                └─ load_resumes ───────────────────────────────────────────────────────────────────────────┴─ check_resumes ─ recall_judgements ─ judge ⇄ verify_judgements
+//   mail:    load_config ─ fetch_mail ─ extract_postings ⇄ validate
+//
+//   collect: load_config ─┬─ intake ─ dedupe ─ hard_gates ─ screen ─ await_resumes ─┐
+//                         └─ load_resumes ──────────────────────────────────────────┴─ check_resumes ─ recall_judgements ─ judge ⇄ verify_judgements
 //   ─ remember_judgements ─ rank ─ explain ⇄ verify_explanations ─ render_report ─ deliver ─ mark_seen
 //
-// No new mail, nothing past the gates, or no resumes to judge against
-// skips straight to render_report. Without resumes, nothing is marked seen, so
-// the next run judges the same mail.
+// collect starts from the sources' postings (run/handoff.ts seedFrom). No new
+// mail, nothing past the gates, or no resumes to judge against skips straight to
+// render_report. Without resumes, nothing is marked seen, so the next run judges
+// the same mail.
 // Keyword insights (#28) add their nodes when they land.
 
 import type { FetchPayload } from "../mail/types.js";
@@ -26,7 +31,58 @@ function need<T>(value: T | null, what: string): T {
   return value;
 }
 
-export function buildWorkflow(
+/** True when a source gave anything to work on: mail to read, or postings. */
+function hasInput(s: State): boolean {
+  return (isPayload(s.mail) && s.mail.messages.length > 0) || s.postings.length > 0;
+}
+
+/** The mail source: its alerts read, and the postings extracted from them. */
+export function buildMailWorkflow(
+  steps: DeterministicSteps,
+  model: ModelSteps,
+  options: WorkflowOptions = {},
+) {
+  const config = (s: State) => need(s.config, "config");
+
+  return new WorkflowBuilder(options)
+    .node("load_config", async (_s, signal) => ({ config: await steps.loadConfig(signal) }))
+    .edge(START, "load_config")
+    .edge("load_config", "fetch_mail")
+    .node("fetch_mail", async (s, signal) => ({ mail: await steps.fetchMail(config(s), signal) }))
+    .branch(
+      "fetch_mail",
+      (s) => (isPayload(s.mail) && s.mail.messages.length > 0 ? "extract" : "no_mail"),
+      { extract: "extract_postings", no_mail: END },
+    )
+    .node("extract_postings", async (s, signal) => {
+      const mail = s.mail as FetchPayload;
+      const r = await model.extractPostings(
+        { messages: mail.messages },
+        s.loops.extract.turns,
+        signal,
+      );
+      return {
+        extracted: r.value,
+        suspicious: r.suspicious,
+        usage: { extract_postings: r.usage },
+        ...(r.warnings?.length ? { warnings: r.warnings } : {}),
+      };
+    })
+    .repairLoop("extract", {
+      generate: "extract_postings",
+      check: "validate",
+      next: END,
+      output: (s) => s.extracted,
+      run: (s) => {
+        const { valid, problems, dropped } = steps.validatePostings(s.extracted);
+        return { problems, update: { postings: valid, dropped } };
+      },
+    })
+    .compile();
+}
+
+/** Everything after the sources: merge, gate, judge, rank, report, deliver. */
+export function buildCollectWorkflow(
   steps: DeterministicSteps,
   model: ModelSteps,
   effects: Effects,
@@ -39,7 +95,7 @@ export function buildWorkflow(
     new WorkflowBuilder(options)
       .node("load_config", async (_s, signal) => ({ config: await steps.loadConfig(signal) }))
       .edge(START, "load_config")
-      .edge("load_config", "fetch_mail")
+      .edge("load_config", "intake")
       .edge("load_config", "load_resumes")
 
       // Resume branch.
@@ -48,36 +104,11 @@ export function buildWorkflow(
         return { resumes: set, warnings: set.warnings };
       })
 
-      // Mail branch.
-      .node("fetch_mail", async (s, signal) => ({ mail: await steps.fetchMail(config(s), signal) }))
-      .branch(
-        "fetch_mail",
-        (s) => (isPayload(s.mail) && s.mail.messages.length > 0 ? "extract" : "no_mail"),
-        { extract: "extract_postings", no_mail: "short_no_mail" },
-      )
-      .node("extract_postings", async (s, signal) => {
-        const mail = s.mail as FetchPayload;
-        const r = await model.extractPostings(
-          { messages: mail.messages },
-          s.loops.extract.turns,
-          signal,
-        );
-        return {
-          extracted: r.value,
-          suspicious: r.suspicious,
-          usage: { extract_postings: r.usage },
-          ...(r.warnings?.length ? { warnings: r.warnings } : {}),
-        };
-      })
-      .repairLoop("extract", {
-        generate: "extract_postings",
-        check: "validate",
-        next: "dedupe",
-        output: (s) => s.extracted,
-        run: (s) => {
-          const { valid, problems, dropped } = steps.validatePostings(s.extracted);
-          return { problems, update: { postings: valid, dropped } };
-        },
+      // The postings branch: what the sources handed over (#171).
+      .node("intake", () => ({}))
+      .branch("intake", (s) => (hasInput(s) ? "continue" : "no_mail"), {
+        continue: "dedupe",
+        no_mail: "short_no_mail",
       })
       .node("dedupe", async (s) => {
         const { fresh, repeats, duplicates } = await steps.dedupe(s.postings, config(s));
@@ -106,7 +137,7 @@ export function buildWorkflow(
         continue: "await_resumes",
         nothing_left: "short_nothing_left",
       })
-      // The mail branch's last stop before the join.
+      // The postings branch's last stop before the join.
       .node("await_resumes", () => ({}))
 
       // Both branches meet here.
