@@ -3,8 +3,8 @@ import "../telemetry.js";
 import { app, type InvocationContext } from "@azure/functions";
 import { DefaultAzureCredential, type TokenCredential } from "@azure/identity";
 import { z } from "zod";
-import { composePipeline, type Pipeline } from "../lib/run/compose.js";
 import { runCollect } from "../lib/run/collect.js";
+import { composePipeline, type Pipeline } from "../lib/run/compose.js";
 import type { HandoffMessage } from "../lib/run/handoff.js";
 import { loadSecrets, secretClientFromEnv } from "../lib/run/secrets.js";
 

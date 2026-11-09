@@ -129,7 +129,11 @@ describe("collect", () => {
     const f = fakes();
     await runIngest({ ...f, throttledMs: () => 10, rateLimited: () => 1 }, quiet);
     const message = f.handoffMessages[0] as HandoffMessage;
-    const result = await runCollect({ ...f, throttledMs: () => 5, rateLimited: () => 2 }, message, quiet);
+    const result = await runCollect(
+      { ...f, throttledMs: () => 5, rateLimited: () => 2 },
+      message,
+      quiet,
+    );
     expect(result).toMatchObject({ summary: { throttledMs: 15, rateLimited: 3 } });
   });
 });
@@ -140,7 +144,10 @@ describe("ingest", () => {
     await runIngest(f, quiet);
     expect(f.handoffMessages).toHaveLength(1);
     const message = f.handoffMessages[0] as HandoffMessage;
-    expect(message).toMatchObject({ source: "mail", day: expect.stringMatching(/^\d{4}-\d\d-\d\d$/) });
+    expect(message).toMatchObject({
+      source: "mail",
+      day: expect.stringMatching(/^\d{4}-\d\d-\d\d$/),
+    });
     expect(f.postingBlobs.has(message.blob)).toBe(true);
     const file = await f.handoffs.read(message.blob);
     expect(file.postings).toHaveLength(1);

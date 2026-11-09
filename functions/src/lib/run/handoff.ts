@@ -108,7 +108,9 @@ export function handoffStore(container: Container): HandoffStore {
       return names.sort().at(-1) ?? null;
     },
     async claim(day, files) {
-      const key = createHash("sha256").update([...files].sort().join("\n")).digest("hex");
+      const key = createHash("sha256")
+        .update([...files].sort().join("\n"))
+        .digest("hex");
       try {
         await container
           .getBlockBlobClient(`${day}/collected/${key.slice(0, 16)}`)

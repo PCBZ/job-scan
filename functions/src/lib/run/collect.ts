@@ -26,7 +26,7 @@ import {
   type SourceHandoff,
   seedFrom,
 } from "./handoff.js";
-import { type RunLog, RUN_TIMEOUT_MS } from "./ingest.js";
+import { RUN_TIMEOUT_MS, type RunLog } from "./ingest.js";
 import { loopRecord, runRecords } from "./records.js";
 
 export interface RunSummary {
