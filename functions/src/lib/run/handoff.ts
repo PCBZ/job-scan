@@ -1,4 +1,4 @@
-// What a source hands to `collect` (#171): its postings and everything the run
+// What a source hands to `collect`: its postings and everything the run
 // learned getting them. The mail source's graph ends with this; collect's graph
 // starts from it, merged over the sources that have one.
 

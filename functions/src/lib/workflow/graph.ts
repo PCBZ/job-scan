@@ -1,4 +1,4 @@
-// The daily run as two LangGraph state graphs (plan §3, #55, #171): a source
+// The daily run as two LangGraph state graphs (plan §3, #55): a source
 // graph for each source, then `collect`, joined by what a source hands over
 // (run/handoff.ts).
 //
@@ -104,7 +104,7 @@ export function buildCollectWorkflow(
         return { resumes: set, warnings: set.warnings };
       })
 
-      // The postings branch: what the sources handed over (#171).
+      // The postings branch: what the sources handed over.
       .node("intake", () => ({}))
       .branch("intake", (s) => (hasInput(s) ? "continue" : "no_mail"), {
         continue: "dedupe",

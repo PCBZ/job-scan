@@ -77,12 +77,12 @@ export async function runDaily(
     { onNode },
   );
   try {
-    // One span over both graphs; the nodes' spans nest under it (#101).
+    // One span over both graphs; the nodes' spans nest under it.
     // Its trace id finds the run's telemetry for the evaluation report (#128).
     let traceId = "";
     const state = await inSpan("daily run", {}, async (span) => {
       traceId = span.spanContext().traceId;
-      // The two graphs of #171 in one invocation, for now: the mail source's,
+      // The two graphs in one invocation, for now: the mail source's,
       // then collect's over what it hands over. The run's own counters carry
       // the measurements the handoff would otherwise bring.
       const mail = await mailWorkflow.invoke({}, { signal });
