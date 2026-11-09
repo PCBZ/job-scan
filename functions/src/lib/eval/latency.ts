@@ -33,7 +33,10 @@ type Logs = Pick<LogsQueryClient, "queryWorkspace">;
 /** Trace ids are 32 hex digits, checked before they go into a query. */
 const TRACE_ID = /^[0-9a-f]{32}$/;
 
-/** The run's spans, with each model call's node; its run span tells whether it's in yet. */
+/**
+ * The run's spans, with each model call's node. Its collect span, the last the run
+ * ends (#171), tells whether the trace is in yet.
+ */
 const spans = (traceId: string) => `
 let deps = AppDependencies | where OperationId == "${traceId}";
 let nodes = deps | where Name startswith "node " | project NodeId = Id, Node = substring(Name, 5);
@@ -65,7 +68,7 @@ export function latencyFromLogs(logs: Logs, workspaceId: string): LatencySource 
 
     const [total] = await query(`${spans(traceId)}
 calls | summarize ${TIMES}, failed = countif(Success == false)
-| extend runs = toscalar(deps | where Name == "daily run" | count)`);
+| extend runs = toscalar(deps | where Name == "collect run" | count)`);
     if (!total || num(total.runs) === 0) return null;
     if (expectCalls && num(total.calls) === 0) return null;
     const byNode = await query(`${spans(traceId)}

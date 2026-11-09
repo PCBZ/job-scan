@@ -41,7 +41,7 @@ export function productionDeps(env: Env, credential: TokenCredential): EvalRepor
 }
 
 /**
- * Each run's evaluation email (#127, #129), from the message the daily run
+ * Each run's evaluation email (#127, #129), from the message the collect run
  * queued (#128). The queue retries a failure, five times in all (host.json),
  * then moves the message to eval-reports-poison. Dependencies and the
  * credential are parameters, so a test can pass its own.
