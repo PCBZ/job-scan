@@ -3,11 +3,11 @@ import "../telemetry.js";
 import { app, type InvocationContext, type Timer } from "@azure/functions";
 import { DefaultAzureCredential } from "@azure/identity";
 import { composePipeline } from "../lib/run/compose.js";
-import { runDaily } from "../lib/run/daily.js";
+import { runIngest } from "../lib/run/ingest.js";
 import { loadSecrets, secretClientFromEnv } from "../lib/run/secrets.js";
 
 // The morning run (#22): secrets from Key Vault, every dependency from app
-// settings, then the workflow. The app's user-assigned identity (AZURE_CLIENT_ID)
+// settings, then the mail source's workflow, which hands its postings to collect (#171). The app's user-assigned identity (AZURE_CLIENT_ID)
 // signs every Azure call.
 export async function daily(timer: Timer, context: InvocationContext): Promise<void> {
   context.log(`daily: triggered (past due: ${timer.isPastDue})`);
@@ -17,7 +17,7 @@ export async function daily(timer: Timer, context: InvocationContext): Promise<v
     secretClientFromEnv(process.env, credential),
   );
   if (missing.length) context.warn(`daily: not in Key Vault, so unset: ${missing.join(", ")}`);
-  await runDaily(composePipeline(env, credential), context);
+  await runIngest(composePipeline(env, credential), context);
 }
 
 app.timer("daily", {

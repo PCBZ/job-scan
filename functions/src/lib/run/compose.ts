@@ -6,6 +6,8 @@
 //   REPORTS_URL         the private reports container (#19)
 //   RUN_RECORDS_URL     the private run-records container (#97)
 //   EVAL_QUEUE_URL      the eval-reports queue, for the evaluation report (#128)
+//   POSTINGS_URL        the private postings container, what a source hands to collect (#171)
+//   POSTINGS_QUEUE_URL  the postings-ready queue, one message per finished source (#171)
 //   APP_VERSION         the deployed release, for the run records; "local" if unset
 //   TABLES_URL          seenmessages, seenjobs
 //   GITHUB_RESUME_PAT   read access to the resume repo (#11, from Key Vault via #47)
@@ -48,6 +50,12 @@ import { blobTextStore } from "../resume/store.js";
 import type { DeterministicSteps, Effects, ModelSteps } from "../workflow/types.js";
 import { productionEffects } from "./effects.js";
 import { type EvalQueue, evalQueueFromUrl } from "./eval-queue.js";
+import {
+  type HandoffQueue,
+  type HandoffStore,
+  handoffQueueFromUrl,
+  handoffStoreFromUrl,
+} from "./handoff.js";
 import { type RunRecordStore, runRecordStoreFromUrl } from "./records.js";
 
 type Env = Record<string, string | undefined>;
@@ -59,6 +67,8 @@ const REQUIRED = [
   "REPORTS_URL",
   "RUN_RECORDS_URL",
   "EVAL_QUEUE_URL",
+  "POSTINGS_URL",
+  "POSTINGS_QUEUE_URL",
   "TABLES_URL",
   "GITHUB_RESUME_PAT",
 ] as const;
@@ -86,6 +96,9 @@ export interface Pipeline {
   records: RunRecordStore;
   /** Where the run's evaluation report is queued (#128). */
   evalQueue: EvalQueue;
+  /** Where a source's postings are kept for collect, and the queue that wakes it (#171). */
+  handoffs: HandoffStore;
+  handoffQueue: HandoffQueue;
   /** The deployed release, for the run records. */
   version: string;
   /** Who serves each model node, with which model, for the run records (#148). */
@@ -177,6 +190,8 @@ export function composePipeline(
     ...(judgements ? { judgementCache: () => judgements.stats() } : {}),
     records: runRecordStoreFromUrl(setting("RUN_RECORDS_URL"), credential),
     evalQueue: evalQueueFromUrl(setting("EVAL_QUEUE_URL"), credential),
+    handoffs: handoffStoreFromUrl(setting("POSTINGS_URL"), credential),
+    handoffQueue: handoffQueueFromUrl(setting("POSTINGS_QUEUE_URL"), credential),
     version: env.APP_VERSION?.trim() || "local",
     models: {
       ...nodeModels(env),

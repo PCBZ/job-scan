@@ -8,6 +8,8 @@ const ENV = {
   REPORTS_URL: "https://acct.blob.core.windows.net/reports",
   RUN_RECORDS_URL: "https://acct.blob.core.windows.net/run-records",
   EVAL_QUEUE_URL: "https://acct.queue.core.windows.net/eval-reports",
+  POSTINGS_URL: "https://acct.blob.core.windows.net/postings",
+  POSTINGS_QUEUE_URL: "https://acct.queue.core.windows.net/postings-ready",
   TABLES_URL: "https://acct.table.core.windows.net/",
   GITHUB_RESUME_PAT: "test-pat",
   MODEL_PROVIDER: "azure-openai",
