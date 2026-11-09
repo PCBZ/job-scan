@@ -63,8 +63,9 @@ describe("seedFrom", () => {
     const mail = { messages: [] } as never;
     const seed = seedFrom([b, { ...a, mail, extract_loop: { ...NO_LOOP, problems: ["p"] } }]);
     expect(seed.mail).toBe(mail);
-    expect((seed.loops as { extract?: { problems: string[] } } | undefined)?.extract?.problems).toEqual(["p"]);
+    expect(
+      (seed.loops as { extract?: { problems: string[] } } | undefined)?.extract?.problems,
+    ).toEqual(["p"]);
     expect(seedFrom([b]).loops).toBeUndefined();
   });
 });
-
