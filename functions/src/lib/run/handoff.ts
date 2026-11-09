@@ -117,7 +117,9 @@ export function handoffStore(container: Container): HandoffStore {
           .upload("", 0, { conditions: { ifNoneMatch: "*" } });
         return true;
       } catch (err) {
-        if (err instanceof RestError && err.statusCode === 409) return false;
+        // An existing marker answers 409 (BlobAlreadyExists) or 412 (ConditionNotMet).
+        if (err instanceof RestError && (err.statusCode === 409 || err.statusCode === 412))
+          return false;
         throw err;
       }
     },
