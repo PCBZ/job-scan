@@ -4,13 +4,15 @@
 // records are written for offline evaluation (#97); a failed write is logged,
 // not a failed run, since the report is already out.
 
+import { runDay } from "../day.js";
 import type { Source } from "../postings/types.js";
 import { inSpan } from "../telemetry/tracing.js";
-import { buildWorkflow, type State } from "../workflow/graph.js";
+import { buildCollectWorkflow, buildMailWorkflow, type State } from "../workflow/graph.js";
 import type { Loop } from "../workflow/state.js";
 import type { NodeEvent } from "../workflow/types.js";
 import type { Pipeline } from "./compose.js";
 import { EVALUATION_DELAY_MINUTES } from "./eval-queue.js";
+import { handoffFrom, seedFrom } from "./handoff.js";
 import { loopRecord, runRecords } from "./records.js";
 
 /** Under host.json's functionTimeout of 30 minutes, so the run stops cleanly first. */
@@ -65,19 +67,35 @@ export async function runDaily(
       `node ${e.node} ${e.ok ? "ok" : "failed"} ${Math.round(e.ms)}ms${e.usage ? ` tokens ${e.usage.input}/${e.usage.output}${e.usage.cached !== undefined ? ` cached ${e.usage.cached}` : ""}` : ""}`,
     );
   };
-  const workflow = buildWorkflow(
+  const mailWorkflow = buildMailWorkflow(pipeline.deterministicSteps, pipeline.modelSteps, {
+    onNode,
+  });
+  const collectWorkflow = buildCollectWorkflow(
     pipeline.deterministicSteps,
     pipeline.modelSteps,
     pipeline.effects,
     { onNode },
   );
   try {
-    // One span over the whole graph; the nodes' spans nest under it (#101).
+    // One span over both graphs; the nodes' spans nest under it.
     // Its trace id finds the run's telemetry for the evaluation report (#128).
     let traceId = "";
-    const state = await inSpan("daily run", {}, (span) => {
+    const state = await inSpan("daily run", {}, async (span) => {
       traceId = span.spanContext().traceId;
-      return workflow.invoke({}, { signal });
+      // The two graphs in one invocation, for now: the mail source's,
+      // then collect's over what it hands over. The run's own counters carry
+      // the measurements the handoff would otherwise bring.
+      const mail = await mailWorkflow.invoke({}, { signal });
+      const handoff = handoffFrom(mail, {
+        source: "mail",
+        day: runDay(startedAt),
+        started_at: startedAt.toISOString(),
+        trace: null,
+        node_ms: {},
+        throttled_ms: 0,
+        rate_limited: 0,
+      });
+      return collectWorkflow.invoke(seedFrom([handoff]), { signal });
     });
     const summary: RunSummary = {
       outcome: state.outcome,

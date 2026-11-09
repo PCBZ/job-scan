@@ -1,14 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { buildWorkflow } from "../../src/lib/workflow/graph.js";
+import { handoffFrom, seedFrom } from "../../src/lib/run/handoff.js";
+import { buildCollectWorkflow, buildMailWorkflow } from "../../src/lib/workflow/graph.js";
 import type { NodeEvent } from "../../src/lib/workflow/types.js";
 import { judgement } from "../judge/helpers.js";
 import { posting } from "../postings/helpers.js";
 import { fakes } from "./fakes.js";
 
-function run(f: ReturnType<typeof fakes>, options = {}, signal?: AbortSignal) {
-  return buildWorkflow(f.deterministicSteps, f.modelSteps, f.effects, options).invoke(
+/** The mail source's graph, then collect over what it handed over: one day's run. */
+async function run(f: ReturnType<typeof fakes>, options = {}, signal?: AbortSignal) {
+  const config = signal ? { signal } : {};
+  const mail = await buildMailWorkflow(f.deterministicSteps, f.modelSteps, options).invoke(
     {},
-    signal ? { signal } : {},
+    config,
+  );
+  const handoff = handoffFrom(mail, {
+    source: "mail",
+    day: "2026-10-13",
+    started_at: "2026-10-13T15:00:00.000Z",
+    trace: null,
+    node_ms: {},
+    throttled_ms: 0,
+    rate_limited: 0,
+  });
+  return buildCollectWorkflow(f.deterministicSteps, f.modelSteps, f.effects, options).invoke(
+    seedFrom([handoff]),
+    config,
   );
 }
 
