@@ -4,8 +4,8 @@ import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { modelClientFromEnv } from "../../src/lib/model/config.js";
-import { runDaily } from "../../src/lib/run/daily.js";
 import { instrumentOpenAI } from "../../src/lib/telemetry/instrument.js";
+import { runDay } from "../run/helpers.js";
 import { fakes } from "../workflow/fakes.js";
 
 // A real provider over an in-memory exporter: the spans the app would export.
@@ -62,12 +62,17 @@ const spans = () => exporter.getFinishedSpans();
 const named = (name: string) => spans().find((s) => s.name === name);
 
 describe("tracing", () => {
-  it("nests every node's span under the run's, with the node's tokens", async () => {
-    await runDaily(fakes(), quiet);
-    const run = named("daily run");
+  it("nests every node's span under its stage's, in one trace, with the node's tokens", async () => {
+    await runDay(fakes(), quiet);
+    const source = named("daily run");
+    const collect = named("collect run");
     const judge = named("node judge");
-    expect(run).toBeDefined();
-    expect(judge?.parentSpanContext?.spanId).toBe(run?.spanContext().spanId);
+    expect(source).toBeDefined();
+    expect(collect).toBeDefined();
+    // collect continues the source's trace: one trace per day's run.
+    expect(collect?.spanContext().traceId).toBe(source?.spanContext().traceId);
+    expect(collect?.parentSpanContext?.spanId).toBe(source?.spanContext().spanId);
+    expect(judge?.parentSpanContext?.spanId).toBe(collect?.spanContext().spanId);
     expect(judge?.attributes).toMatchObject({
       "job_scan.node": "judge",
       "gen_ai.usage.input_tokens": 10,
@@ -75,25 +80,27 @@ describe("tracing", () => {
     });
     const nodes = spans().filter((s) => s.name.startsWith("node "));
     expect(nodes.map((s) => s.name)).toContain("node mark_seen");
-    expect(nodes.every((s) => s.parentSpanContext?.spanId === run?.spanContext().spanId)).toBe(
-      true,
+    expect(named("node extract_postings")?.parentSpanContext?.spanId).toBe(
+      source?.spanContext().spanId,
     );
+    expect(named("node mark_seen")?.parentSpanContext?.spanId).toBe(collect?.spanContext().spanId);
   });
 
   it("names the run's trace in its evaluation report message (#128)", async () => {
     const sent: { traceId: string }[] = [];
-    await runDaily({ ...fakes(), evalQueue: { send: async (m) => void sent.push(m) } }, quiet);
+    await runDay({ ...fakes(), evalQueue: { send: async (m) => void sent.push(m) } }, quiet);
     expect(sent[0]?.traceId).toBe(named("daily run")?.spanContext().traceId);
     expect(sent[0]?.traceId).toMatch(/^[0-9a-f]{32}$/);
   });
 
   it("marks a failed node and the run as errors", async () => {
-    await expect(runDaily(fakes({ deliverFails: true }), quiet)).rejects.toThrow("smtp down");
+    await expect(runDay(fakes({ deliverFails: true }), quiet)).rejects.toThrow("smtp down");
     expect(named("node deliver")?.status).toMatchObject({
       code: SpanStatusCode.ERROR,
       message: "smtp down",
     });
-    expect(named("daily run")?.status.code).toBe(SpanStatusCode.ERROR);
+    expect(named("collect run")?.status.code).toBe(SpanStatusCode.ERROR);
+    expect(named("daily run")?.status.code).not.toBe(SpanStatusCode.ERROR);
   });
 
   it("nests each model call under its node, with tokens but never the prompt or answer", async () => {
@@ -108,7 +115,7 @@ describe("tracing", () => {
       });
       return judge(...args);
     };
-    await runDaily(f, quiet);
+    await runDay(f, quiet);
     const call = named("OpenAI Chat Completions");
     expect(call?.parentSpanContext?.spanId).toBe(named("node judge")?.spanContext().spanId);
     expect(call?.attributes).toMatchObject({
@@ -132,7 +139,7 @@ describe("tracing", () => {
       await model(busy).structured({ name: "x", system: "s", user: "u", schema: z.object({}) });
       throw new Error("unreachable");
     };
-    await expect(runDaily(f, quiet)).rejects.toMatchObject({ code: "model_provider" });
+    await expect(runDay(f, quiet)).rejects.toMatchObject({ code: "model_provider" });
     expect(named("node judge")?.status).toMatchObject({ code: SpanStatusCode.ERROR });
     expect(named("node judge")?.status.message).toContain("503");
     expect(spans().filter((s) => s.name === "OpenAI Chat Completions")).toEqual([]);

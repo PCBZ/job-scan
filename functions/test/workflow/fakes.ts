@@ -3,6 +3,7 @@ import type { Judgement } from "../../src/lib/judge/verify.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
 import type { ResumeSet } from "../../src/lib/resume/load.js";
 import type { EvalQueue } from "../../src/lib/run/eval-queue.js";
+import { type HandoffMessage, type HandoffQueue, handoffStore } from "../../src/lib/run/handoff.js";
 import type { RunRecordStore } from "../../src/lib/run/records.js";
 import type {
   DeterministicSteps,
@@ -13,6 +14,7 @@ import type {
 } from "../../src/lib/workflow/types.js";
 import { judgement, rankedOf } from "../judge/helpers.js";
 import { posting } from "../postings/helpers.js";
+import { fakePostingsContainer } from "../run/fake-postings.js";
 
 export const CONFIG = { mail: {}, resume: {}, profile: {}, report: {} } as unknown as AppConfig;
 
@@ -228,6 +230,13 @@ export function fakes(o: FakeOptions = {}) {
   const records: RunRecordStore = { write: async () => "fake.jsonl" };
   /** Nor do evaluation reports (#128). */
   const evalQueue: EvalQueue = { send: async () => {} };
+  /** A source's handoff goes through the shipping store and queue, over faked SDK clients. */
+  const postings = fakePostingsContainer();
+  const handoffs = handoffStore(postings.container);
+  const handoffMessages: HandoffMessage[] = [];
+  const handoffQueue: HandoffQueue = {
+    send: async (message) => void handoffMessages.push(message),
+  };
 
   return {
     deterministicSteps,
@@ -235,6 +244,10 @@ export function fakes(o: FakeOptions = {}) {
     effects,
     records,
     evalQueue,
+    handoffs,
+    handoffQueue,
+    handoffMessages,
+    postingBlobs: postings.blobs,
     version: "test",
     models: {
       extract_postings: { provider: "azure-openai", model: "nano-test" },
