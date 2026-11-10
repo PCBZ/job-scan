@@ -10,6 +10,8 @@ from __future__ import annotations
 import hashlib
 import re
 
+from bs4 import BeautifulSoup
+
 # jobspy's site names to the pipeline's source labels.
 SOURCES = {
     "linkedin": "linkedin",
@@ -26,8 +28,9 @@ MAX_LINE_CHARS = 300
 MIN_LINE_CHARS = 4
 
 _BULLET = re.compile(r"^\s*(?:[-*•·▪◦]|\d+[.)])\s+")
-_MARKUP = re.compile(r"[*_`#>]+")
-_ESCAPE = re.compile(r"\\([^\w\s])")
+# Tags that end a line of text. jobspy's own "plain" format folds the whole
+# description into one line, which would leave nothing to split.
+_BLOCKS = ["p", "li", "div", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "table"]
 
 _CURRENCY = {"USD": "$", "CAD": "CA$", "GBP": "£", "EUR": "€"}
 _PER = {
@@ -79,12 +82,26 @@ def workplace_of(row: dict) -> str:
     return "remote" if row.get("is_remote") is True else "unknown"
 
 
+def lines_of(description: str) -> list[str]:
+    """The description as lines of plain text: one per block, no markup."""
+    soup = BeautifulSoup(description, "html.parser")
+    for br in soup.find_all("br"):
+        br.replace_with("\n")
+    for tag in soup.find_all(_BLOCKS):
+        tag.insert_before("\n")
+        tag.insert_after("\n")
+    return soup.get_text().splitlines()
+
+
 def requirements_from(description: str) -> list[str]:
-    """The description's lines, without markdown, capped; empty if there is none."""
+    """The description's lines, capped; empty if there is none.
+
+    `description` is jobspy's HTML (description_format="html"); text that is
+    already plain passes through, one line per line.
+    """
     lines: list[str] = []
-    for raw in description.splitlines():
-        line = _ESCAPE.sub(r"\1", _BULLET.sub("", raw))
-        line = " ".join(_MARKUP.sub("", line).split())
+    for raw in lines_of(description):
+        line = " ".join(_BULLET.sub("", raw).split())
         if len(line) < MIN_LINE_CHARS:
             continue
         lines.append(line[:MAX_LINE_CHARS])

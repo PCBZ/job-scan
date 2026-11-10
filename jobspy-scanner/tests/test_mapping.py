@@ -31,16 +31,25 @@ def test_workplace_from_the_board_then_the_remote_flag():
     assert workplace_of(INDEED) == "unknown"
 
 
-def test_requirements_are_the_descriptions_lines_without_markup():
+def test_requirements_are_the_descriptions_lines_as_plain_text():
     assert requirements_from(DESCRIPTION) == [
         "About the role",
         "We build payment systems.",
         "Requirements",
         "3+ years of Python",
-        "Experience with - Kubernetes",
-        "Comfortable with SQL",
+        "Experience with Kubernetes & SQL",
+        "Comfortable with",
+        "on-call",
     ]
     assert requirements_from("") == []
+
+
+def test_text_that_is_already_plain_keeps_its_lines():
+    assert requirements_from("- Python\n- Go and Rust\n\n1) SQL basics\n- C") == [
+        "Python",
+        "Go and Rust",
+        "SQL basics",
+    ]
 
 
 def test_requirements_are_capped():

@@ -26,7 +26,7 @@ runs one language. Plan: the wiki's Jobspy Plan.
    real config only once the Node side knows it (a later step). Until then the scan
    runs on the defaults.
 2. Maps each row to a posting in code. There is no model call. A posting's
-   `requirements` are the description's own lines (markdown stripped, at most 40, each
+   `requirements` are the description's own lines (HTML turned into plain text, one line per block, at most 40, each
    at most 300 characters), since the judge reads requirements and nothing else of the
    description.
 3. Writes `<day>/jobspy/<started-at>-<random>.json` to the `postings` container and

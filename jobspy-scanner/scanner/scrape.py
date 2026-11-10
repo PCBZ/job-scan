@@ -59,7 +59,7 @@ def _one(scrape: Scrape, config: ScanConfig, title: str, place: str) -> list[dic
         hours_old=config.hours_old,
         country_indeed=config.country_indeed,
         linkedin_fetch_description=config.fetch_descriptions,
-        description_format="markdown",
+        description_format="html",
         verbose=0,
     )
     return frame.to_dict("records")  # type: ignore[attr-defined]

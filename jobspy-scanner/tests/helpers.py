@@ -13,17 +13,9 @@ target_titles = ["Software Engineer"]
 locations = ["Boston, MA"]
 """
 
-DESCRIPTION = """**About the role**
-
-We build payment systems.
-
-**Requirements**
-- 3+ years of Python
-- Experience with \\- Kubernetes
-* Comfortable with SQL
-
-ok
-"""
+DESCRIPTION = """<div><p><b>About the role</b></p><p>We build payment systems.</p>
+<h3>Requirements</h3><ul><li>3+ years of Python</li><li>Experience with Kubernetes &amp; SQL</li>
+<li><span>Comfortable</span> with<br>on-call</li></ul><p>ok</p></div>"""
 
 
 def frame(*rows: dict) -> pd.DataFrame:

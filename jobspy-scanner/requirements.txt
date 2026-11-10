@@ -2,4 +2,5 @@ azure-functions==1.26.0
 azure-identity==1.27.0
 azure-storage-blob==12.31.1
 azure-storage-queue==12.18.1
+beautifulsoup4==4.15.0
 python-jobspy==1.4.1
