@@ -33,7 +33,7 @@ def test_each_search_is_passed_the_configs_options():
     out = run_searches(CONFIG, scrape)
     assert len(calls) == 4 and len(out.rows) == 4 and out.warnings == []
     boston = next(c for c in calls if c["location"] == "Boston, MA")
-    assert boston["is_remote"] is False and boston["site_name"] == list(CONFIG.sites)
+    assert boston["is_remote"] is False and boston["site_name"] == [s.value for s in CONFIG.sites]
     assert boston["results_wanted"] == 15 and boston["hours_old"] == 48
     assert boston["linkedin_fetch_description"] is True
     remote = next(c for c in calls if c["location"] == "USA")

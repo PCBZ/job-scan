@@ -54,7 +54,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           # A version Azure Functions runs; the skill's floor above is not one.
-          python-version: "3.12"
+          python-version: "3.13"
           cache: pip
           cache-dependency-path: jobspy-scanner/requirements-dev.txt
 

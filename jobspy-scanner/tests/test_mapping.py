@@ -19,14 +19,14 @@ def test_missing_cells_are_empty_text():
 
 
 def test_salary_reads_like_an_alert_would():
-    assert salary_text(INDEED) == "$120,000 - $150,000 a year"
-    assert salary_text(ZIP_HOURLY) == "CA$55 an hour"
-    assert salary_text({"min_amount": 90000.0, "interval": "yearly"}) == "$90,000 a year"
+    assert salary_text(INDEED) == "USD 120,000 - 150,000 a year"
+    assert salary_text(ZIP_HOURLY) == "CAD 55 an hour"
+    assert salary_text({"min_amount": 90000.0, "interval": "yearly"}) == "USD 90,000 a year"
     assert salary_text({"min_amount": float("nan"), "max_amount": None}) == ""
 
 
-def test_workplace_from_the_board_then_the_remote_flag():
-    assert workplace_of(ZIP_HOURLY) == "hybrid"
+def test_workplace_is_remote_only_when_jobspy_says_so():
+    assert workplace_of(ZIP_HOURLY) == "unknown"
     assert workplace_of(LINKEDIN) == "remote"
     assert workplace_of(INDEED) == "unknown"
 
@@ -77,9 +77,9 @@ def test_the_same_link_has_the_same_id_and_zip_recruiter_is_one_word():
     a, b = posting_from(INDEED, 0), posting_from(INDEED, 9)
     assert a and b and a["message_id"] == b["message_id"]
     z = posting_from(ZIP_HOURLY, 0)
-    assert z and z["source"] == "ziprecruiter" and z["posted"] == ""
+    assert z and z["source"] == "zip_recruiter" and z["posted"] == ""
 
 
 def test_a_row_without_a_title_company_link_or_known_site_is_not_a_posting():
-    for gap in ({"title": ""}, {"company": None}, {"job_url": ""}, {"site": "bayt"}):
+    for gap in ({"title": ""}, {"company": None}, {"job_url": ""}, {"site": "monster"}):
         assert posting_from({**INDEED, **gap}, 0) is None

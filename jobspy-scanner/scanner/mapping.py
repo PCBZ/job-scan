@@ -11,15 +11,7 @@ import hashlib
 import re
 
 from bs4 import BeautifulSoup
-
-# jobspy's site names to the pipeline's source labels.
-SOURCES = {
-    "linkedin": "linkedin",
-    "indeed": "indeed",
-    "glassdoor": "glassdoor",
-    "zip_recruiter": "ziprecruiter",
-    "google": "google",
-}
+from jobspy.model import Site
 
 # What the judge reads in place of an extracted requirements list: the
 # description's own lines, capped so one long posting can't dominate its input.
@@ -27,12 +19,14 @@ MAX_REQUIREMENT_LINES = 40
 MAX_LINE_CHARS = 300
 MIN_LINE_CHARS = 4
 
+# jobspy's own site names; a posting's source is the site it came from.
+SITES = {site.value for site in Site}
+
 _BULLET = re.compile(r"^\s*(?:[-*•·▪◦]|\d+[.)])\s+")
 # Tags that end a line of text. jobspy's own "plain" format folds the whole
 # description into one line, which would leave nothing to split.
 _BLOCKS = ["p", "li", "div", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "table"]
 
-_CURRENCY = {"USD": "$", "CAD": "CA$", "GBP": "£", "EUR": "€"}
 _PER = {
     "yearly": "a year",
     "monthly": "a month",
@@ -63,22 +57,20 @@ def _money(value: float) -> str:
 
 
 def salary_text(row: dict) -> str:
+    """`USD 120,000 - 150,000 a year`: the currency's code, so any currency reads the same."""
     low, high = _amount(row.get("min_amount")), _amount(row.get("max_amount"))
     if low is None and high is None:
         return ""
-    currency = text(row.get("currency")).upper() or "USD"
-    sign = _CURRENCY.get(currency, f"{currency} ")
-    per = _PER.get(text(row.get("interval")).lower(), "")
     low = low if low is not None else high
     high = high if high is not None else low
-    amount = f"{sign}{_money(low)}" if low == high else f"{sign}{_money(low)} - {sign}{_money(high)}"
-    return f"{amount} {per}".strip()
+    amount = _money(low) if low == high else f"{_money(low)} - {_money(high)}"
+    currency = text(row.get("currency")).upper() or "USD"
+    per = _PER.get(text(row.get("interval")).lower(), "")
+    return f"{currency} {amount} {per}".strip()
 
 
 def workplace_of(row: dict) -> str:
-    kind = text(row.get("work_from_home_type")).lower()
-    if kind in ("remote", "hybrid", "onsite"):
-        return kind
+    # jobspy says only whether a posting is remote; hybrid and onsite aren't in its rows.
     return "remote" if row.get("is_remote") is True else "unknown"
 
 
@@ -114,7 +106,7 @@ def posting_from(row: dict, index: int) -> dict | None:
     """The posting for one row, or None when it lacks a title, company or link."""
     title, company, url = text(row.get("title")), text(row.get("company")), text(row.get("job_url"))
     site = text(row.get("site")).lower()
-    if not (title and company and url and site in SOURCES):
+    if not (title and company and url and site in SITES):
         return None
     posted = row.get("date_posted")
     return {
@@ -128,7 +120,7 @@ def posting_from(row: dict, index: int) -> dict | None:
         "skills": [],
         "link": None,
         "url": url,
-        "source": SOURCES[site],
+        "source": site,
         "account": "jobspy",
         "message_id": hashlib.sha256(f"{site}|{url}".encode()).hexdigest()[:16],
         "message_subject": f"jobspy {site}",

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scanner.config import ConfigError, parse_config
+from scanner.config import parse_config
 from scanner.handoff import iso, message_for, run_day
 from scanner.run import postings_from, run_scan, scan
 
@@ -75,10 +75,10 @@ def test_a_config_that_turns_it_off_hands_over_nothing():
 
 def test_a_failed_scan_still_hands_over_so_collect_does_not_wait_the_deadline():
     run, container, queue = go(config='target_titles = ["A"]')
-    with pytest.raises(ConfigError):
+    with pytest.raises(ValueError):
         run()
     handoff = json.loads(next(iter(container.blobs.values())))
-    assert handoff["postings"] == [] and handoff["warnings"] == ["jobspy: scan failed: ConfigError"]
+    assert handoff["postings"] == [] and handoff["warnings"] == ["jobspy: scan failed: ValidationError"]
     assert len(queue.sent) == 1
 
 

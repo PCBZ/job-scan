@@ -13,7 +13,8 @@ import secrets
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from azure.storage.blob import ContentSettings
+from azure.storage.blob import ContainerClient, ContentSettings
+from azure.storage.queue import QueueClient
 
 SOURCE = "jobspy"
 RUN_TIME_ZONE = "America/Vancouver"
@@ -23,8 +24,7 @@ WRITE_TIMEOUT_SECONDS = 60
 
 def iso(moment: datetime) -> str:
     """The instant as JavaScript's toISOString writes it: milliseconds, Z."""
-    utc = moment.astimezone(timezone.utc)
-    return utc.strftime("%Y-%m-%dT%H:%M:%S.") + f"{utc.microsecond // 1000:03d}Z"
+    return moment.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def run_day(moment: datetime) -> str:
@@ -65,7 +65,7 @@ def blob_name(handoff: dict) -> str:
     return f"{handoff['day']}/{handoff['source']}/{handoff['started_at']}-{secrets.token_hex(4)}.json"
 
 
-def write_handoff(container, handoff: dict) -> str:
+def write_handoff(container: ContainerClient, handoff: dict) -> str:
     """Upload the file to the postings container; returns the blob's name."""
     name = blob_name(handoff)
     body = json.dumps(handoff, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -88,7 +88,7 @@ def message_for(handoff: dict, blob: str, first_seen: datetime) -> dict:
     }
 
 
-def send_message(queue, message: dict, delay_seconds: int = 0) -> None:
+def send_message(queue: QueueClient, message: dict, delay_seconds: int = 0) -> None:
     """Plain JSON, readable in the portal; host.json's messageEncoding "none" matches."""
     queue.send_message(
         json.dumps(message, separators=(",", ":")), visibility_timeout=delay_seconds

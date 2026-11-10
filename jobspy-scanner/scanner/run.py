@@ -6,9 +6,12 @@ import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
 
+from azure.storage.blob import ContainerClient
+from azure.storage.queue import QueueClient
+
 from .config import ScanConfig, parse_config
 from .handoff import build_handoff, message_for, send_message, write_handoff
-from .mapping import SOURCES, posting_from
+from .mapping import SITES, posting_from
 from .scrape import Scrape, run_searches
 
 log = logging.getLogger("jobspy-scanner")
@@ -27,9 +30,8 @@ def postings_from(rows: list[dict]) -> tuple[list[dict], dict[str, int]]:
         seen.add(key)
         posting = posting_from(row, len(postings))
         if posting is None:
-            source = SOURCES.get(site)
-            if source:
-                dropped[source] = dropped.get(source, 0) + 1
+            if site in SITES:
+                dropped[site] = dropped.get(site, 0) + 1
             continue
         postings.append(posting)
     return postings, dropped
@@ -52,8 +54,8 @@ def run_scan(
     *,
     config_text: Callable[[], str],
     scrape: Scrape,
-    container,
-    queue,
+    container: ContainerClient,
+    queue: QueueClient,
     now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> str | None:
     """Scan and hand over; returns the file's blob name, or None when scanning is off.

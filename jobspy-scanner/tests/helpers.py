@@ -22,7 +22,7 @@ def frame(*rows: dict) -> pd.DataFrame:
     """A frame with jobspy's columns, as scrape_jobs returns it."""
     columns = [
         "site", "title", "company", "location", "job_url", "date_posted", "description",
-        "is_remote", "work_from_home_type", "min_amount", "max_amount", "interval", "currency",
+        "is_remote", "min_amount", "max_amount", "interval", "currency",
     ]  # fmt: skip
     return pd.DataFrame([{c: row.get(c) for c in columns} for row in rows], columns=columns)
 
@@ -60,7 +60,6 @@ ZIP_HOURLY = {
     "date_posted": None,
     "description": "Own the pipelines.",
     "is_remote": False,
-    "work_from_home_type": "hybrid",
     "min_amount": 55.0,
     "max_amount": 55.0,
     "interval": "hourly",

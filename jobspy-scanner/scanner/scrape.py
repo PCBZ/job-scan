@@ -51,7 +51,7 @@ def remote_country(place: str) -> str:
 def _one(scrape: Scrape, config: ScanConfig, title: str, place: str) -> list[dict]:
     where, remote = _where(place)
     frame = scrape(
-        site_name=list(config.sites),
+        site_name=[site.value for site in config.sites],
         search_term=title,
         location=where,
         is_remote=remote,
