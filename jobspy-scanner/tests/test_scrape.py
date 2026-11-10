@@ -36,6 +36,7 @@ def test_each_search_is_passed_the_configs_options():
     assert boston["is_remote"] is False and boston["site_name"] == [s.value for s in CONFIG.sites]
     assert boston["results_wanted"] == 15 and boston["hours_old"] == 48
     assert boston["linkedin_fetch_description"] is True
+    assert boston["description_format"] == "plain"
     remote = next(c for c in calls if c["location"] == "USA")
     assert remote["is_remote"] is True
 

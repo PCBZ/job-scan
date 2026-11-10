@@ -8,6 +8,7 @@ from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobClient, ContainerClient
 from azure.storage.queue import QueueClient
 
+from scanner.extract import extractor_from_env
 from scanner.run import run_scan
 
 app = func.FunctionApp()
@@ -30,6 +31,7 @@ def scan(timer: func.TimerRequest) -> None:
     blob = run_scan(
         config_text=lambda: config.download_blob().readall().decode("utf-8"),
         scrape=scrape_jobs,
+        extractor=lambda: extractor_from_env(dict(os.environ), credential),
         container=ContainerClient.from_container_url(_setting("POSTINGS_URL"), credential=credential),
         queue=QueueClient.from_queue_url(_setting("POSTINGS_QUEUE_URL"), credential=credential),
     )

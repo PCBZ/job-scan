@@ -1,4 +1,4 @@
-"""One scan: read the config, scrape, write the file, queue the message."""
+"""One scan: read the config, scrape, read the postings, write the file, queue the message."""
 
 from __future__ import annotations
 
@@ -10,43 +10,66 @@ from azure.storage.blob import ContainerClient
 from azure.storage.queue import QueueClient
 
 from .config import ScanConfig, parse_config
+from .extract import Extractor, extract_all
 from .handoff import build_handoff, message_for, send_message, write_handoff
-from .mapping import SITES, posting_from
+from .mapping import SITES, fingerprint, posting_from, text, usable
 from .scrape import Scrape, run_searches
 
 log = logging.getLogger("jobspy-scanner")
 
+# With the scrape's 15 minutes this stays inside the host's 30.
+EXTRACT_BUDGET_SECONDS = 10 * 60
 
-def postings_from(rows: list[dict]) -> tuple[list[dict], dict[str, int]]:
-    """The postings of the rows, once per job link, and the rows dropped per source."""
-    postings: list[dict] = []
+
+def distinct(rows: list[dict]) -> tuple[list[dict], dict[str, int]]:
+    """The usable rows, once per job link and once per company and title, and the
+    rows dropped for lacking a title, company or link, per site."""
+    kept: list[dict] = []
     dropped: dict[str, int] = {}
-    seen: set[tuple[str, str]] = set()
+    links: set[tuple[str, str]] = set()
+    jobs: set[tuple[str, str]] = set()
     for row in rows:
-        site = str(row.get("site", "")).lower()
-        key = (site, str(row.get("job_url", "")))
-        if key in seen:
+        site = text(row.get("site")).lower()
+        link = (site, text(row.get("job_url")))
+        if link in links:
             continue
-        seen.add(key)
-        posting = posting_from(row, len(postings))
-        if posting is None:
+        links.add(link)
+        if not usable(row):
             if site in SITES:
                 dropped[site] = dropped.get(site, 0) + 1
             continue
-        postings.append(posting)
-    return postings, dropped
+        if fingerprint(row) in jobs:
+            continue
+        jobs.add(fingerprint(row))
+        kept.append(row)
+    return kept, dropped
 
 
-def scan(config: ScanConfig, scrape: Scrape, started_at: datetime) -> dict:
+def scan(config: ScanConfig, scrape: Scrape, extractor: Extractor, started_at: datetime) -> dict:
     scraped = run_searches(config, scrape)
-    postings, dropped = postings_from(scraped.rows)
+    rows, dropped = distinct(scraped.rows)
+    warnings = list(scraped.warnings)
+    if len(rows) > config.max_postings:
+        warnings.append(f"jobspy: {len(rows) - config.max_postings} postings left out (max_postings)")
+        rows = rows[: config.max_postings]
+    done = extract_all(
+        rows,
+        extractor,
+        concurrency=config.extract_concurrency,
+        budget=EXTRACT_BUDGET_SECONDS,
+    )
+    if done.failed or done.unfinished:
+        warnings.append(
+            f"jobspy: {done.failed + done.unfinished} of {len(rows)} postings kept without "
+            "their requirements (extraction failed or ran out of time)"
+        )
+    postings = [posting_from(row, done.results[i], i) for i, row in enumerate(rows)]
     return build_handoff(
         started_at=started_at,
-        # Rows that were postings before the checks here dropped some of them.
         extracted=postings,
         postings=postings,
         dropped=dropped,
-        warnings=scraped.warnings,
+        warnings=warnings,
     )
 
 
@@ -54,6 +77,7 @@ def run_scan(
     *,
     config_text: Callable[[], str],
     scrape: Scrape,
+    extractor: Callable[[], Extractor],
     container: ContainerClient,
     queue: QueueClient,
     now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
@@ -63,6 +87,8 @@ def run_scan(
     `collect` waits for this source, so a scan that fails still writes an empty
     file (with the reason as a warning) before the error goes on: the day's
     report runs on the mail alone instead of waiting out the deadline.
+    `extractor` is built only once a scan is going to run, so a config that turns
+    scanning off needs no model settings.
     """
     started_at = now()
     try:
@@ -70,7 +96,7 @@ def run_scan(
         if not config.enabled:
             log.info("jobspy scan is off in the config")
             return None
-        handoff = scan(config, scrape, started_at)
+        handoff = scan(config, scrape, extractor(), started_at)
         error = None
     except Exception as err:
         error = err

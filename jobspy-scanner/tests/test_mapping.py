@@ -1,16 +1,9 @@
 from datetime import date
 
-from scanner.mapping import (
-    MAX_LINE_CHARS,
-    MAX_REQUIREMENT_LINES,
-    posting_from,
-    requirements_from,
-    salary_text,
-    text,
-    workplace_of,
-)
+from scanner.extract import Extracted
+from scanner.mapping import fingerprint, posting_from, text, usable
 
-from .helpers import DESCRIPTION, INDEED, LINKEDIN, ZIP_HOURLY
+from .helpers import INDEED, LINKEDIN, PYTHON_ROLE, ZIP_HOURLY
 
 
 def test_missing_cells_are_empty_text():
@@ -18,68 +11,44 @@ def test_missing_cells_are_empty_text():
     assert text(" x ") == "x"
 
 
-def test_salary_reads_like_an_alert_would():
-    assert salary_text(INDEED) == "USD 120,000 - 150,000 a year"
-    assert salary_text(ZIP_HOURLY) == "CAD 55 an hour"
-    assert salary_text({"min_amount": 90000.0, "interval": "yearly"}) == "USD 90,000 a year"
-    assert salary_text({"min_amount": float("nan"), "max_amount": None}) == ""
-
-
-def test_workplace_is_remote_only_when_jobspy_says_so():
-    assert workplace_of(ZIP_HOURLY) == "unknown"
-    assert workplace_of(LINKEDIN) == "remote"
-    assert workplace_of(INDEED) == "unknown"
-
-
-def test_requirements_are_the_descriptions_lines_as_plain_text():
-    assert requirements_from(DESCRIPTION) == [
-        "About the role",
-        "We build payment systems.",
-        "Requirements",
-        "3+ years of Python",
-        "Experience with Kubernetes & SQL",
-        "Comfortable with",
-        "on-call",
-    ]
-    assert requirements_from("") == []
-
-
-def test_text_that_is_already_plain_keeps_its_lines():
-    assert requirements_from("- Python\n- Go and Rust\n\n1) SQL basics\n- C") == [
-        "Python",
-        "Go and Rust",
-        "SQL basics",
-    ]
-
-
-def test_requirements_are_capped():
-    lines = requirements_from("\n".join(f"line number {i}" for i in range(100)))
-    assert len(lines) == MAX_REQUIREMENT_LINES
-    assert len(requirements_from("x" * 1000)[0]) == MAX_LINE_CHARS
-
-
-def test_a_row_becomes_a_posting():
-    p = posting_from({**INDEED, "date_posted": date(2026, 11, 9)}, 3)
-    assert p is not None
-    assert (p["title"], p["company"], p["source"], p["account"], p["row"]) == (
-        "Software Engineer",
-        "Acme Pay",
-        "indeed",
-        "jobspy",
-        3,
-    )
-    assert p["posted"] == "2026-11-09"
-    assert p["link"] is None and p["skills"] == []
-    assert p["url"] == INDEED["job_url"]
-
-
-def test_the_same_link_has_the_same_id_and_zip_recruiter_is_one_word():
-    a, b = posting_from(INDEED, 0), posting_from(INDEED, 9)
-    assert a and b and a["message_id"] == b["message_id"]
-    z = posting_from(ZIP_HOURLY, 0)
-    assert z and z["source"] == "zip_recruiter" and z["posted"] == ""
-
-
-def test_a_row_without_a_title_company_link_or_known_site_is_not_a_posting():
+def test_a_row_needs_a_title_company_link_and_a_site_jobspy_knows():
+    assert usable(INDEED)
     for gap in ({"title": ""}, {"company": None}, {"job_url": ""}, {"site": "monster"}):
-        assert posting_from({**INDEED, **gap}, 0) is None
+        assert not usable({**INDEED, **gap})
+
+
+def test_the_same_job_on_two_boards_has_one_fingerprint():
+    assert fingerprint(INDEED) == fingerprint({**LINKEDIN, "title": " software ENGINEER ", "company": "acme pay"})
+
+
+def test_the_row_supplies_the_fields_and_the_model_the_rest():
+    p = posting_from({**INDEED, "date_posted": date(2026, 11, 9)}, PYTHON_ROLE, 3)
+    assert (p["title"], p["company"], p["source"], p["account"], p["row"]) == (
+        "Software Engineer", "Acme Pay", "indeed", "jobspy", 3,
+    )  # fmt: skip
+    assert p["location"] == "Boston, MA, US" and p["url"] == INDEED["job_url"]
+    assert p["posted"] == "2026-11-09"
+    assert p["salary"] == PYTHON_ROLE.salary and p["requirements"] == PYTHON_ROLE.requirements
+    assert p["skills"] == PYTHON_ROLE.skills and p["workplace"] == "unknown"
+    assert p["link"] is None
+
+
+def test_a_missing_date_is_empty():
+    assert posting_from(ZIP_HOURLY, PYTHON_ROLE, 0)["posted"] == ""
+
+
+def test_the_same_link_has_the_same_id():
+    a, b = posting_from(INDEED, PYTHON_ROLE, 0), posting_from(INDEED, PYTHON_ROLE, 9)
+    assert a["message_id"] == b["message_id"]
+    assert posting_from(ZIP_HOURLY, PYTHON_ROLE, 0)["source"] == "zip_recruiter"
+
+
+def test_without_an_extraction_the_posting_keeps_the_row_and_is_thin():
+    p = posting_from(LINKEDIN, None, 0)
+    assert p["workplace"] == "remote" and p["requirements"] == [] and p["salary"] == ""
+    assert posting_from(INDEED, None, 0)["workplace"] == "unknown"
+
+
+def test_the_models_workplace_is_used_when_there_is_one():
+    remote = Extracted(workplace="hybrid", salary="", requirements=[], skills=[])
+    assert posting_from(INDEED, remote, 0)["workplace"] == "hybrid"

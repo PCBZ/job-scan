@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from types import SimpleNamespace
 
 import pandas as pd
+
+from scanner.extract import Extracted, Extractor
 
 STARTED_AT = datetime(2026, 11, 10, 15, 0, 1, 113000, tzinfo=timezone.utc)
 
@@ -13,9 +16,7 @@ target_titles = ["Software Engineer"]
 locations = ["Boston, MA"]
 """
 
-DESCRIPTION = """<div><p><b>About the role</b></p><p>We build payment systems.</p>
-<h3>Requirements</h3><ul><li>3+ years of Python</li><li>Experience with Kubernetes &amp; SQL</li>
-<li><span>Comfortable</span> with<br>on-call</li></ul><p>ok</p></div>"""
+DESCRIPTION = "About the role. We build payment systems. Requirements: 3+ years of Python, Kubernetes and SQL."
 
 
 def frame(*rows: dict) -> pd.DataFrame:
@@ -99,3 +100,36 @@ class FakeQueue:
 
     def send_message(self, content, *, visibility_timeout):
         self.sent.append((content, visibility_timeout))
+
+
+PYTHON_ROLE = Extracted(
+    workplace="unknown",
+    salary="USD 120,000 - 150,000 a year",
+    requirements=["3+ years of Python", "Kubernetes and SQL"],
+    skills=["Python", "Kubernetes", "SQL"],
+)
+
+
+class FakeOpenAI:
+    """The one SDK call the extractor makes: client.beta.chat.completions.parse.
+
+    `answer` gets the request's kwargs and returns an Extracted or raises.
+    """
+
+    def __init__(self, answer=lambda **_: PYTHON_ROLE) -> None:
+        self.requests: list[dict] = []
+        self._answer = answer
+        completions = SimpleNamespace(parse=self._parse)
+        self.beta = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    def _parse(self, **kwargs):
+        self.requests.append(kwargs)
+        parsed = self._answer(**kwargs)
+        message = SimpleNamespace(parsed=parsed)
+        usage = SimpleNamespace(prompt_tokens=100, completion_tokens=20)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=usage)
+
+
+def extractor(answer=lambda **_: PYTHON_ROLE, effort: str | None = None) -> Extractor:
+    client = FakeOpenAI(answer)
+    return Extractor(client, "extract-deployment", effort)  # type: ignore[arg-type]

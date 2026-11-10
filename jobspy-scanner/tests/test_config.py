@@ -10,6 +10,7 @@ def test_defaults_come_from_the_mail_configs_lists():
     assert (c.titles, c.locations) == (["A", "B"], ["Boston, MA"])
     assert c.sites == DEFAULT_SITES == [Site.INDEED, Site.LINKEDIN, Site.GLASSDOOR, Site.ZIP_RECRUITER]
     assert (c.enabled, c.results_wanted, c.hours_old, c.concurrency) == (True, 15, 48, 2)
+    assert (c.max_postings, c.extract_concurrency) == (200, 8)
     assert c.fetch_descriptions is True
 
 

@@ -30,6 +30,9 @@ class ScanConfig(BaseModel):
     results_wanted: Count = 15
     hours_old: Count = 48
     concurrency: Count = 2
+    # Postings the model reads, after duplicates are dropped; the rest are left out.
+    max_postings: Count = 200
+    extract_concurrency: Count = 8
     country_indeed: str = Field(default="USA", min_length=1)
     fetch_descriptions: StrictBool = True
 

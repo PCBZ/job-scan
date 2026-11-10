@@ -18,7 +18,7 @@ log = logging.getLogger("jobspy-scanner")
 
 # The whole scan has a budget under the host's 30 minutes; searches still
 # running when it ends are abandoned and counted.
-SCAN_BUDGET_SECONDS = 20 * 60
+SCAN_BUDGET_SECONDS = 15 * 60
 
 Scrape = Callable[..., object]
 
@@ -59,7 +59,7 @@ def _one(scrape: Scrape, config: ScanConfig, title: str, place: str) -> list[dic
         hours_old=config.hours_old,
         country_indeed=config.country_indeed,
         linkedin_fetch_description=config.fetch_descriptions,
-        description_format="html",
+        description_format="plain",
         verbose=0,
     )
     return frame.to_dict("records")  # type: ignore[attr-defined]
