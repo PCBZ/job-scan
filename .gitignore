@@ -49,3 +49,8 @@ node_modules/
 functions/dist/
 local.settings.json
 /functions/.preview/
+
+# The jobspy scanner's local environment and Functions build output
+jobspy-scanner/.venv/
+jobspy-scanner/.python_packages/
+.pytest_cache/

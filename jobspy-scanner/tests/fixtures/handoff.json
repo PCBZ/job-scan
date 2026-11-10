@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "source": "jobspy",
+  "day": "2026-11-10",
+  "started_at": "2026-11-10T15:00:01.113Z",
+  "trace": null,
+  "node_ms": {},
+  "throttled_ms": 0,
+  "rate_limited": 0,
+  "mail": null,
+  "extracted": [
+    {
+      "title": "Software Engineer",
+      "company": "Acme Pay",
+      "location": "Boston, MA, US",
+      "workplace": "unknown",
+      "salary": "$120,000 - $150,000 a year",
+      "posted": "2026-11-09",
+      "requirements": [
+        "About the role",
+        "We build payment systems.",
+        "Requirements",
+        "3+ years of Python",
+        "Experience with - Kubernetes",
+        "Comfortable with SQL"
+      ],
+      "skills": [],
+      "link": null,
+      "url": "https://www.indeed.com/viewjob?jk=aaa111",
+      "source": "indeed",
+      "account": "jobspy",
+      "message_id": "2b0fc10e0d888b5d",
+      "message_subject": "jobspy indeed",
+      "row": 0
+    },
+    {
+      "title": "Backend Engineer",
+      "company": "Globex",
+      "location": "Remote",
+      "workplace": "remote",
+      "salary": "",
+      "posted": "2026-11-10",
+      "requirements": [],
+      "skills": [],
+      "link": null,
+      "url": "https://www.linkedin.com/jobs/view/222",
+      "source": "linkedin",
+      "account": "jobspy",
+      "message_id": "452b7d7f86286620",
+      "message_subject": "jobspy linkedin",
+      "row": 1
+    },
+    {
+      "title": "Data Engineer",
+      "company": "Initech",
+      "location": "Cambridge, MA, US",
+      "workplace": "hybrid",
+      "salary": "CA$55 an hour",
+      "posted": "",
+      "requirements": ["Own the pipelines."],
+      "skills": [],
+      "link": null,
+      "url": "https://www.ziprecruiter.com/c/initech/job/333",
+      "source": "ziprecruiter",
+      "account": "jobspy",
+      "message_id": "ddb1e25e450d9e1a",
+      "message_subject": "jobspy zip_recruiter",
+      "row": 2
+    }
+  ],
+  "postings": [
+    {
+      "title": "Software Engineer",
+      "company": "Acme Pay",
+      "location": "Boston, MA, US",
+      "workplace": "unknown",
+      "salary": "$120,000 - $150,000 a year",
+      "posted": "2026-11-09",
+      "requirements": [
+        "About the role",
+        "We build payment systems.",
+        "Requirements",
+        "3+ years of Python",
+        "Experience with - Kubernetes",
+        "Comfortable with SQL"
+      ],
+      "skills": [],
+      "link": null,
+      "url": "https://www.indeed.com/viewjob?jk=aaa111",
+      "source": "indeed",
+      "account": "jobspy",
+      "message_id": "2b0fc10e0d888b5d",
+      "message_subject": "jobspy indeed",
+      "row": 0
+    },
+    {
+      "title": "Backend Engineer",
+      "company": "Globex",
+      "location": "Remote",
+      "workplace": "remote",
+      "salary": "",
+      "posted": "2026-11-10",
+      "requirements": [],
+      "skills": [],
+      "link": null,
+      "url": "https://www.linkedin.com/jobs/view/222",
+      "source": "linkedin",
+      "account": "jobspy",
+      "message_id": "452b7d7f86286620",
+      "message_subject": "jobspy linkedin",
+      "row": 1
+    },
+    {
+      "title": "Data Engineer",
+      "company": "Initech",
+      "location": "Cambridge, MA, US",
+      "workplace": "hybrid",
+      "salary": "CA$55 an hour",
+      "posted": "",
+      "requirements": ["Own the pipelines."],
+      "skills": [],
+      "link": null,
+      "url": "https://www.ziprecruiter.com/c/initech/job/333",
+      "source": "ziprecruiter",
+      "account": "jobspy",
+      "message_id": "ddb1e25e450d9e1a",
+      "message_subject": "jobspy zip_recruiter",
+      "row": 2
+    }
+  ],
+  "dropped": {
+    "indeed": 1
+  },
+  "suspicious": {},
+  "usage": {},
+  "extract_loop": {
+    "turns": [],
+    "problems": [],
+    "retry": false
+  },
+  "warnings": []
+}

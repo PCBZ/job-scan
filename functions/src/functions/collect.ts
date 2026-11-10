@@ -10,7 +10,7 @@ import { loadSecrets, secretClientFromEnv } from "../lib/run/secrets.js";
 
 type Env = Record<string, string | undefined>;
 
-const messageSchema = z.object({
+export const messageSchema = z.object({
   day: z.string(),
   source: z.string(),
   blob: z.string(),
