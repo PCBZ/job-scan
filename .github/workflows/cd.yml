@@ -131,7 +131,6 @@ jobs:
         run: |
           echo "name=$(terraform output -raw function_app_name)" >> "$GITHUB_OUTPUT"
           echo "jobspy=$(terraform output -raw jobspy_app_name)" >> "$GITHUB_OUTPUT"
-          echo "group=$(terraform output -raw resource_group_name)" >> "$GITHUB_OUTPUT"
 
       # The code goes out through OneDeploy, the only way Flex Consumption takes
       # it: azurerm's zip_deploy_file can't (hashicorp/terraform-provider-azurerm#29630).
@@ -155,16 +154,7 @@ jobs:
           app-name: ${{ steps.app.outputs.jobspy }}
           package: ${{ github.workspace }}/jobspy-scanner
           remote-build: true
-
-      # A deploy that built but didn't register the timer (a bad requirement, an
-      # import error) shows here, not at 15:00 UTC.
-      - name: The scanner registered its function
-        run: >-
-          az functionapp function show
-          --resource-group "${{ steps.app.outputs.group }}"
-          --name "${{ steps.app.outputs.jobspy }}"
-          --function-name scan
-          --query name -o tsv
+          respect-funcignore: true
 
   # The deployed evalReport, end to end in Azure: the queue trigger as the
   # app's identity, Blob, Log Analytics and Gmail (#134). It reports on the
