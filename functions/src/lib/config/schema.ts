@@ -3,6 +3,7 @@
 // instead of silently dropping a setting.
 
 import { z } from "zod";
+import { BOARDS } from "../postings/types.js";
 
 const strings = z.array(z.string());
 const positiveInt = z.number().int().positive();
@@ -54,23 +55,8 @@ const profile = z.strictObject({
 // pipeline ignores it. Its target titles and locations come from [profile],
 // and `titles` here narrows the scan to fewer.
 const jobspy = z.strictObject({
-  enabled: z.boolean().optional(),
   titles: strings.optional(),
-  sites: z
-    .array(
-      z.enum([
-        "linkedin",
-        "indeed",
-        "glassdoor",
-        "zip_recruiter",
-        "google",
-        "bayt",
-        "naukri",
-        "bdjobs",
-        "hellowork",
-      ]),
-    )
-    .optional(),
+  sites: z.array(z.enum(BOARDS)).optional(),
   results_wanted: positiveInt.optional(),
   hours_old: positiveInt.optional(),
   concurrency: positiveInt.optional(),

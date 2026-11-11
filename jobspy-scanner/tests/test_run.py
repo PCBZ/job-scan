@@ -68,23 +68,6 @@ def test_a_day_that_finds_nothing_still_hands_over_an_empty_file():
     assert len(queue.sent) == 1
 
 
-def test_a_config_that_turns_it_off_hands_over_an_empty_file_and_needs_no_model():
-    def no_model():
-        raise AssertionError("the model is not needed")
-
-    container, queue = FakeContainer(), FakeQueue()
-    name = run_scan(
-        config_text=lambda: "[jobspy]\nenabled = false",
-        scrape=scrape,
-        extractor=no_model,
-        container=container,  # type: ignore[arg-type]
-        queue=queue,  # type: ignore[arg-type]
-    )
-    handoff = json.loads(container.blobs[name])
-    assert handoff["postings"] == [] and handoff["warnings"] == []
-    assert len(queue.sent) == 1
-
-
 def test_postings_over_the_cap_are_left_out_with_a_warning():
     run, container, _ = go(config=CONFIG + "[jobspy]\nmax_postings = 2")
     run()

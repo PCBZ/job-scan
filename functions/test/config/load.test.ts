@@ -113,7 +113,7 @@ describe("parseConfig and the jobspy table", () => {
   it("accepts the scanner's keys, which the mail pipeline ignores", () => {
     expect(() =>
       parseConfig(
-        `${MIN}\n[jobspy]\nenabled = true\ntitles = ["A"]\nsites = ["indeed", "zip_recruiter"]\nresults_wanted = 5\nfetch_descriptions = false\n`,
+        `${MIN}\n[jobspy]\ntitles = ["A"]\nsites = ["indeed", "zip_recruiter"]\nresults_wanted = 5\nfetch_descriptions = false\n`,
         "config.toml",
       ),
     ).not.toThrow();

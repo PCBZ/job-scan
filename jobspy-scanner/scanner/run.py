@@ -84,23 +84,13 @@ def run_scan(
 ) -> str:
     """Scan and hand over; returns the file's blob name.
 
-    `collect` waits for this source, so a day with nothing to hand over still
-    writes an empty file: a scan the config turns off, and a scan that fails
-    (with the reason as a warning, before the error goes on). The day's report
-    then runs on the mail alone instead of waiting out the deadline.
-    `extractor` is built only once a scan is going to run, so a config that turns
-    scanning off needs no model settings.
+    `collect` waits for this source, so a scan that fails still writes an empty
+    file (with the reason as a warning) before the error goes on: the day's
+    report runs on the mail alone instead of waiting out the deadline.
     """
     started_at = now()
     try:
-        config = parse_config(config_text())
-        if config.enabled:
-            handoff = scan(config, scrape, extractor(), started_at)
-        else:
-            log.info("jobspy scan is off in the config")
-            handoff = build_handoff(
-                started_at=started_at, extracted=[], postings=[], dropped={}, warnings=[]
-            )
+        handoff = scan(parse_config(config_text()), scrape, extractor(), started_at)
         error = None
     except Exception as err:
         error = err
