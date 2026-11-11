@@ -4,7 +4,7 @@ from scanner.scrape import remote_country, run_searches, searches
 from .helpers import INDEED, LINKEDIN, frame
 
 CONFIG = parse_config(
-    'target_titles = ["A", "B"]\nlocations = ["Boston, MA", "Remote (US)"]\n[jobspy]\nconcurrency = 2'
+    '[profile]\ntarget_titles = ["A", "B"]\nlocations = ["Boston, MA", "Remote (US)"]\n[jobspy]\nconcurrency = 2'
 )
 
 
@@ -67,7 +67,7 @@ def test_searches_still_running_at_the_budget_are_given_up_on():
         release.wait(5)
         return frame(INDEED)
 
-    one = parse_config('target_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nconcurrency = 1')
+    one = parse_config('[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nconcurrency = 1')
     out = run_searches(one, scrape, budget=0.05)
     release.set()
     assert out.rows == [] and out.warnings == ["jobspy: 1 searches unfinished after 0s"]

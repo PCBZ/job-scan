@@ -12,6 +12,7 @@ from scanner.extract import Extracted, Extractor
 STARTED_AT = datetime(2026, 11, 10, 15, 0, 1, 113000, tzinfo=timezone.utc)
 
 CONFIG = """
+[profile]
 target_titles = ["Software Engineer"]
 locations = ["Boston, MA"]
 """

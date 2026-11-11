@@ -110,7 +110,7 @@ def test_a_failed_extraction_keeps_the_posting_without_its_requirements():
 
 
 def test_a_failed_scan_still_hands_over_so_collect_does_not_wait_the_deadline():
-    run, container, queue = go(config='target_titles = ["A"]')
+    run, container, queue = go(config='[profile]\ntarget_titles = ["A"]')
     with pytest.raises(ValueError):
         run()
     handoff = json.loads(next(iter(container.blobs.values())))

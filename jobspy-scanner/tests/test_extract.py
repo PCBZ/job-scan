@@ -69,9 +69,10 @@ def test_postings_still_waiting_at_the_budget_are_given_up_on():
         release.wait(5)
         return PYTHON_ROLE
 
-    out = extract_all([INDEED], extractor(answer), concurrency=1, budget=0.05)
+    # One worker: the first is running at the budget, the others are still queued.
+    out = extract_all([INDEED] * 4, extractor(answer), concurrency=1, budget=0.05)
     release.set()
-    assert out.results == [None] and out.unfinished == 1
+    assert out.results == [None] * 4 and out.unfinished == 4
 
 
 class Credential:

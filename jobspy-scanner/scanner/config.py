@@ -49,5 +49,6 @@ def parse_config(text: str) -> ScanConfig:
     data = tomllib.loads(text)
     table = dict(data.get("jobspy", {}))
     # A `titles` list in [jobspy] narrows the scan; the mail pipeline's list is the default.
-    titles = table.pop("titles", None) or data.get("target_titles", [])
-    return ScanConfig(titles=titles, locations=data.get("locations", []), **table)
+    profile = data.get("profile", {})
+    titles = table.pop("titles", None) or profile.get("target_titles", [])
+    return ScanConfig(titles=titles, locations=profile.get("locations", []), **table)

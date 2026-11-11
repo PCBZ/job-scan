@@ -145,7 +145,7 @@ def extract_all(
             pass
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
-    unfinished = sum(1 for f in futures if not f.done())
+    unfinished = sum(1 for f in futures if f.cancelled() or not f.done())
     log.info(
         "extracted %d postings in %.0fs: %d failed, %d unfinished, %d input and %d output tokens",
         len(rows), clock() - started, failed, unfinished, usage.input, usage.output,

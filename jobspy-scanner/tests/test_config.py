@@ -6,7 +6,7 @@ from scanner.config import DEFAULT_SITES, parse_config
 
 
 def test_defaults_come_from_the_mail_configs_lists():
-    c = parse_config('target_titles = ["A", " B "]\nlocations = ["Boston, MA"]')
+    c = parse_config('[profile]\ntarget_titles = ["A", " B "]\nlocations = ["Boston, MA"]')
     assert (c.titles, c.locations) == (["A", "B"], ["Boston, MA"])
     assert c.sites == DEFAULT_SITES == [Site.INDEED, Site.LINKEDIN, Site.GLASSDOOR, Site.ZIP_RECRUITER]
     assert (c.enabled, c.results_wanted, c.hours_old, c.concurrency) == (True, 15, 48, 2)
@@ -16,7 +16,7 @@ def test_defaults_come_from_the_mail_configs_lists():
 
 def test_the_jobspy_table_overrides():
     c = parse_config(
-        'target_titles = ["A"]\nlocations = ["X"]\n'
+        '[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n'
         '[jobspy]\ntitles = ["Only This"]\nsites = ["indeed"]\nresults_wanted = 5\n'
         "hours_old = 24\nconcurrency = 1\nfetch_descriptions = false\n"
     )
@@ -33,13 +33,13 @@ def test_a_config_that_turns_it_off_needs_no_searches():
     "text, message",
     [
         ("not toml [", "Expected"),
-        ('locations = ["X"]', "no target_titles"),
-        ('target_titles = ["A"]', "no locations"),
-        ('target_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nsites = ["monster"]', "sites"),
-        ('target_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nconcurrency = 0', "concurrency"),
-        ('target_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nenabled = "yes"', "enabled"),
-        ('target_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nresult_wanted = 5', "result_wanted"),
-        ('target_titles = "A"\nlocations = ["X"]', "target_titles|titles"),
+        ('[profile]\nlocations = ["X"]', "no target_titles"),
+        ('[profile]\ntarget_titles = ["A"]', "no locations"),
+        ('[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nsites = ["monster"]', "sites"),
+        ('[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nconcurrency = 0', "concurrency"),
+        ('[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nenabled = "yes"', "enabled"),
+        ('[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nresult_wanted = 5', "result_wanted"),
+        ('[profile]\ntarget_titles = "A"\nlocations = ["X"]', "target_titles|titles"),
     ],
 )
 def test_a_bad_config_says_why(text, message):
