@@ -6,6 +6,10 @@ output "function_app_name" {
   value = module.function_app.name
 }
 
+output "jobspy_app_name" {
+  value = module.jobspy_app.name
+}
+
 output "function_app_hostname" {
   value = module.function_app.default_hostname
 }

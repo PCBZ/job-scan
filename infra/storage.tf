@@ -6,12 +6,13 @@ module "storage" {
   tags                = var.tags
 
   containers = [
-    "deployments",  # Flex Consumption deployment package
-    "reports",      # HTML reports, read through user delegation SAS links
-    "resume-cache", # extracted resume text, keyed by content hash
-    "config",       # config.toml for the cloud run
-    "run-records",  # each run's postings, filters, picks and metrics (#97)
-    "postings",     # what each source hands to collect: its postings and mail text
+    "deployments",        # Flex Consumption deployment package
+    "jobspy-deployments", # the Python scanner app's deployment package
+    "reports",            # HTML reports, read through user delegation SAS links
+    "resume-cache",       # extracted resume text, keyed by content hash
+    "config",             # config.toml for the cloud run
+    "run-records",        # each run's postings, filters, picks and metrics (#97)
+    "postings",           # what each source hands to collect: its postings and mail text
   ]
 
   # Run records hold real mail and resume text: keep them 90 days only.
