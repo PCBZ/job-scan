@@ -71,10 +71,18 @@ jobs:
           npm prune --omit=dev
           zip -qr ../app.zip dist prompts templates host.json package.json node_modules
 
+      # The Python scanner ships its source; Azure installs requirements.txt on
+      # deploy (remote build). CI tests it, so the build only packages it.
+      - name: Package the scanner
+        working-directory: jobspy-scanner
+        run: zip -qr ../jobspy.zip function_app.py scanner host.json requirements.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: app
-          path: app.zip
+          path: |
+            app.zip
+            jobspy.zip
           retention-days: 7
 
   deploy:
@@ -126,9 +134,12 @@ jobs:
       - name: Apply
         run: terraform apply -auto-approve
 
-      - name: Function App name
+      - name: Function App names
         id: app
-        run: echo "name=$(terraform output -raw function_app_name)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "name=$(terraform output -raw function_app_name)" >> "$GITHUB_OUTPUT"
+          echo "jobspy=$(terraform output -raw jobspy_app_name)" >> "$GITHUB_OUTPUT"
+          echo "group=$(terraform output -raw resource_group_name)" >> "$GITHUB_OUTPUT"
 
       # The code goes out through OneDeploy, the only way Flex Consumption takes
       # it: azurerm's zip_deploy_file can't (hashicorp/terraform-provider-azurerm#29630).
@@ -144,6 +155,23 @@ jobs:
         with:
           app-name: ${{ steps.app.outputs.name }}
           package: ${{ runner.temp }}/app.zip
+
+      # The Python scanner: same OneDeploy, with Azure building its packages.
+      - uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ steps.app.outputs.jobspy }}
+          package: ${{ runner.temp }}/jobspy.zip
+          remote-build: true
+
+      # A deploy that built but didn't register the timer (a bad requirement, an
+      # import error) shows here, not at 15:00 UTC.
+      - name: The scanner registered its function
+        run: >-
+          az functionapp function show
+          --resource-group "${{ steps.app.outputs.group }}"
+          --name "${{ steps.app.outputs.jobspy }}"
+          --function-name scan
+          --query name -o tsv
 
   # The deployed evalReport, end to end in Azure: the queue trigger as the
   # app's identity, Blob, Log Analytics and Gmail (#134). It reports on the

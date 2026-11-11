@@ -11,8 +11,14 @@ variable "location" {
   type = string
 }
 
-variable "node_version" {
-  description = "Node runtime. 24 is the newest Flex Consumption offers."
+variable "runtime_name" {
+  description = "Language runtime: node or python. One Flex Consumption app runs one."
+  type        = string
+  default     = "node"
+}
+
+variable "runtime_version" {
+  description = "Runtime version. Node 24 is the newest Flex Consumption offers; Python 3.13 is GA there."
   type        = string
   default     = "24"
 }
