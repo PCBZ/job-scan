@@ -23,7 +23,6 @@ Count = Annotated[int, Field(strict=True, gt=0)]
 class ScanConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
 
-    enabled: StrictBool = True
     titles: list[str] = []
     locations: list[str] = []
     sites: list[Site] = DEFAULT_SITES
@@ -38,9 +37,9 @@ class ScanConfig(BaseModel):
 
     @model_validator(mode="after")
     def _something_to_search(self) -> Self:
-        if self.enabled and not self.titles:
+        if not self.titles:
             raise ValueError("no target_titles to search for")
-        if self.enabled and not self.locations:
+        if not self.locations:
             raise ValueError("no locations to search in")
         return self
 

@@ -253,9 +253,11 @@ export function buildCollectWorkflow(
       .edge("deliver", "mark_seen")
       .node("mark_seen", async (s, signal) => {
         // Only after a delivery, and only once judged: a failed or unjudged run
-        // must see the same mail tomorrow.
-        if (isPayload(s.mail) && s.outcome !== "no_resumes")
-          await effects.markSeen({ mail: s.mail, top: s.top }, signal);
+        // must see the same mail tomorrow. A day with no mail still records what
+        // other sources recommended, so it isn't recommended again tomorrow.
+        const mail = isPayload(s.mail) ? s.mail : null;
+        if (s.outcome !== "no_resumes" && (mail || s.top.length > 0))
+          await effects.markSeen({ mail, top: s.top }, signal);
         return {};
       })
       .edge("mark_seen", END)

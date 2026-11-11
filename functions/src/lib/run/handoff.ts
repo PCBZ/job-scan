@@ -18,7 +18,7 @@ import type { LoopState, State, Update } from "../workflow/state.js";
 import type { Posting, SuspiciousByMessage } from "../workflow/types.js";
 
 /** The sources `collect` waits for. A source joins this list when it exists. */
-export const EXPECTED_SOURCES = ["mail"] as const;
+export const EXPECTED_SOURCES = ["mail", "jobspy"] as const;
 
 /** How long `collect` waits for a missing source before it runs with what it has. */
 export const COLLECT_DEADLINE_MINUTES = 60;

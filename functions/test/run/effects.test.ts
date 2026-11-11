@@ -177,6 +177,12 @@ describe("productionEffects.markSeen", () => {
     expect(calls).toEqual(["seen 2 2026-10-09", "jobs 1 2026-10-09"]);
   });
 
+  it("records what other sources recommended on a day with no mail", async () => {
+    const { effects, calls } = harness();
+    await effects.markSeen({ mail: null, top: [rankedOf(judgement())] });
+    expect(calls).toEqual(["seen 0 2026-10-09", "jobs 1 2026-10-09"]);
+  });
+
   it("on Sundays, prunes last, 90 days back", async () => {
     const { effects, calls } = harness({ now: new Date("2026-10-11T15:00:00Z") });
     await effects.markSeen({ mail, top: [rankedOf(judgement())] });

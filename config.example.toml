@@ -177,6 +177,21 @@ core_skills = []
 
 exclude_keywords = ["unpaid", "commission only", "MLM"]
 
+# ---------------------------------------------------------------------------
+# The jobspy scanner: job boards searched directly, besides the alert mail. It
+# searches [profile]'s target_titles in its locations; every key is optional.
+# ---------------------------------------------------------------------------
+[jobspy]
+# titles = []            # narrows the scan to these instead of every target title
+# sites = ["indeed", "linkedin", "glassdoor", "zip_recruiter"]
+# results_wanted = 15    # per search (title x location x site)
+# hours_old = 48
+# concurrency = 2        # searches at once
+# max_postings = 200     # read by the model per day, after duplicates
+# extract_concurrency = 8
+# country_indeed = "USA"
+# fetch_descriptions = true
+
 [report]
 max_top_picks = 5
 min_score_to_recommend = 60

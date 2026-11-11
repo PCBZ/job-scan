@@ -81,22 +81,16 @@ def run_scan(
     container: ContainerClient,
     queue: QueueClient,
     now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
-) -> str | None:
-    """Scan and hand over; returns the file's blob name, or None when scanning is off.
+) -> str:
+    """Scan and hand over; returns the file's blob name.
 
     `collect` waits for this source, so a scan that fails still writes an empty
     file (with the reason as a warning) before the error goes on: the day's
     report runs on the mail alone instead of waiting out the deadline.
-    `extractor` is built only once a scan is going to run, so a config that turns
-    scanning off needs no model settings.
     """
     started_at = now()
     try:
-        config = parse_config(config_text())
-        if not config.enabled:
-            log.info("jobspy scan is off in the config")
-            return None
-        handoff = scan(config, scrape, extractor(), started_at)
+        handoff = scan(parse_config(config_text()), scrape, extractor(), started_at)
         error = None
     except Exception as err:
         error = err

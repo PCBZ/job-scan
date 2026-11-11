@@ -109,6 +109,25 @@ describe("parseConfig defaults", () => {
   });
 });
 
+describe("parseConfig and the jobspy table", () => {
+  it("accepts the scanner's keys, which the mail pipeline ignores", () => {
+    expect(() =>
+      parseConfig(
+        `${MIN}\n[jobspy]\ntitles = ["A"]\nsites = ["indeed", "zip_recruiter"]\nresults_wanted = 5\nfetch_descriptions = false\n`,
+        "config.toml",
+      ),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ["an unknown key", "result_wanted = 5", "result_wanted"],
+    ["an unknown site", 'sites = ["monster"]', "jobspy.sites"],
+    ["a count that isn't positive", "concurrency = 0", "jobspy.concurrency"],
+  ])("rejects %s", (_name, line, message) => {
+    expect(errorOf(`${MIN}\n[jobspy]\n${line}\n`)).toContain(message);
+  });
+});
+
 describe("parseConfig rejects", () => {
   it.each([
     [

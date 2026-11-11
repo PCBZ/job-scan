@@ -5,7 +5,20 @@
 import type { ExtractedPosting } from "./schema.js";
 
 export type Workplace = ExtractedPosting["workplace"];
-export type Source = "linkedin" | "indeed" | "glassdoor" | "other";
+/** The job boards, by jobspy's own site names; mail alerts come from the first three. */
+export const BOARDS = [
+  "linkedin",
+  "indeed",
+  "glassdoor",
+  "zip_recruiter",
+  "google",
+  "bayt",
+  "naukri",
+  "bdjobs",
+  "hellowork",
+] as const;
+
+export type Source = (typeof BOARDS)[number] | "other";
 
 /** Filled in by code from the message, never by the model. */
 export interface Provenance {
