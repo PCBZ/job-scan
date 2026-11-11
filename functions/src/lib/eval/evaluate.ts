@@ -3,6 +3,7 @@
 
 import { runDay } from "../day.js";
 import type { TokenUsage } from "../model/types.js";
+import type { ScrapeStats } from "../postings/types.js";
 import type { FilteredRecord, PickRecord, RunRecord, RunStatsRecord } from "../run/records.js";
 import type { Loop } from "../workflow/state.js";
 import type { Latency } from "./latency.js";
@@ -37,6 +38,20 @@ export interface TrendRow {
   filtered: number;
   /** Of the judge's input, the share served from the prompt cache. */
   cachedShare: number | null;
+}
+
+/** One job board's day. Scraped and silent are null for a board that only mail named. */
+export interface BoardRow {
+  site: string;
+  scraped: number | null;
+  /** Searches in which the board returned no rows. */
+  silent: number | null;
+  /** Rows the model read into postings. */
+  read: number;
+  dropped: number;
+  /** Postings the code gates and Jev screened out. */
+  filtered: number;
+  picks: number;
 }
 
 export interface Evaluation {
@@ -77,6 +92,10 @@ export interface Evaluation {
     unsurePicks: number;
   };
   dropped: { source: string; dropped: number; extracted: number }[];
+  /** Per job board, when a scraping source ran; null on a day without one. */
+  boards: BoardRow[] | null;
+  /** "12 searches, 1 failed outright"; empty without a scraping source. */
+  scrapeSummary: string;
   warnings: number;
   /** This run and the ones before it, oldest first. */
   trend: TrendRow[];
@@ -144,6 +163,29 @@ function trendRow(run: RunStatsRecord, prices: Prices): TrendRow {
     filtered: run.filtered,
     cachedShare: cachedShare(run),
   };
+}
+
+function boardRows(
+  scrape: ScrapeStats,
+  read: Record<string, number>,
+  dropped: Partial<Record<string, number>>,
+  filtered: FilteredRecord[],
+  picks: PickRecord[],
+): BoardRow[] {
+  const count = (rows: { posting: { source: string } }[], site: string) =>
+    rows.filter((r) => r.posting.source === site).length;
+  const sites = new Set([...Object.keys(scrape.sites), ...Object.keys(read)]);
+  return [...sites]
+    .map((site) => ({
+      site,
+      scraped: scrape.sites[site]?.rows ?? null,
+      silent: scrape.sites[site]?.silent ?? null,
+      read: read[site] ?? 0,
+      dropped: dropped[site] ?? 0,
+      filtered: count(filtered, site),
+      picks: count(picks, site),
+    }))
+    .sort((a, b) => (b.scraped ?? -1) - (a.scraped ?? -1) || b.read - a.read);
 }
 
 /**
@@ -228,6 +270,10 @@ export function evaluate(
         (p.posting.gate_notes ?? []).some((n) => n.startsWith("Possibly")),
       ).length,
     },
+    scrapeSummary: run.scrape
+      ? `${run.scrape.searches} searches, ${run.scrape.failed} failed outright`
+      : "",
+    boards: run.scrape ? boardRows(run.scrape, extractedBy, run.dropped, filtered, picks) : null,
     dropped: Object.entries(extractedBy)
       .map(([source, extracted]) => ({
         source,

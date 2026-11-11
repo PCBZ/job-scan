@@ -70,6 +70,7 @@ def scan(config: ScanConfig, scrape: Scrape, extractor: Extractor, started_at: d
         postings=postings,
         dropped=dropped,
         warnings=warnings,
+        scrape=scraped.stats(),
     )
 
 

@@ -50,6 +50,25 @@ export function renderText(e: Evaluation): string {
           ),
         ]
       : []),
+    ...(v.hasBoards
+      ? [
+          "",
+          "Job boards",
+          v.searches,
+          table(
+            ["Board", "Scraped", "Silent searches", "Read", "Dropped", "Screened out", "Picks"],
+            v.boards.map((b) => [
+              b.site,
+              String(b.scraped),
+              String(b.silent),
+              String(b.read),
+              String(b.dropped),
+              String(b.filtered),
+              String(b.picks),
+            ]),
+          ),
+        ]
+      : []),
     "",
     "Dropped as misaligned",
     v.dropped,

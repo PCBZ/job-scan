@@ -46,6 +46,15 @@
     </table>
     {{/hasScreened}}
 
+    {{#hasBoards}}
+    <h2 style="margin: 16px 0 6px; font-size: 16px;">Job boards</h2>
+    <p style="margin: 0 0 6px;">{{searches}}. A board with silent searches may be blocking.</p>
+    <table role="presentation" style="border-collapse: collapse; width: 100%;">
+      <tr style="color: #475467; text-align: left;"><th style="padding: 4px 8px 4px 0;">Board</th><th style="padding: 4px 8px; text-align: right;">Scraped</th><th style="padding: 4px 8px; text-align: right;">Silent searches</th><th style="padding: 4px 8px; text-align: right;">Read</th><th style="padding: 4px 8px; text-align: right;">Dropped</th><th style="padding: 4px 8px; text-align: right;">Screened out</th><th style="padding: 4px 0 4px 8px; text-align: right;">Picks</th></tr>
+      {{#boards}}<tr style="border-top: 1px solid #eaecf0;"><td style="padding: 4px 8px 4px 0;">{{site}}</td><td style="padding: 4px 8px; text-align: right;">{{scraped}}</td><td style="padding: 4px 8px; text-align: right;">{{silent}}</td><td style="padding: 4px 8px; text-align: right;">{{read}}</td><td style="padding: 4px 8px; text-align: right;">{{dropped}}</td><td style="padding: 4px 8px; text-align: right;">{{filtered}}</td><td style="padding: 4px 0 4px 8px; text-align: right;">{{picks}}</td></tr>{{/boards}}
+    </table>
+    {{/hasBoards}}
+
     <h2 style="margin: 16px 0 6px; font-size: 16px;">Dropped as misaligned</h2>
     <p style="margin: 0;">{{dropped}}</p>
 

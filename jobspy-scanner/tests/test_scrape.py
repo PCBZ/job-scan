@@ -53,6 +53,28 @@ def test_a_failed_search_is_a_warning_and_the_others_still_count():
     assert "secret" not in " ".join(out.warnings)
 
 
+def test_a_site_that_goes_quiet_shows_as_silent_searches():
+    # Glassdoor is blocked: the search still succeeds, it just has no Glassdoor rows.
+    def scrape(**_):
+        return frame(INDEED, LINKEDIN)
+
+    out = run_searches(CONFIG, scrape)
+    assert (out.stats()["searches"], out.stats()["failed"]) == (4, 0)
+    assert out.stats()["sites"]["indeed"] == {"rows": 4, "silent": 0}
+    assert out.stats()["sites"]["glassdoor"] == {"rows": 0, "silent": 4}
+
+
+def test_a_failed_search_is_not_a_silent_one():
+    def scrape(**kwargs):
+        if kwargs["search_term"] == "A":
+            raise RuntimeError("blocked")
+        return frame(INDEED)
+
+    stats = run_searches(CONFIG, scrape).stats()
+    assert stats["failed"] == 2 and stats["sites"]["indeed"] == {"rows": 2, "silent": 0}
+    assert stats["sites"]["linkedin"]["silent"] == 2
+
+
 def test_searches_that_find_nothing_are_counted():
     out = run_searches(CONFIG, lambda **_: frame())
     assert out.rows == [] and out.warnings == ["jobspy: 4 of 4 searches found nothing"]

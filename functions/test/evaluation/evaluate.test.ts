@@ -123,6 +123,30 @@ describe("evaluate", () => {
     ]);
   });
 
+  it("shows each board's day when a scraping source ran, and nothing on a day without one", () => {
+    expect(e.boards).toBeNull();
+    const scraped = evaluate(
+      records({
+        scrape: {
+          searches: 5,
+          failed: 1,
+          sites: {
+            indeed: { rows: 5, silent: 0 },
+            glassdoor: { rows: 3, silent: 1 },
+            zip_recruiter: { rows: 0, silent: 4 },
+          },
+        },
+      }),
+      [],
+    );
+    expect(scraped.scrapeSummary).toBe("5 searches, 1 failed outright");
+    expect(scraped.boards).toEqual([
+      { site: "indeed", scraped: 5, silent: 0, read: 1, dropped: 0, filtered: 2, picks: 0 },
+      { site: "glassdoor", scraped: 3, silent: 1, read: 2, dropped: 1, filtered: 0, picks: 1 },
+      { site: "zip_recruiter", scraped: 0, silent: 4, read: 0, dropped: 0, filtered: 0, picks: 0 },
+    ]);
+  });
+
   it("trends this run after the earlier ones, oldest first, ignoring later runs", () => {
     const earlier = [
       runLine({

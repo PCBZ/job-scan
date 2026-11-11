@@ -20,6 +20,17 @@ export const BOARDS = [
 
 export type Source = (typeof BOARDS)[number] | "other";
 
+/**
+ * What a scraping source saw, for the evaluation: how many searches it ran, how
+ * many failed outright, and per board the rows it returned and the searches in
+ * which the board returned none (a blocked board raises nothing; it goes quiet).
+ */
+export interface ScrapeStats {
+  searches: number;
+  failed: number;
+  sites: Record<string, { rows: number; silent: number }>;
+}
+
 /** Filled in by code from the message, never by the model. */
 export interface Provenance {
   url: string;

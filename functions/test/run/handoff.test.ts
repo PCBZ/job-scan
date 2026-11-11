@@ -134,6 +134,12 @@ describe("seedFrom and mergeMeta", () => {
     expect(seed.suspicious).toEqual({ "<m0@x>": [] });
   });
 
+  it("carries the scraping source's counts, and none when no source scraped", () => {
+    const scrape = { searches: 2, failed: 0, sites: { indeed: { rows: 3, silent: 1 } } };
+    expect(seedFrom([a, { ...b, scrape }]).scrape).toEqual(scrape);
+    expect(seedFrom([a, b])).not.toHaveProperty("scrape");
+  });
+
   it("takes the mail and the extract loop from the mail source only", () => {
     const mail = { messages: [] } as never;
     const seed = seedFrom([b, { ...a, mail, extract_loop: { ...NO_LOOP, problems: ["p"] } }]);

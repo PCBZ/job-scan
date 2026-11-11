@@ -14,7 +14,7 @@ import type { JudgementCacheStats } from "../judge/cache-stats.js";
 import { postingId } from "../judge/verify.js";
 import type { FetchedMessage } from "../mail/types.js";
 import type { TokenUsage } from "../model/types.js";
-import type { Source } from "../postings/types.js";
+import type { ScrapeStats, Source } from "../postings/types.js";
 import type { Loop, State } from "../workflow/state.js";
 import type { Explanation, Filtered, Outcome, Posting, Ranked } from "../workflow/types.js";
 
@@ -98,6 +98,8 @@ export interface RunStatsRecord extends RunMeta {
   repeats: number;
   duplicates: number;
   dropped: Partial<Record<Source, number>>;
+  /** What the scraping source saw; absent on a day without one. */
+  scrape?: ScrapeStats;
   loops: Record<Loop, LoopRecord>;
   warnings: number;
   usage: Record<string, TokenUsage>;
@@ -173,6 +175,7 @@ export function runRecords(state: State, meta: RunMeta): RunRecord[] {
     repeats: state.repeats,
     duplicates: state.duplicates,
     dropped: state.dropped,
+    ...(state.scrape ? { scrape: state.scrape } : {}),
     loops: {
       extract: loopRecord(state.loops.extract),
       judge: loopRecord(state.loops.judge),

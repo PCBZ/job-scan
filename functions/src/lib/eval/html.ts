@@ -106,6 +106,13 @@ export function view(e: Evaluation) {
         : `${e.screen.filtered.length} screened out (${screenGates}). ${e.screen.unsurePicks} pick(s) Jev was unsure about.`,
     hasScreened: e.screen.filtered.length > 0,
     screened: e.screen.filtered.map((s) => ({ ...s, probability: s.probability.toFixed(2) })),
+    hasBoards: e.boards !== null,
+    searches: e.scrapeSummary,
+    boards: (e.boards ?? []).map((b) => ({
+      ...b,
+      scraped: b.scraped ?? "—",
+      silent: b.silent ?? "—",
+    })),
     dropped:
       e.dropped.map((d) => `${d.source} ${d.dropped}/${d.extracted}`).join(" · ") || "No postings.",
     trend: e.trend.map((t) => ({
