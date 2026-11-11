@@ -71,18 +71,10 @@ jobs:
           npm prune --omit=dev
           zip -qr ../app.zip dist prompts templates host.json package.json node_modules
 
-      # The Python scanner ships its source; Azure installs requirements.txt on
-      # deploy (remote build). CI tests it, so the build only packages it.
-      - name: Package the scanner
-        working-directory: jobspy-scanner
-        run: zip -qr ../jobspy.zip function_app.py scanner host.json requirements.txt
-
       - uses: actions/upload-artifact@v4
         with:
           name: app
-          path: |
-            app.zip
-            jobspy.zip
+          path: app.zip
           retention-days: 7
 
   deploy:
@@ -156,11 +148,12 @@ jobs:
           app-name: ${{ steps.app.outputs.name }}
           package: ${{ runner.temp }}/app.zip
 
-      # The Python scanner: same OneDeploy, with Azure building its packages.
+      # The Python scanner: its source as committed, same OneDeploy, with Azure
+      # installing requirements.txt. CI tests it; nothing is built here.
       - uses: Azure/functions-action@v1
         with:
           app-name: ${{ steps.app.outputs.jobspy }}
-          package: ${{ runner.temp }}/jobspy.zip
+          package: ${{ github.workspace }}/jobspy-scanner
           remote-build: true
 
       # A deploy that built but didn't register the timer (a bad requirement, an
