@@ -5,7 +5,21 @@
 import type { ExtractedPosting } from "./schema.js";
 
 export type Workplace = ExtractedPosting["workplace"];
-export type Source = "linkedin" | "indeed" | "glassdoor" | "other";
+/**
+ * A job board: mail names the first three by sender; the jobspy scanner names
+ * each posting's board by jobspy's own site names.
+ */
+export type Source =
+  | "linkedin"
+  | "indeed"
+  | "glassdoor"
+  | "zip_recruiter"
+  | "google"
+  | "bayt"
+  | "naukri"
+  | "bdjobs"
+  | "hellowork"
+  | "other";
 
 /** Filled in by code from the message, never by the model. */
 export interface Provenance {

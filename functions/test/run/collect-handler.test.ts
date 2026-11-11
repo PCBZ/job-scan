@@ -12,6 +12,15 @@ describe("collectHandler", () => {
   it("builds the pipeline from the credential it's given and collects the message's day", async () => {
     const f = fakes();
     await runIngest(f, quiet);
+    // The jobspy scanner's file, so collect has every source and runs.
+    const mailFile = await f.handoffs.read(f.handoffMessages[0]?.blob ?? "");
+    await f.handoffs.write({
+      ...mailFile,
+      source: "jobspy",
+      mail: null,
+      extracted: [],
+      postings: [],
+    });
     const given: TokenCredential[] = [];
     const make = (_env: Record<string, string | undefined>, c: TokenCredential) => {
       given.push(c);

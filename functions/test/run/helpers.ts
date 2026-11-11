@@ -13,7 +13,7 @@ export async function runDay(
   pipeline: Day,
   log: RunLog,
   signal?: AbortSignal,
-  options: CollectOptions = {},
+  options: CollectOptions = { expected: ["mail"] },
 ) {
   await runIngest(pipeline, log, signal);
   const message = pipeline.handoffMessages.at(-1);

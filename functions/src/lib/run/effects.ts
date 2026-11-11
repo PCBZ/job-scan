@@ -64,7 +64,7 @@ export function productionEffects(d: EffectsServices): Effects {
     async markSeen({ mail, top }) {
       const day = runDay(d.now());
       await d.seen.markSeen(
-        mail.messages.map((m) => ({ account: m.account, message_id: m.message_id })),
+        (mail?.messages ?? []).map((m) => ({ account: m.account, message_id: m.message_id })),
         day,
       );
       await d.seenJobs.recordRecommended(

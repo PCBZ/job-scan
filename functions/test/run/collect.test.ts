@@ -11,6 +11,9 @@ import { fakes } from "../workflow/fakes.js";
 
 const quiet = { log: () => {}, error: () => {} };
 
+/** The mail source alone, as before another source existed. */
+const MAIL = { expected: ["mail"] };
+
 /** The mail source has run; its message is what collect gets. */
 async function afterMail(options: Parameters<typeof fakes>[0] = {}) {
   const f = fakes(options);
@@ -20,11 +23,15 @@ async function afterMail(options: Parameters<typeof fakes>[0] = {}) {
 }
 
 /** Another source's file for the same day, as a second source would write it. */
-async function otherSource(f: Awaited<ReturnType<typeof afterMail>>["f"], message: HandoffMessage) {
+async function otherSource(
+  f: Awaited<ReturnType<typeof afterMail>>["f"],
+  message: HandoffMessage,
+  source = "second",
+) {
   const mailFile = await f.handoffs.read(message.blob);
   return f.handoffs.write({
     ...mailFile,
-    source: "second",
+    source,
     started_at: "2026-10-13T12:00:00.000Z",
     mail: null,
     extracted: [posting({ title: "Platform Engineer", row: 9 })],
@@ -42,7 +49,7 @@ async function otherSource(f: Awaited<ReturnType<typeof afterMail>>["f"], messag
 describe("collect", () => {
   it("runs on the mail source's message alone, as the whole day's run once did", async () => {
     const { f, message } = await afterMail();
-    const result = await runCollect(f, message, quiet);
+    const result = await runCollect(f, message, quiet, MAIL);
     expect(result).toMatchObject({ status: "ran", summary: { outcome: "report", top: 1 } });
     expect(f.log).toContain("deliver");
     expect(f.log).toContain("mark_seen");
@@ -50,16 +57,16 @@ describe("collect", () => {
 
   it("does nothing for a message it already collected", async () => {
     const { f, message } = await afterMail();
-    await runCollect(f, message, quiet);
+    await runCollect(f, message, quiet, MAIL);
     f.log.length = 0;
-    expect(await runCollect(f, message, quiet)).toEqual({ status: "duplicate" });
+    expect(await runCollect(f, message, quiet, MAIL)).toEqual({ status: "duplicate" });
     expect(f.log).toEqual([]);
   });
 
   it("is not retried after a failed run: its mail is reported again tomorrow", async () => {
     const { f, message } = await afterMail({ deliverFails: true });
-    await expect(runCollect(f, message, quiet)).rejects.toThrow("smtp down");
-    expect(await runCollect(f, message, quiet)).toEqual({ status: "duplicate" });
+    await expect(runCollect(f, message, quiet, MAIL)).rejects.toThrow("smtp down");
+    expect(await runCollect(f, message, quiet, MAIL)).toEqual({ status: "duplicate" });
     expect(f.log).not.toContain("mark_seen");
   });
 
@@ -70,9 +77,58 @@ describe("collect", () => {
       written.push(startedAt.toISOString());
       return "x.jsonl";
     };
-    await runCollect(f, message, quiet);
+    await runCollect(f, message, quiet, MAIL);
     const mailFile = await f.handoffs.read(message.blob);
     expect(written).toEqual([mailFile.started_at]);
+  });
+
+  describe("with every source there is", () => {
+    const at = (message: HandoffMessage, minutes: number) => () =>
+      new Date(Date.parse(message.first_seen) + minutes * 60_000);
+
+    it("runs on mail and jobspy together, merging their postings", async () => {
+      const { f, message } = await afterMail();
+      await otherSource(f, message, "jobspy");
+      const result = await runCollect(f, message, quiet);
+      expect(result).toMatchObject({ status: "ran", summary: { outcome: "report" } });
+      if (result.status === "ran") expect(result.summary.extracted).toEqual({ indeed: 2 });
+    });
+
+    it("goes on with jobspy's postings on a day with no mail", async () => {
+      const { f, message } = await afterMail({ messages: 0 });
+      await otherSource(f, message, "jobspy");
+      const result = await runCollect(f, message, quiet);
+      expect(result).toMatchObject({ status: "ran", summary: { outcome: "report" } });
+      expect(f.log).toContain("mark_seen");
+    });
+
+    it("sends the short report when neither source has anything", async () => {
+      const { f, message } = await afterMail({ messages: 0 });
+      const mailFile = await f.handoffs.read(message.blob);
+      await f.handoffs.write({ ...mailFile, source: "jobspy", mail: null });
+      const result = await runCollect(f, message, quiet);
+      expect(result).toMatchObject({ status: "ran", summary: { outcome: "no_mail" } });
+    });
+
+    it("waits for jobspy, and runs on the mail alone at the deadline", async () => {
+      const { f, message } = await afterMail();
+      const sent: unknown[] = [];
+      f.handoffQueue.send = async (m) => void sent.push(m);
+      const waiting = await runCollect(f, message, quiet, { now: at(message, 5) });
+      expect(waiting).toEqual({ status: "waiting", missing: ["jobspy"] });
+      expect(sent).toHaveLength(1);
+      const late = await runCollect(f, message, quiet, {
+        now: at(message, COLLECT_DEADLINE_MINUTES + 1),
+      });
+      expect(late.status).toBe("ran");
+    });
+
+    it("runs on jobspy's message when mail's file is the one missing", async () => {
+      const { f, message } = await afterMail();
+      const blob = await otherSource(f, message, "jobspy");
+      const result = await runCollect(f, { ...message, source: "jobspy", blob }, quiet);
+      expect(result.status).toBe("ran");
+    });
   });
 
   describe("with a second source expected", () => {
@@ -133,6 +189,7 @@ describe("collect", () => {
       { ...f, throttledMs: () => 5, rateLimited: () => 2 },
       message,
       quiet,
+      MAIL,
     );
     expect(result).toMatchObject({ summary: { throttledMs: 15, rateLimited: 3 } });
   });
@@ -162,7 +219,7 @@ describe("ingest", () => {
     const f = fakes({ messages: 0 });
     await runIngest(f, quiet);
     expect(f.handoffMessages).toHaveLength(1);
-    const result = await runCollect(f, f.handoffMessages[0] as HandoffMessage, quiet);
+    const result = await runCollect(f, f.handoffMessages[0] as HandoffMessage, quiet, MAIL);
     expect(result).toMatchObject({ status: "ran", summary: { outcome: "no_mail" } });
   });
 

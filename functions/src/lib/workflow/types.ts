@@ -114,7 +114,10 @@ export interface Effects {
     signal?: AbortSignal,
   ): Promise<string[]>;
   /** After delivery: record the seen messages and the recommended postings. */
-  markSeen(input: { mail: FetchPayload; top: Ranked[] }, signal?: AbortSignal): Promise<void>;
+  markSeen(
+    input: { mail: FetchPayload | null; top: Ranked[] },
+    signal?: AbortSignal,
+  ): Promise<void>;
 }
 
 export type Outcome = "report" | "no_mail" | "nothing_left" | "no_resumes";

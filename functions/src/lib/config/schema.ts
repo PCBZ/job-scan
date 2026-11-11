@@ -50,6 +50,36 @@ const profile = z.strictObject({
   exclude_keywords: strings.optional(),
 });
 
+// The jobspy scanner's own table (jobspy-scanner/scanner/config.py); the mail
+// pipeline ignores it. Its target titles and locations come from [profile],
+// and `titles` here narrows the scan to fewer.
+const jobspy = z.strictObject({
+  enabled: z.boolean().optional(),
+  titles: strings.optional(),
+  sites: z
+    .array(
+      z.enum([
+        "linkedin",
+        "indeed",
+        "glassdoor",
+        "zip_recruiter",
+        "google",
+        "bayt",
+        "naukri",
+        "bdjobs",
+        "hellowork",
+      ]),
+    )
+    .optional(),
+  results_wanted: positiveInt.optional(),
+  hours_old: positiveInt.optional(),
+  concurrency: positiveInt.optional(),
+  max_postings: positiveInt.optional(),
+  extract_concurrency: positiveInt.optional(),
+  country_indeed: z.string().trim().min(1).optional(),
+  fetch_descriptions: z.boolean().optional(),
+});
+
 const report = z.strictObject({
   max_top_picks: positiveInt.optional(),
   min_score_to_recommend: z.number().min(0).max(100).optional(),
@@ -89,6 +119,7 @@ const resume = z.strictObject({
 export const rawConfig = z.strictObject({
   account: z.array(account).optional(),
   mail: mail.optional(),
+  jobspy: jobspy.optional(),
   profile: profile.optional(),
   report: report.optional(),
   resume: resume.optional(),
