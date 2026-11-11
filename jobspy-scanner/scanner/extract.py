@@ -67,13 +67,11 @@ def user_message(row: dict) -> str:
 
 
 class Extractor:
-    def __init__(self, client: AzureOpenAI, model: str, reasoning_effort: str | None = None):
+    def __init__(self, client: AzureOpenAI, model: str):
         self.client = client
         self.model = model
-        self.reasoning_effort = reasoning_effort
 
     def extract(self, row: dict) -> tuple[Extracted, Usage]:
-        extra = {"reasoning_effort": self.reasoning_effort} if self.reasoning_effort else {}
         completion = self.client.beta.chat.completions.parse(
             model=self.model,
             messages=[
@@ -81,7 +79,6 @@ class Extractor:
                 {"role": "user", "content": user_message(row)},
             ],
             response_format=Extracted,
-            **extra,
         )
         parsed = completion.choices[0].message.parsed
         if parsed is None:
@@ -91,14 +88,10 @@ class Extractor:
 
 
 def extractor_from_env(env: dict[str, str], credential: TokenCredential) -> Extractor:
-    """From MODEL_EXTRACT_NAME / _ENDPOINT / _API_VERSION / _REASONING_EFFORT, else MODEL_*.
+    """From MODEL_EXTRACT_NAME / _ENDPOINT / _API_VERSION, else MODEL_*, as the Node app does."""
 
-    Like the Node app, the extract slot takes the main slot's name, endpoint and
-    API version, but never its reasoning effort.
-    """
-
-    def pick(key: str, fallback: bool = True) -> str:
-        return (env.get(f"MODEL_EXTRACT_{key}") or (env.get(f"MODEL_{key}") if fallback else "") or "").strip()
+    def pick(key: str) -> str:
+        return (env.get(f"MODEL_EXTRACT_{key}") or env.get(f"MODEL_{key}") or "").strip()
 
     endpoint, name = pick("ENDPOINT"), pick("NAME")
     for key, value in (("MODEL_ENDPOINT", endpoint), ("MODEL_NAME", name)):
@@ -111,7 +104,7 @@ def extractor_from_env(env: dict[str, str], credential: TokenCredential) -> Extr
         max_retries=MAX_RETRIES,
         timeout=TIMEOUT_SECONDS,
     )
-    return Extractor(client, name, pick("REASONING_EFFORT", fallback=False) or None)
+    return Extractor(client, name)
 
 
 @dataclass

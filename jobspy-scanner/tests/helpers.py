@@ -130,6 +130,6 @@ class FakeOpenAI:
         return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=usage)
 
 
-def extractor(answer=lambda **_: PYTHON_ROLE, effort: str | None = None) -> Extractor:
+def extractor(answer=lambda **_: PYTHON_ROLE) -> Extractor:
     client = FakeOpenAI(answer)
-    return Extractor(client, "extract-deployment", effort)  # type: ignore[arg-type]
+    return Extractor(client, "extract-deployment")  # type: ignore[arg-type]

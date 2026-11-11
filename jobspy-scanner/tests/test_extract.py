@@ -38,13 +38,7 @@ def test_one_structured_call_per_posting():
     (request,) = client.requests
     assert request["model"] == "dep" and request["response_format"] is Extracted
     assert request["messages"][0] == {"role": "system", "content": SYSTEM}
-    assert "reasoning_effort" not in request
-
-
-def test_reasoning_effort_is_sent_only_when_set():
-    client = FakeOpenAI()
-    Extractor(client, "dep", "none").extract(INDEED)  # type: ignore[arg-type]
-    assert client.requests[0]["reasoning_effort"] == "none"
+    assert "reasoning_effort" not in request  # the scanner never sets one
 
 
 def test_an_answer_that_cannot_be_parsed_is_an_error():
@@ -88,18 +82,13 @@ class Credential:
 ENV = {
     "MODEL_ENDPOINT": "https://main.openai.azure.com",
     "MODEL_NAME": "main-deployment",
-    "MODEL_REASONING_EFFORT": "medium",
 }
 
 
-def test_the_extract_slot_takes_the_main_ones_name_and_endpoint_but_not_its_effort():
-    e = extractor_from_env(ENV, Credential())  # type: ignore[arg-type]
-    assert (e.model, e.reasoning_effort) == ("main-deployment", None)
-    own = extractor_from_env(
-        {**ENV, "MODEL_EXTRACT_NAME": "nano", "MODEL_EXTRACT_REASONING_EFFORT": "none"},
-        Credential(),  # type: ignore[arg-type]
-    )
-    assert (own.model, own.reasoning_effort) == ("nano", "none")
+def test_the_extract_slot_takes_the_main_ones_name_unless_it_has_its_own():
+    assert extractor_from_env(ENV, Credential()).model == "main-deployment"  # type: ignore[arg-type]
+    own = extractor_from_env({**ENV, "MODEL_EXTRACT_NAME": "nano"}, Credential())  # type: ignore[arg-type]
+    assert own.model == "nano"
 
 
 def test_a_missing_setting_is_named():
