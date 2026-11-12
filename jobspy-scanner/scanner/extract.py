@@ -15,12 +15,13 @@ import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as BudgetOver
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from azure.core.credentials import TokenCredential
 from azure.identity import get_bearer_token_provider
 from openai import AzureOpenAI
+from openai.types.chat import ParsedChatCompletion
 from pydantic import BaseModel
 
 log = logging.getLogger("jobspy-scanner")
@@ -52,8 +53,36 @@ class Extracted(BaseModel):
 
 @dataclass
 class Usage:
+    """Tokens a model call used, as the Node side's TokenUsage counts them."""
+
     input: int = 0
     output: int = 0
+    # Of the input, tokens served from, and written to, the prompt cache; of the
+    # output, tokens spent reasoning.
+    cached: int = 0
+    cache_write: int = 0
+    reasoning: int = 0
+    # The models that answered, as the provider names them with their version.
+    models: set[str] = field(default_factory=set)
+
+    def __iadd__(self, other: Usage) -> Usage:
+        self.input += other.input
+        self.output += other.output
+        self.cached += other.cached
+        self.cache_write += other.cache_write
+        self.reasoning += other.reasoning
+        self.models |= other.models
+        return self
+
+    def as_json(self) -> dict:
+        return {
+            "input": self.input,
+            "output": self.output,
+            "cached": self.cached,
+            "cacheWrite": self.cache_write,
+            "reasoning": self.reasoning,
+            **({"models": sorted(self.models)} if self.models else {}),
+        }
 
 
 def user_message(row: dict) -> str:
@@ -71,7 +100,9 @@ class Extractor:
         self.client = client
         self.model = model
 
-    def extract(self, row: dict) -> tuple[Extracted, Usage]:
+    def extract(self, row: dict) -> tuple[Extracted | None, Usage]:
+        """The model's reading of one row, and what the call used. A refusal still
+        used tokens, so it returns None with them rather than raising."""
         completion = self.client.beta.chat.completions.parse(
             model=self.model,
             messages=[
@@ -80,11 +111,23 @@ class Extractor:
             ],
             response_format=Extracted,
         )
-        parsed = completion.choices[0].message.parsed
-        if parsed is None:
-            raise ValueError("the model refused or returned nothing parsable")
-        usage = completion.usage
-        return parsed, Usage(usage.prompt_tokens, usage.completion_tokens) if usage else Usage()
+        return completion.choices[0].message.parsed, usage_of(completion)
+
+
+def usage_of(completion: ParsedChatCompletion[Extracted]) -> Usage:
+    """What the call used; a provider that doesn't say leaves the count at zero."""
+    used = completion.usage
+    if used is None:
+        return Usage()
+    prompt, output = used.prompt_tokens_details, used.completion_tokens_details
+    return Usage(
+        input=used.prompt_tokens,
+        output=used.completion_tokens,
+        cached=(prompt.cached_tokens or 0) if prompt else 0,
+        cache_write=(prompt.cache_write_tokens or 0) if prompt else 0,
+        reasoning=(output.reasoning_tokens or 0) if output else 0,
+        models={completion.model},
+    )
 
 
 def extractor_from_env(env: dict[str, str], credential: TokenCredential) -> Extractor:
@@ -115,6 +158,7 @@ class Extractions:
     failed: int
     unfinished: int
     usage: Usage
+    seconds: float
 
 
 def extract_all(
@@ -139,15 +183,18 @@ def extract_all(
                     failed += 1
                     log.warning("extraction failed: %s", type(err).__name__)
                 else:
-                    usage.input += used.input
-                    usage.output += used.output
+                    usage += used
+                    if results[futures[future]] is None:
+                        failed += 1
+                        log.warning("extraction refused or returned nothing parsable")
         except BudgetOver:
             pass
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
     unfinished = sum(1 for f in futures if f.cancelled() or not f.done())
+    seconds = clock() - started
     log.info(
         "extracted %d postings in %.0fs: %d failed, %d unfinished, %d input and %d output tokens",
-        len(rows), clock() - started, failed, unfinished, usage.input, usage.output,
+        len(rows), seconds, failed, unfinished, usage.input, usage.output,
     )  # fmt: skip
-    return Extractions(results, failed, unfinished, usage)
+    return Extractions(results, failed, unfinished, usage, seconds)

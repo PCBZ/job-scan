@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
 import pandas as pd
+from openai.types.completion_usage import CompletionUsage
 
 from scanner.extract import Extracted, Extractor
 
@@ -127,8 +128,20 @@ class FakeOpenAI:
         self.requests.append(kwargs)
         parsed = self._answer(**kwargs)
         message = SimpleNamespace(parsed=parsed)
-        usage = SimpleNamespace(prompt_tokens=100, completion_tokens=20)
-        return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=usage)
+        usage = CompletionUsage.model_validate(
+            {
+                "prompt_tokens": 100,
+                "completion_tokens": 20,
+                "total_tokens": 120,
+                "prompt_tokens_details": {"cached_tokens": 40, "cache_write_tokens": 8},
+                "completion_tokens_details": {"reasoning_tokens": 5},
+            }
+        )
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=message)],
+            usage=usage,
+            model="extract-deployment-2026-03-17",
+        )
 
 
 def extractor(answer=lambda **_: PYTHON_ROLE) -> Extractor:
