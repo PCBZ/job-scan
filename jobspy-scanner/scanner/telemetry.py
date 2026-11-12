@@ -6,8 +6,8 @@ and spans go nowhere.
 
 The distro instruments HTTP clients by default. Those are off here: jobspy
 scrapes through `requests`, and every search URL carries the target titles and
-locations. (The OpenAI client uses `httpx2`, which the distro doesn't
-instrument; OpenInference spans its calls.)
+locations; the OpenAI client goes through `httpx2`, and OpenInference already
+spans those calls.
 Only this scanner's own logger is exported, never a library's: jobspy logs
 the URLs it fetched. OpenInference hides prompts and answers, which hold
 posting text. Span names follow the Node side ("node <stage>"), so the
@@ -25,7 +25,7 @@ LOGGER = "jobspy-scanner"
 TRACER = "jobspy-scanner"
 
 # The distro's instrumentations that would record request URLs or duplicate spans.
-HTTP_CLIENTS = ("requests", "urllib", "urllib3", "httpx")
+HTTP_CLIENTS = ("requests", "urllib", "urllib3", "httpx", "httpx2")
 
 
 def configure(
@@ -58,9 +58,21 @@ def instrument_openai(tracer_provider: trace.TracerProvider | None = None) -> No
 
 @contextmanager
 def span(name: str) -> Iterator[trace.Span]:
-    """A span current for the block; an exception marks it failed and goes on."""
-    with trace.get_tracer(TRACER).start_as_current_span(name) as current:
-        yield current
+    """A span current for the block; an exception marks it failed and goes on.
+
+    Only the exception's type is recorded: its message can hold config values
+    or posting text (a validation error quotes its input)."""
+    tracer = trace.get_tracer(TRACER)
+    with tracer.start_as_current_span(
+        name, record_exception=False, set_status_on_exception=False
+    ) as current:
+        try:
+            yield current
+        except BaseException as err:
+            kind = type(err).__name__
+            current.add_event("exception", {"exception.type": kind})
+            current.set_status(trace.Status(trace.StatusCode.ERROR, kind))
+            raise
 
 
 def trace_of(current: trace.Span) -> dict[str, str] | None:

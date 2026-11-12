@@ -22,7 +22,7 @@ def test_it_exports_only_its_own_logs_with_the_http_clients_off():
     (options,) = calls
     assert options["logger_name"] == LOGGER
     assert options["instrumentation_options"] == {name: {"enabled": False} for name in HTTP_CLIENTS}
-    assert {"requests", "httpx"} <= set(HTTP_CLIENTS)
+    assert {"requests", "httpx2"} <= set(HTTP_CLIENTS)
 
 
 def test_a_run_is_one_trace_its_stages_nest_under_it_and_the_file_names_it(spans):
@@ -106,3 +106,39 @@ def test_each_model_call_is_a_span_under_its_stage_with_no_posting_text(spans):
     recorded = json.dumps([dict(c.attributes or {}) for c in calls], default=str)
     assert DESCRIPTION not in recorded and "Acme Pay" not in recorded
     assert "extract-2026-03-17" in recorded  # the model is kept
+
+
+def _everything_exported(spans) -> str:
+    """Every attribute, event and status a test's spans would export, as text."""
+    return json.dumps(
+        [
+            {
+                "attributes": dict(s.attributes or {}),
+                "events": [dict(e.attributes or {}) for e in s.events],
+                "status": s.status.description,
+            }
+            for s in spans.get_finished_spans()
+        ],
+        default=str,
+    )
+
+
+def test_an_answer_that_does_not_fit_is_no_result_and_its_text_stays_out_of_the_spans(spans):
+    bad = {"workplace": "QUOTED-FROM-THE-POSTING", "salary": "", "requirements": [], "skills": []}
+    result, usage = Extractor(_azure_openai(bad), "extract").extract(INDEED)
+    assert result is None and usage.input == 100
+    (call,) = spans.get_finished_spans()
+    assert call.status.is_ok
+    assert "QUOTED-FROM-THE-POSTING" not in _everything_exported(spans)
+
+
+def test_a_failed_stage_records_the_error_type_only(spans):
+    try:
+        with span("node scrape"):
+            raise ValueError("Acme Pay, Software Engineer in Boston")
+    except ValueError:
+        pass
+    (stage,) = spans.get_finished_spans()
+    assert stage.status.description == "ValueError"
+    assert [dict(e.attributes or {}) for e in stage.events] == [{"exception.type": "ValueError"}]
+    assert "Acme Pay" not in _everything_exported(spans)
