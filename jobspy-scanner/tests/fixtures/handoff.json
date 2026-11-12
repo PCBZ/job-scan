@@ -4,10 +4,7 @@
   "day": "2026-11-10",
   "started_at": "2026-11-10T15:00:01.113Z",
   "trace": null,
-  "node_ms": {
-    "scrape": 1500,
-    "extract_postings": 2500
-  },
+  "node_ms": {},
   "throttled_ms": 0,
   "rate_limited": 0,
   "mail": null,
@@ -143,16 +140,7 @@
     }
   },
   "suspicious": {},
-  "usage": {
-    "extract_postings": {
-      "input": 300,
-      "output": 60,
-      "cached": 120,
-      "cacheWrite": 24,
-      "reasoning": 15,
-      "models": ["extract-deployment-2026-03-17"]
-    }
-  },
+  "usage": {},
   "extract_loop": {
     "turns": [],
     "problems": [],

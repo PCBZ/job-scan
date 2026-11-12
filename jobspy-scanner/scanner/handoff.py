@@ -40,8 +40,6 @@ def build_handoff(
     dropped: dict[str, int],
     warnings: list[str],
     scrape: dict | None = None,
-    usage: dict | None = None,
-    node_ms: dict[str, int] | None = None,
 ) -> dict:
     return {
         "version": 1,
@@ -49,7 +47,7 @@ def build_handoff(
         "day": run_day(started_at),
         "started_at": iso(started_at),
         "trace": None,
-        "node_ms": node_ms or {},
+        "node_ms": {},
         "throttled_ms": 0,
         "rate_limited": 0,
         "mail": None,
@@ -58,7 +56,7 @@ def build_handoff(
         "dropped": dropped,
         **({"scrape": scrape} if scrape else {}),
         "suspicious": {},
-        "usage": usage or {},
+        "usage": {},
         "extract_loop": {"turns": [], "problems": [], "retry": False},
         "warnings": warnings,
     }
