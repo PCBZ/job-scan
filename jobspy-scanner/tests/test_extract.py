@@ -73,9 +73,15 @@ def test_a_provider_that_reports_no_details_counts_zero_for_them():
 
     from scanner.extract import usage_of
 
-    bare = SimpleNamespace(usage=SimpleNamespace(prompt_tokens=7, completion_tokens=3))
-    assert usage_of(bare).as_json() == {"input": 7, "output": 3, "cached": 0, "reasoning": 0}
-    assert usage_of(SimpleNamespace(usage=None)).as_json()["input"] == 0
+    from openai.types.completion_usage import CompletionUsage
+
+    bare = SimpleNamespace(
+        usage=CompletionUsage(prompt_tokens=7, completion_tokens=3, total_tokens=10), model="m"
+    )
+    assert usage_of(bare).as_json() == {  # type: ignore[arg-type]
+        "input": 7, "output": 3, "cached": 0, "reasoning": 0, "models": ["m"],
+    }  # fmt: skip
+    assert usage_of(SimpleNamespace(usage=None, model="m")).as_json()["input"] == 0  # type: ignore[arg-type]
 
 
 def test_postings_still_waiting_at_the_budget_are_given_up_on():

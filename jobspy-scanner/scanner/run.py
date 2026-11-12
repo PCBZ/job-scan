@@ -53,22 +53,19 @@ def scan(
     started_at: datetime,
     clock: Callable[[], float] = time.monotonic,
 ) -> dict:
-    begun = clock()
-    scraped = run_searches(config, scrape)
-    scrape_ms = round((clock() - begun) * 1000)
+    scraped = run_searches(config, scrape, clock=clock)
     rows, dropped = distinct(scraped.rows)
     warnings = list(scraped.warnings)
     if len(rows) > config.max_postings:
         warnings.append(f"jobspy: {len(rows) - config.max_postings} postings left out (max_postings)")
         rows = rows[: config.max_postings]
-    begun = clock()
     done = extract_all(
         rows,
         extractor,
         concurrency=config.extract_concurrency,
         budget=EXTRACT_BUDGET_SECONDS,
+        clock=clock,
     )
-    extract_ms = round((clock() - begun) * 1000)
     if done.failed or done.unfinished:
         warnings.append(
             f"jobspy: {done.failed + done.unfinished} of {len(rows)} postings kept without "
@@ -85,7 +82,10 @@ def scan(
         # The Node side's names: usage is priced by the node's model, and the
         # scanner reads postings with the extract deployment the mail source uses.
         usage={"extract_postings": done.usage.as_json()} if rows else {},
-        node_ms={"scrape": scrape_ms, "extract_postings": extract_ms},
+        node_ms={
+            "scrape": round(scraped.seconds * 1000),
+            "extract_postings": round(done.seconds * 1000),
+        },
     )
 
 

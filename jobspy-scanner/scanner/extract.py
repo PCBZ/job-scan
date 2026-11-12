@@ -21,6 +21,7 @@ from typing import Literal
 from azure.core.credentials import TokenCredential
 from azure.identity import get_bearer_token_provider
 from openai import AzureOpenAI
+from openai.types.chat import ParsedChatCompletion
 from pydantic import BaseModel
 
 log = logging.getLogger("jobspy-scanner")
@@ -62,12 +63,13 @@ class Usage:
     # The models that answered, as the provider names them with their version.
     models: set[str] = field(default_factory=set)
 
-    def add(self, other: Usage) -> None:
+    def __iadd__(self, other: Usage) -> Usage:
         self.input += other.input
         self.output += other.output
         self.cached += other.cached
         self.reasoning += other.reasoning
         self.models |= other.models
+        return self
 
     def as_json(self) -> dict:
         return {
@@ -109,19 +111,18 @@ class Extractor:
         return parsed, usage_of(completion)
 
 
-def usage_of(completion) -> Usage:
+def usage_of(completion: ParsedChatCompletion[Extracted]) -> Usage:
     """What the call used; a provider that doesn't say leaves the count at zero."""
     used = completion.usage
-    if not used:
+    if used is None:
         return Usage()
-    prompt = getattr(used, "prompt_tokens_details", None)
-    output = getattr(used, "completion_tokens_details", None)
+    prompt, output = used.prompt_tokens_details, used.completion_tokens_details
     return Usage(
         input=used.prompt_tokens,
         output=used.completion_tokens,
-        cached=getattr(prompt, "cached_tokens", 0) or 0,
-        reasoning=getattr(output, "reasoning_tokens", 0) or 0,
-        models={completion.model} if getattr(completion, "model", None) else set(),
+        cached=(prompt.cached_tokens or 0) if prompt else 0,
+        reasoning=(output.reasoning_tokens or 0) if output else 0,
+        models={completion.model},
     )
 
 
@@ -153,6 +154,7 @@ class Extractions:
     failed: int
     unfinished: int
     usage: Usage
+    seconds: float
 
 
 def extract_all(
@@ -177,14 +179,15 @@ def extract_all(
                     failed += 1
                     log.warning("extraction failed: %s", type(err).__name__)
                 else:
-                    usage.add(used)
+                    usage += used
         except BudgetOver:
             pass
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
     unfinished = sum(1 for f in futures if f.cancelled() or not f.done())
+    seconds = clock() - started
     log.info(
         "extracted %d postings in %.0fs: %d failed, %d unfinished, %d input and %d output tokens",
-        len(rows), clock() - started, failed, unfinished, usage.input, usage.output,
+        len(rows), seconds, failed, unfinished, usage.input, usage.output,
     )  # fmt: skip
-    return Extractions(results, failed, unfinished, usage)
+    return Extractions(results, failed, unfinished, usage, seconds)

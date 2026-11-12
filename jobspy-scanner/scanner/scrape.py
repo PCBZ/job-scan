@@ -30,6 +30,7 @@ class Scraped:
     warnings: list[str] = field(default_factory=list)
     searches: int = 0
     failed: int = 0
+    seconds: float = 0.0
     # Per site: rows returned, and searches in which it returned none. A blocked
     # site raises nothing; it goes quiet, and this is where that shows.
     sites: dict[str, dict[str, int]] = field(default_factory=dict)
@@ -118,10 +119,11 @@ def run_searches(
         out.warnings.append(f"jobspy: {unfinished} searches unfinished after {budget:.0f}s")
     if empty:
         out.warnings.append(f"jobspy: {empty} of {len(todo)} searches found nothing")
+    out.seconds = clock() - started
     log.info(
         "scanned %d searches in %.0fs: %d rows, %d failed, %d empty, %d unfinished",
         len(todo),
-        clock() - started,
+        out.seconds,
         len(out.rows),
         failed,
         empty,
