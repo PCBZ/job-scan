@@ -8,12 +8,8 @@ from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobClient, ContainerClient
 from azure.storage.queue import QueueClient
 
-from scanner import telemetry
 from scanner.extract import extractor_from_env
 from scanner.run import run_scan
-
-# Before any client is built: OpenInference patches the OpenAI client.
-telemetry.configure(dict(os.environ))
 
 app = func.FunctionApp()
 

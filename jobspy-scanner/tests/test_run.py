@@ -103,16 +103,8 @@ def test_a_failed_scan_still_hands_over_so_collect_does_not_wait_the_deadline():
 def test_the_file_matches_the_golden_file():
     """The shape SourceHandoff (functions/src/lib/run/handoff.ts) reads, kept as a golden file."""
     fixture = json.loads((Path(__file__).parent / "fixtures" / "handoff.json").read_text())
-    times = iter([0.0, 1.5, 1.5, 4.0])  # scrape 1.5 s, then extract 2.5 s
-    scanned = scan(parse_config(CONFIG), scrape, extractor(), STARTED_AT, clock=lambda: next(times))
+    scanned = scan(parse_config(CONFIG), scrape, extractor(), STARTED_AT)
     assert scanned == fixture
-    assert scanned["node_ms"] == {"scrape": 1500, "extract_postings": 2500}
-
-
-def test_a_day_with_nothing_to_read_reports_no_usage():
-    times = iter([0.0, 1.0, 1.0, 1.0])
-    scanned = scan(parse_config(CONFIG), lambda **_: frame(), extractor(), STARTED_AT, clock=lambda: next(times))
-    assert scanned["usage"] == {} and scanned["node_ms"]["scrape"] == 1000
 
 
 def test_the_message_matches_the_golden_file():

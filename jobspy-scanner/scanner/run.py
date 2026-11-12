@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 
@@ -15,7 +14,6 @@ from .extract import Extractor, extract_all
 from .handoff import build_handoff, message_for, send_message, write_handoff
 from .mapping import SITES, fingerprint, posting_from, text, usable
 from .scrape import Scrape, run_searches
-from .telemetry import span, trace_of
 
 log = logging.getLogger("jobspy-scanner")
 
@@ -47,28 +45,19 @@ def distinct(rows: list[dict]) -> tuple[list[dict], dict[str, int]]:
     return kept, dropped
 
 
-def scan(
-    config: ScanConfig,
-    scrape: Scrape,
-    extractor: Extractor,
-    started_at: datetime,
-    clock: Callable[[], float] = time.monotonic,
-) -> dict:
-    with span("node scrape"):
-        scraped = run_searches(config, scrape, clock=clock)
+def scan(config: ScanConfig, scrape: Scrape, extractor: Extractor, started_at: datetime) -> dict:
+    scraped = run_searches(config, scrape)
     rows, dropped = distinct(scraped.rows)
     warnings = list(scraped.warnings)
     if len(rows) > config.max_postings:
         warnings.append(f"jobspy: {len(rows) - config.max_postings} postings left out (max_postings)")
         rows = rows[: config.max_postings]
-    with span("node extract_postings"):
-        done = extract_all(
-            rows,
-            extractor,
-            concurrency=config.extract_concurrency,
-            budget=EXTRACT_BUDGET_SECONDS,
-            clock=clock,
-        )
+    done = extract_all(
+        rows,
+        extractor,
+        concurrency=config.extract_concurrency,
+        budget=EXTRACT_BUDGET_SECONDS,
+    )
     if done.failed or done.unfinished:
         warnings.append(
             f"jobspy: {done.failed + done.unfinished} of {len(rows)} postings kept without "
@@ -82,13 +71,6 @@ def scan(
         dropped=dropped,
         warnings=warnings,
         scrape=scraped.stats(),
-        # The Node side's names: usage is priced by the node's model, and the
-        # scanner reads postings with the extract deployment the mail source uses.
-        usage={"extract_postings": done.usage.as_json()} if rows else {},
-        node_ms={
-            "scrape": round(scraped.seconds * 1000),
-            "extract_postings": round(done.seconds * 1000),
-        },
     )
 
 
@@ -106,27 +88,23 @@ def run_scan(
     `collect` waits for this source, so a scan that fails still writes an empty
     file (with the reason as a warning) before the error goes on: the day's
     report runs on the mail alone instead of waiting out the deadline.
-    The run is one span, the root of its trace; the file names that trace so
-    `collect` can link to it.
     """
-    with span("jobspy run") as run:
-        started_at = now()
-        try:
-            handoff = scan(parse_config(config_text()), scrape, extractor(), started_at)
-            error = None
-        except Exception as err:
-            error = err
-            handoff = build_handoff(
-                started_at=started_at,
-                extracted=[],
-                postings=[],
-                dropped={},
-                warnings=[f"jobspy: scan failed: {type(err).__name__}"],
-            )
-        handoff["trace"] = trace_of(run)
-        blob = write_handoff(container, handoff)
-        send_message(queue, message_for(handoff, blob, now()))
-        log.info("handed over %d postings", len(handoff["postings"]))
-        if error:
-            raise error
-        return blob
+    started_at = now()
+    try:
+        handoff = scan(parse_config(config_text()), scrape, extractor(), started_at)
+        error = None
+    except Exception as err:
+        error = err
+        handoff = build_handoff(
+            started_at=started_at,
+            extracted=[],
+            postings=[],
+            dropped={},
+            warnings=[f"jobspy: scan failed: {type(err).__name__}"],
+        )
+    blob = write_handoff(container, handoff)
+    send_message(queue, message_for(handoff, blob, now()))
+    log.info("handed over %d postings", len(handoff["postings"]))
+    if error:
+        raise error
+    return blob
