@@ -52,10 +52,13 @@ const profile = z.strictObject({
 });
 
 // The jobspy scanner's own table (jobspy-scanner/scanner/config.py); the mail
-// pipeline ignores it. Its target titles and locations come from [profile],
-// and `titles` here narrows the scan to fewer.
+// pipeline ignores it. Its target titles and locations come from [profile];
+// `titles` and `locations` here replace them for the scan only (the location
+// gate keeps [profile]'s), e.g. one metro area and a remote country instead of
+// every town in it.
 const jobspy = z.strictObject({
   titles: strings.optional(),
+  locations: strings.optional(),
   sites: z.array(z.enum(BOARDS)).optional(),
   results_wanted: positiveInt.optional(),
   hours_old: positiveInt.optional(),

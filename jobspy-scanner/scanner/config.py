@@ -1,7 +1,10 @@
 """The scan's settings, read from the same config.toml the Node app reads.
 
-Searches come from `target_titles` and `locations`, which the mail pipeline
-already uses. An optional `[jobspy]` table tunes the scrape; every key has a
+Searches come from `[profile]`'s `target_titles` and `locations`, which the
+mail pipeline already uses; `[jobspy]`'s `titles` and `locations` replace them
+for the scan only. A search term is passed to the boards as written, so one can
+join titles with OR. The mail pipeline's location gate keeps `[profile]`'s
+list. An optional `[jobspy]` table tunes the scrape; every key has a
 default, so a config without the table scans with those. Unknown keys in the
 table are an error, as in the Node app's config.
 """
@@ -47,7 +50,8 @@ class ScanConfig(BaseModel):
 def parse_config(text: str) -> ScanConfig:
     data = tomllib.loads(text)
     table = dict(data.get("jobspy", {}))
-    # A `titles` list in [jobspy] narrows the scan; the mail pipeline's list is the default.
+    # [jobspy]'s lists replace [profile]'s for the scan; [profile]'s are the default.
     profile = data.get("profile", {})
     titles = table.pop("titles", None) or profile.get("target_titles", [])
-    return ScanConfig(titles=titles, locations=profile.get("locations", []), **table)
+    locations = table.pop("locations", None) or profile.get("locations", [])
+    return ScanConfig(titles=titles, locations=locations, **table)
