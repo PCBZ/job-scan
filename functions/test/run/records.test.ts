@@ -51,6 +51,7 @@ function state(over: Partial<State> = {}): State {
     duplicates: 0,
     filtered: [],
     dropped: {},
+    scrape: null,
     judged: [],
     top: [],
     rest: [],
@@ -178,6 +179,12 @@ describe("runRecords", () => {
     const records = runRecords(state({ outcome: "no_mail" }), META);
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({ kind: "run", outcome: "no_mail", messages: 0, top: 0 });
+  });
+
+  it("carries what the scraping source saw on the run line, and nothing without one", () => {
+    const scrape = { searches: 2, failed: 0, sites: { indeed: { rows: 3, silent: 1 } } };
+    expect(runRecords(state({ scrape }), META).at(-1)).toMatchObject({ kind: "run", scrape });
+    expect(runRecords(state(), META).at(-1)).not.toHaveProperty("scrape");
   });
 
   it("keeps a pick whose variant or explanation is missing, with nulls", () => {

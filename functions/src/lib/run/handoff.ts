@@ -13,7 +13,7 @@ import { ContainerClient, RestError } from "@azure/storage-blob";
 import { QueueClient } from "@azure/storage-queue";
 import type { AllAccountsFailed, FetchPayload } from "../mail/types.js";
 import { addUsage, type TokenUsage } from "../model/types.js";
-import type { Source } from "../postings/types.js";
+import type { ScrapeStats, Source } from "../postings/types.js";
 import type { LoopState, State, Update } from "../workflow/state.js";
 import type { Posting, SuspiciousByMessage } from "../workflow/types.js";
 
@@ -44,6 +44,8 @@ export interface SourceHandoff {
   /** The rows that passed validation. */
   postings: Posting[];
   dropped: Partial<Record<Source, number>>;
+  /** Only a source that scrapes writes it. */
+  scrape?: ScrapeStats;
   suspicious: SuspiciousByMessage;
   usage: Record<string, TokenUsage>;
   extract_loop: LoopState;
@@ -187,7 +189,9 @@ export function seedFrom(handoffs: SourceHandoff[]): Update {
     Object.assign(suspicious, h.suspicious);
   }
   const withLoop = handoffs.find((h) => h.source === "mail");
+  const scrape = handoffs.find((h) => h.scrape)?.scrape;
   return {
+    ...(scrape ? { scrape } : {}),
     mail: handoffs.find((h) => h.mail !== null)?.mail ?? null,
     extracted: handoffs.flatMap((h) => h.extracted),
     postings: handoffs.flatMap((h) => h.postings),

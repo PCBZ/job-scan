@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as SearchTimeout, as_completed
 from dataclasses import dataclass, field
@@ -27,6 +28,15 @@ Scrape = Callable[..., object]
 class Scraped:
     rows: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    searches: int = 0
+    failed: int = 0
+    # Per site: rows returned, and searches in which it returned none. A blocked
+    # site raises nothing; it goes quiet, and this is where that shows.
+    sites: dict[str, dict[str, int]] = field(default_factory=dict)
+
+    def stats(self) -> dict:
+        """The Node side's ScrapeStats (functions/src/lib/postings/types.ts)."""
+        return {"searches": self.searches, "failed": self.failed, "sites": self.sites}
 
 
 def searches(config: ScanConfig) -> list[tuple[str, str]]:
@@ -73,7 +83,10 @@ def run_searches(
     clock: Callable[[], float] = time.monotonic,
 ) -> Scraped:
     todo = searches(config)
-    out = Scraped()
+    out = Scraped(
+        searches=len(todo),
+        sites={site.value: {"rows": 0, "silent": 0} for site in config.sites},
+    )
     failed = empty = unfinished = 0
     started = clock()
     pool = ThreadPoolExecutor(max_workers=config.concurrency)
@@ -85,10 +98,15 @@ def run_searches(
                     rows = future.result()
                 except Exception as err:  # a blocked or broken search, whatever the library raised
                     failed += 1
+                    out.failed += 1
                     log.warning("search failed: %s", type(err).__name__)
                 else:
                     empty += 0 if rows else 1
                     out.rows.extend(rows)
+                    seen = Counter(str(row.get("site", "")).lower() for row in rows)
+                    for site, counts in out.sites.items():
+                        counts["rows"] += seen[site]
+                        counts["silent"] += 0 if seen[site] else 1
         except SearchTimeout:
             unfinished = sum(1 for f in futures if not f.done())
     finally:

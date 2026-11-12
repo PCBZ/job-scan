@@ -5,7 +5,7 @@ import type { AppConfig } from "../config/load.js";
 import type { AllAccountsFailed, FetchPayload } from "../mail/types.js";
 import { addUsage, type RepairTurn, type TokenUsage } from "../model/types.js";
 import type { Filtered } from "../postings/gates.js";
-import type { Source } from "../postings/types.js";
+import type { ScrapeStats, Source } from "../postings/types.js";
 import type { ResumeSet } from "../resume/load.js";
 import type {
   Explanation,
@@ -52,6 +52,8 @@ export const WorkflowState = Annotation.Root({
   // Code gates (#16), then model gates (#17).
   filtered: appended<Filtered>(),
   dropped: last<Partial<Record<Source, number>>>({}),
+  /** What the scraping source saw, per board; null when none ran. */
+  scrape: last<ScrapeStats | null>(null),
   /** Answers kept from earlier runs, found before judge (#150). */
   recalled: last<Judgement[]>([]),
   judged: last<Judgement[]>([]),

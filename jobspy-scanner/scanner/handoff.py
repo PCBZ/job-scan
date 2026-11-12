@@ -39,6 +39,7 @@ def build_handoff(
     postings: list[dict],
     dropped: dict[str, int],
     warnings: list[str],
+    scrape: dict | None = None,
 ) -> dict:
     return {
         "version": 1,
@@ -53,6 +54,7 @@ def build_handoff(
         "extracted": extracted,
         "postings": postings,
         "dropped": dropped,
+        **({"scrape": scrape} if scrape else {}),
         "suspicious": {},
         "usage": {},
         "extract_loop": {"turns": [], "problems": [], "retry": False},

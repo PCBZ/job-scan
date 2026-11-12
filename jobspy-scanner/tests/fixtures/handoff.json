@@ -117,6 +117,28 @@
   "dropped": {
     "indeed": 1
   },
+  "scrape": {
+    "searches": 1,
+    "failed": 0,
+    "sites": {
+      "indeed": {
+        "rows": 3,
+        "silent": 0
+      },
+      "linkedin": {
+        "rows": 1,
+        "silent": 0
+      },
+      "glassdoor": {
+        "rows": 0,
+        "silent": 1
+      },
+      "zip_recruiter": {
+        "rows": 1,
+        "silent": 0
+      }
+    }
+  },
   "suspicious": {},
   "usage": {},
   "extract_loop": {

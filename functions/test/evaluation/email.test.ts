@@ -20,6 +20,33 @@ describe("formatting", () => {
   });
 });
 
+describe("the evaluation email's job boards", () => {
+  const scraped = evaluate(
+    records({
+      scrape: {
+        searches: 4,
+        failed: 0,
+        sites: { indeed: { rows: 5, silent: 0 }, google: { rows: 0, silent: 4 } },
+      },
+    }),
+    [],
+    null,
+    PRICES,
+  );
+
+  it("lists them in both parts on a day a source scraped", () => {
+    for (const part of [renderHtml(scraped), renderText(scraped)]) {
+      expect(part).toContain("Job boards");
+      expect(part).toContain("4 searches, 0 failed outright");
+      expect(part).toContain("google");
+    }
+  });
+
+  it("leaves the section out on a day without one", () => {
+    for (const part of [renderHtml(e), renderText(e)]) expect(part).not.toContain("Job boards");
+  });
+});
+
 describe("the evaluation email", () => {
   it("carries every section in both parts", () => {
     for (const part of [renderHtml(e), renderText(e)]) {
