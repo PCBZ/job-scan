@@ -15,6 +15,7 @@ from .extract import Extractor, extract_all
 from .handoff import build_handoff, message_for, send_message, write_handoff
 from .mapping import SITES, fingerprint, posting_from, text, usable
 from .scrape import Scrape, run_searches
+from .telemetry import span, trace_of
 
 log = logging.getLogger("jobspy-scanner")
 
@@ -53,19 +54,21 @@ def scan(
     started_at: datetime,
     clock: Callable[[], float] = time.monotonic,
 ) -> dict:
-    scraped = run_searches(config, scrape, clock=clock)
+    with span("node scrape"):
+        scraped = run_searches(config, scrape, clock=clock)
     rows, dropped = distinct(scraped.rows)
     warnings = list(scraped.warnings)
     if len(rows) > config.max_postings:
         warnings.append(f"jobspy: {len(rows) - config.max_postings} postings left out (max_postings)")
         rows = rows[: config.max_postings]
-    done = extract_all(
-        rows,
-        extractor,
-        concurrency=config.extract_concurrency,
-        budget=EXTRACT_BUDGET_SECONDS,
-        clock=clock,
-    )
+    with span("node extract_postings"):
+        done = extract_all(
+            rows,
+            extractor,
+            concurrency=config.extract_concurrency,
+            budget=EXTRACT_BUDGET_SECONDS,
+            clock=clock,
+        )
     if done.failed or done.unfinished:
         warnings.append(
             f"jobspy: {done.failed + done.unfinished} of {len(rows)} postings kept without "
@@ -103,23 +106,27 @@ def run_scan(
     `collect` waits for this source, so a scan that fails still writes an empty
     file (with the reason as a warning) before the error goes on: the day's
     report runs on the mail alone instead of waiting out the deadline.
+    The run is one span, the root of its trace; the file names that trace so
+    `collect` can link to it.
     """
-    started_at = now()
-    try:
-        handoff = scan(parse_config(config_text()), scrape, extractor(), started_at)
-        error = None
-    except Exception as err:
-        error = err
-        handoff = build_handoff(
-            started_at=started_at,
-            extracted=[],
-            postings=[],
-            dropped={},
-            warnings=[f"jobspy: scan failed: {type(err).__name__}"],
-        )
-    blob = write_handoff(container, handoff)
-    send_message(queue, message_for(handoff, blob, now()))
-    log.info("handed over %d postings", len(handoff["postings"]))
-    if error:
-        raise error
-    return blob
+    with span("jobspy run") as run:
+        started_at = now()
+        try:
+            handoff = scan(parse_config(config_text()), scrape, extractor(), started_at)
+            error = None
+        except Exception as err:
+            error = err
+            handoff = build_handoff(
+                started_at=started_at,
+                extracted=[],
+                postings=[],
+                dropped={},
+                warnings=[f"jobspy: scan failed: {type(err).__name__}"],
+            )
+        handoff["trace"] = trace_of(run)
+        blob = write_handoff(container, handoff)
+        send_message(queue, message_for(handoff, blob, now()))
+        log.info("handed over %d postings", len(handoff["postings"]))
+        if error:
+            raise error
+        return blob

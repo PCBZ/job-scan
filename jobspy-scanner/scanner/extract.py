@@ -10,6 +10,7 @@ is reached with the app's identity, so no key is stored.
 from __future__ import annotations
 
 import json
+from contextvars import copy_context
 import logging
 import time
 from collections.abc import Callable
@@ -174,7 +175,10 @@ def extract_all(
     started = clock()
     pool = ThreadPoolExecutor(max_workers=concurrency)
     try:
-        futures = {pool.submit(extractor.extract, row): i for i, row in enumerate(rows)}
+        # Each call runs in the caller's context, so its span nests under the stage's.
+        futures = {
+            pool.submit(copy_context().run, extractor.extract, row): i for i, row in enumerate(rows)
+        }
         try:
             for future in as_completed(futures, timeout=budget):
                 try:
