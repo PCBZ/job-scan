@@ -4,6 +4,7 @@ import pytest
 
 from scanner.extract import (
     MAX_DESCRIPTION_CHARS,
+    RESPONSE_FORMAT,
     SYSTEM,
     Extracted,
     Extractor,
@@ -36,7 +37,7 @@ def test_one_structured_call_per_posting():
     result, usage = Extractor(client, "dep").extract(INDEED)  # type: ignore[arg-type]
     assert result == PYTHON_ROLE and (usage.input, usage.output) == (100, 20)
     (request,) = client.requests
-    assert request["model"] == "dep" and request["response_format"] is Extracted
+    assert request["model"] == "dep" and request["response_format"] == RESPONSE_FORMAT
     assert request["messages"][0] == {"role": "system", "content": SYSTEM}
     assert "reasoning_effort" not in request  # the scanner never sets one
 
