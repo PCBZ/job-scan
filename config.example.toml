@@ -191,7 +191,7 @@ exclude_keywords = ["unpaid", "commission only", "MLM"]
 # concurrency = 2        # searches at once
 # max_postings = 200     # read by the model per day, after duplicates
 # extract_concurrency = 8
-# country_indeed = "USA"
+# country_indeed = "USA"  # Indeed's country: set it to the one the locations are in, e.g. "Canada"
 # fetch_descriptions = true
 
 [report]
