@@ -174,7 +174,11 @@ function boardRows(
 ): BoardRow[] {
   const count = (rows: { posting: { source: string } }[], site: string) =>
     rows.filter((r) => r.posting.source === site).length;
-  const sites = new Set([...Object.keys(scrape.sites), ...Object.keys(read)]);
+  const sites = new Set([
+    ...Object.keys(scrape.sites),
+    ...Object.keys(read),
+    ...Object.keys(dropped),
+  ]);
   return [...sites]
     .map((site) => ({
       site,

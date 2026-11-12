@@ -147,6 +147,25 @@ describe("evaluate", () => {
     ]);
   });
 
+  it("keeps a board that mail named but whose rows were all dropped", () => {
+    const only = evaluate(
+      records({
+        dropped: { glassdoor: 1, bayt: 2 },
+        scrape: { searches: 1, failed: 0, sites: { indeed: { rows: 1, silent: 0 } } },
+      }),
+      [],
+    );
+    expect(only.boards?.find((b) => b.site === "bayt")).toEqual({
+      site: "bayt",
+      scraped: null,
+      silent: null,
+      read: 0,
+      dropped: 2,
+      filtered: 0,
+      picks: 0,
+    });
+  });
+
   it("trends this run after the earlier ones, oldest first, ignoring later runs", () => {
     const earlier = [
       runLine({
