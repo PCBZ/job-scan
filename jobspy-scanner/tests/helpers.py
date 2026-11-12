@@ -133,7 +133,7 @@ class FakeOpenAI:
                 "prompt_tokens": 100,
                 "completion_tokens": 20,
                 "total_tokens": 120,
-                "prompt_tokens_details": {"cached_tokens": 40},
+                "prompt_tokens_details": {"cached_tokens": 40, "cache_write_tokens": 8},
                 "completion_tokens_details": {"reasoning_tokens": 5},
             }
         )

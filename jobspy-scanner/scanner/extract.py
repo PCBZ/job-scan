@@ -57,8 +57,10 @@ class Usage:
 
     input: int = 0
     output: int = 0
-    # Of the input, tokens served from the prompt cache; of the output, tokens spent reasoning.
+    # Of the input, tokens served from, and written to, the prompt cache; of the
+    # output, tokens spent reasoning.
     cached: int = 0
+    cache_write: int = 0
     reasoning: int = 0
     # The models that answered, as the provider names them with their version.
     models: set[str] = field(default_factory=set)
@@ -67,6 +69,7 @@ class Usage:
         self.input += other.input
         self.output += other.output
         self.cached += other.cached
+        self.cache_write += other.cache_write
         self.reasoning += other.reasoning
         self.models |= other.models
         return self
@@ -76,6 +79,7 @@ class Usage:
             "input": self.input,
             "output": self.output,
             "cached": self.cached,
+            "cacheWrite": self.cache_write,
             "reasoning": self.reasoning,
             **({"models": sorted(self.models)} if self.models else {}),
         }
@@ -96,7 +100,9 @@ class Extractor:
         self.client = client
         self.model = model
 
-    def extract(self, row: dict) -> tuple[Extracted, Usage]:
+    def extract(self, row: dict) -> tuple[Extracted | None, Usage]:
+        """The model's reading of one row, and what the call used. A refusal still
+        used tokens, so it returns None with them rather than raising."""
         completion = self.client.beta.chat.completions.parse(
             model=self.model,
             messages=[
@@ -105,10 +111,7 @@ class Extractor:
             ],
             response_format=Extracted,
         )
-        parsed = completion.choices[0].message.parsed
-        if parsed is None:
-            raise ValueError("the model refused or returned nothing parsable")
-        return parsed, usage_of(completion)
+        return completion.choices[0].message.parsed, usage_of(completion)
 
 
 def usage_of(completion: ParsedChatCompletion[Extracted]) -> Usage:
@@ -121,6 +124,7 @@ def usage_of(completion: ParsedChatCompletion[Extracted]) -> Usage:
         input=used.prompt_tokens,
         output=used.completion_tokens,
         cached=(prompt.cached_tokens or 0) if prompt else 0,
+        cache_write=(prompt.cache_write_tokens or 0) if prompt else 0,
         reasoning=(output.reasoning_tokens or 0) if output else 0,
         models={completion.model},
     )
@@ -180,6 +184,9 @@ def extract_all(
                     log.warning("extraction failed: %s", type(err).__name__)
                 else:
                     usage += used
+                    if results[futures[future]] is None:
+                        failed += 1
+                        log.warning("extraction refused or returned nothing parsable")
         except BudgetOver:
             pass
     finally:

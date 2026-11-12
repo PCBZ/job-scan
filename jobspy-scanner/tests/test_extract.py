@@ -41,9 +41,13 @@ def test_one_structured_call_per_posting():
     assert "reasoning_effort" not in request  # the scanner never sets one
 
 
-def test_an_answer_that_cannot_be_parsed_is_an_error():
-    with pytest.raises(ValueError, match="refused"):
-        extractor(lambda **_: None).extract(INDEED)
+def test_an_answer_that_cannot_be_parsed_is_no_result_but_still_costs_tokens():
+    result, usage = extractor(lambda **_: None).extract(INDEED)
+    assert result is None and (usage.input, usage.output) == (100, 20)
+
+    out = extract_all([INDEED], extractor(lambda **_: None), concurrency=1, budget=5)
+    assert out.results == [None] and out.failed == 1
+    assert (out.usage.input, out.usage.output) == (100, 20)
 
 
 def test_results_stay_in_row_order_and_a_failure_leaves_a_gap():
@@ -58,11 +62,12 @@ def test_results_stay_in_row_order_and_a_failure_leaves_a_gap():
     assert [r.requirements if r else None for r in out.results] == [["a"], None, ["c"]]
     assert (out.failed, out.unfinished) == (1, 0)
     assert (out.usage.input, out.usage.output) == (200, 40)
-    assert (out.usage.cached, out.usage.reasoning) == (80, 10)
+    assert (out.usage.cached, out.usage.cache_write, out.usage.reasoning) == (80, 16, 10)
     assert out.usage.as_json() == {
         "input": 200,
         "output": 40,
         "cached": 80,
+        "cacheWrite": 16,
         "reasoning": 10,
         "models": ["extract-deployment-2026-03-17"],
     }
@@ -79,7 +84,7 @@ def test_a_provider_that_reports_no_details_counts_zero_for_them():
         usage=CompletionUsage(prompt_tokens=7, completion_tokens=3, total_tokens=10), model="m"
     )
     assert usage_of(bare).as_json() == {  # type: ignore[arg-type]
-        "input": 7, "output": 3, "cached": 0, "reasoning": 0, "models": ["m"],
+        "input": 7, "output": 3, "cached": 0, "cacheWrite": 0, "reasoning": 0, "models": ["m"],
     }  # fmt: skip
     assert usage_of(SimpleNamespace(usage=None, model="m")).as_json()["input"] == 0  # type: ignore[arg-type]
 

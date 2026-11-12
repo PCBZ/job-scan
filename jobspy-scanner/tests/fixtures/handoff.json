@@ -148,6 +148,7 @@
       "input": 300,
       "output": 60,
       "cached": 120,
+      "cacheWrite": 24,
       "reasoning": 15,
       "models": ["extract-deployment-2026-03-17"]
     }
