@@ -14,6 +14,17 @@ def test_defaults_come_from_the_mail_configs_lists():
     assert c.fetch_descriptions is True
 
 
+def test_the_jobspy_tables_lists_replace_the_profiles_for_the_scan():
+    c = parse_config(
+        '[profile]\ntarget_titles = ["A"]\nlocations = ["Burnaby", "Surrey"]\n'
+        '[jobspy]\ntitles = ["a OR b"]\nlocations = ["Vancouver, BC", "Remote (Canada)"]\n'
+    )
+    assert (c.titles, c.locations) == (["a OR b"], ["Vancouver, BC", "Remote (Canada)"])
+    # An empty list falls back to the profile's, as for titles.
+    c = parse_config('[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nlocations = []\n')
+    assert c.locations == ["X"]
+
+
 def test_the_jobspy_table_overrides():
     c = parse_config(
         '[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n'

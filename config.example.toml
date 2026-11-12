@@ -182,14 +182,16 @@ exclude_keywords = ["unpaid", "commission only", "MLM"]
 # searches [profile]'s target_titles in its locations; every key is optional.
 # ---------------------------------------------------------------------------
 [jobspy]
-# titles = []            # narrows the scan to these instead of every target title
+# titles = []            # searched instead of the target titles; one may join several with OR
+# locations = []         # searched instead of [profile]'s, e.g. ["Vancouver, BC", "Remote (Canada)"];
+#                        # jobspy searches a 50-mile radius, so one city covers its metro area
 # sites = ["indeed", "linkedin", "glassdoor", "zip_recruiter"]
 # results_wanted = 15    # per search (title x location x site)
 # hours_old = 48
 # concurrency = 2        # searches at once
 # max_postings = 200     # read by the model per day, after duplicates
 # extract_concurrency = 8
-# country_indeed = "USA"
+# country_indeed = "USA"  # Indeed's country: set it to the one the locations are in, e.g. "Canada"
 # fetch_descriptions = true
 
 [report]
