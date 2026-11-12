@@ -182,7 +182,9 @@ exclude_keywords = ["unpaid", "commission only", "MLM"]
 # searches [profile]'s target_titles in its locations; every key is optional.
 # ---------------------------------------------------------------------------
 [jobspy]
-# titles = []            # narrows the scan to these instead of every target title
+# titles = []            # searched instead of the target titles; one may join several with OR
+# locations = []         # searched instead of [profile]'s, e.g. ["Vancouver, BC", "Remote (Canada)"];
+#                        # jobspy searches a 50-mile radius, so one city covers its metro area
 # sites = ["indeed", "linkedin", "glassdoor", "zip_recruiter"]
 # results_wanted = 15    # per search (title x location x site)
 # hours_old = 48
