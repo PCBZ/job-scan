@@ -127,8 +127,17 @@ class FakeOpenAI:
         self.requests.append(kwargs)
         parsed = self._answer(**kwargs)
         message = SimpleNamespace(parsed=parsed)
-        usage = SimpleNamespace(prompt_tokens=100, completion_tokens=20)
-        return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=usage)
+        usage = SimpleNamespace(
+            prompt_tokens=100,
+            completion_tokens=20,
+            prompt_tokens_details=SimpleNamespace(cached_tokens=40),
+            completion_tokens_details=SimpleNamespace(reasoning_tokens=5),
+        )
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=message)],
+            usage=usage,
+            model="extract-deployment-2026-03-17",
+        )
 
 
 def extractor(answer=lambda **_: PYTHON_ROLE) -> Extractor:

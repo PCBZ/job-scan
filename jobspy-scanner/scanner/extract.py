@@ -15,7 +15,7 @@ import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as BudgetOver
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from azure.core.credentials import TokenCredential
@@ -52,8 +52,31 @@ class Extracted(BaseModel):
 
 @dataclass
 class Usage:
+    """Tokens a model call used, as the Node side's TokenUsage counts them."""
+
     input: int = 0
     output: int = 0
+    # Of the input, tokens served from the prompt cache; of the output, tokens spent reasoning.
+    cached: int = 0
+    reasoning: int = 0
+    # The models that answered, as the provider names them with their version.
+    models: set[str] = field(default_factory=set)
+
+    def add(self, other: Usage) -> None:
+        self.input += other.input
+        self.output += other.output
+        self.cached += other.cached
+        self.reasoning += other.reasoning
+        self.models |= other.models
+
+    def as_json(self) -> dict:
+        return {
+            "input": self.input,
+            "output": self.output,
+            "cached": self.cached,
+            "reasoning": self.reasoning,
+            **({"models": sorted(self.models)} if self.models else {}),
+        }
 
 
 def user_message(row: dict) -> str:
@@ -83,8 +106,23 @@ class Extractor:
         parsed = completion.choices[0].message.parsed
         if parsed is None:
             raise ValueError("the model refused or returned nothing parsable")
-        usage = completion.usage
-        return parsed, Usage(usage.prompt_tokens, usage.completion_tokens) if usage else Usage()
+        return parsed, usage_of(completion)
+
+
+def usage_of(completion) -> Usage:
+    """What the call used; a provider that doesn't say leaves the count at zero."""
+    used = completion.usage
+    if not used:
+        return Usage()
+    prompt = getattr(used, "prompt_tokens_details", None)
+    output = getattr(used, "completion_tokens_details", None)
+    return Usage(
+        input=used.prompt_tokens,
+        output=used.completion_tokens,
+        cached=getattr(prompt, "cached_tokens", 0) or 0,
+        reasoning=getattr(output, "reasoning_tokens", 0) or 0,
+        models={completion.model} if getattr(completion, "model", None) else set(),
+    )
 
 
 def extractor_from_env(env: dict[str, str], credential: TokenCredential) -> Extractor:
@@ -139,8 +177,7 @@ def extract_all(
                     failed += 1
                     log.warning("extraction failed: %s", type(err).__name__)
                 else:
-                    usage.input += used.input
-                    usage.output += used.output
+                    usage.add(used)
         except BudgetOver:
             pass
     finally:

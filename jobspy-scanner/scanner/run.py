@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 
@@ -45,19 +46,29 @@ def distinct(rows: list[dict]) -> tuple[list[dict], dict[str, int]]:
     return kept, dropped
 
 
-def scan(config: ScanConfig, scrape: Scrape, extractor: Extractor, started_at: datetime) -> dict:
+def scan(
+    config: ScanConfig,
+    scrape: Scrape,
+    extractor: Extractor,
+    started_at: datetime,
+    clock: Callable[[], float] = time.monotonic,
+) -> dict:
+    begun = clock()
     scraped = run_searches(config, scrape)
+    scrape_ms = round((clock() - begun) * 1000)
     rows, dropped = distinct(scraped.rows)
     warnings = list(scraped.warnings)
     if len(rows) > config.max_postings:
         warnings.append(f"jobspy: {len(rows) - config.max_postings} postings left out (max_postings)")
         rows = rows[: config.max_postings]
+    begun = clock()
     done = extract_all(
         rows,
         extractor,
         concurrency=config.extract_concurrency,
         budget=EXTRACT_BUDGET_SECONDS,
     )
+    extract_ms = round((clock() - begun) * 1000)
     if done.failed or done.unfinished:
         warnings.append(
             f"jobspy: {done.failed + done.unfinished} of {len(rows)} postings kept without "
@@ -71,6 +82,10 @@ def scan(config: ScanConfig, scrape: Scrape, extractor: Extractor, started_at: d
         dropped=dropped,
         warnings=warnings,
         scrape=scraped.stats(),
+        # The Node side's names: usage is priced by the node's model, and the
+        # scanner reads postings with the extract deployment the mail source uses.
+        usage={"extract_postings": done.usage.as_json()} if rows else {},
+        node_ms={"scrape": scrape_ms, "extract_postings": extract_ms},
     )
 
 

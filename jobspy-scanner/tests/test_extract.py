@@ -58,6 +58,24 @@ def test_results_stay_in_row_order_and_a_failure_leaves_a_gap():
     assert [r.requirements if r else None for r in out.results] == [["a"], None, ["c"]]
     assert (out.failed, out.unfinished) == (1, 0)
     assert (out.usage.input, out.usage.output) == (200, 40)
+    assert (out.usage.cached, out.usage.reasoning) == (80, 10)
+    assert out.usage.as_json() == {
+        "input": 200,
+        "output": 40,
+        "cached": 80,
+        "reasoning": 10,
+        "models": ["extract-deployment-2026-03-17"],
+    }
+
+
+def test_a_provider_that_reports_no_details_counts_zero_for_them():
+    from types import SimpleNamespace
+
+    from scanner.extract import usage_of
+
+    bare = SimpleNamespace(usage=SimpleNamespace(prompt_tokens=7, completion_tokens=3))
+    assert usage_of(bare).as_json() == {"input": 7, "output": 3, "cached": 0, "reasoning": 0}
+    assert usage_of(SimpleNamespace(usage=None)).as_json()["input"] == 0
 
 
 def test_postings_still_waiting_at_the_budget_are_given_up_on():
