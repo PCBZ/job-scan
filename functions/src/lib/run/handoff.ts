@@ -14,6 +14,7 @@ import { QueueClient } from "@azure/storage-queue";
 import type { AllAccountsFailed, FetchPayload } from "../mail/types.js";
 import { addUsage, type TokenUsage } from "../model/types.js";
 import type { ScrapeStats, Source } from "../postings/types.js";
+import type { TracePoint } from "../telemetry/tracing.js";
 import type { LoopState, State, Update } from "../workflow/state.js";
 import type { Posting, SuspiciousByMessage } from "../workflow/types.js";
 
@@ -33,8 +34,8 @@ export interface SourceHandoff {
   /** The run day, in the run's own zone. */
   day: string;
   started_at: string;
-  /** Where the run's trace stands, so `collect`'s spans join it (one trace per run). */
-  trace: { trace_id: string; span_id: string } | null;
+  /** The source's own trace and its run span, for `collect`'s span to link to. */
+  trace: TracePoint | null;
   /** Milliseconds per node, summed over its runs. */
   node_ms: Record<string, number>;
   throttled_ms: number;
@@ -213,6 +214,7 @@ export function mergeMeta(handoffs: SourceHandoff[]) {
     nodeMs,
     throttledMs: handoffs.reduce((n, h) => n + h.throttled_ms, 0),
     rateLimited: handoffs.reduce((n, h) => n + h.rate_limited, 0),
-    trace: handoffs.find((h) => h.trace)?.trace ?? null,
+    /** Every source's trace, for the collect run to link to. */
+    traces: handoffs.flatMap((h) => (h.trace ? [h.trace] : [])),
   };
 }

@@ -4,7 +4,12 @@ import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { modelClientFromEnv } from "../../src/lib/model/config.js";
+import { runCollect } from "../../src/lib/run/collect.js";
+import type { HandoffMessage } from "../../src/lib/run/handoff.js";
+import { runIngest } from "../../src/lib/run/ingest.js";
+import type { RunRecord, RunStatsRecord } from "../../src/lib/run/records.js";
 import { instrumentOpenAI } from "../../src/lib/telemetry/instrument.js";
+import type { TracePoint } from "../../src/lib/telemetry/tracing.js";
 import { runDay } from "../run/helpers.js";
 import { fakes } from "../workflow/fakes.js";
 
@@ -62,16 +67,17 @@ const spans = () => exporter.getFinishedSpans();
 const named = (name: string) => spans().find((s) => s.name === name);
 
 describe("tracing", () => {
-  it("nests every node's span under its stage's, in one trace, with the node's tokens", async () => {
+  it("nests every node's span under its stage's, each stage in its own trace, with the node's tokens", async () => {
     await runDay(fakes(), quiet);
     const source = named("daily run");
     const collect = named("collect run");
     const judge = named("node judge");
     expect(source).toBeDefined();
     expect(collect).toBeDefined();
-    // collect continues the source's trace: one trace per day's run.
-    expect(collect?.spanContext().traceId).toBe(source?.spanContext().traceId);
-    expect(collect?.parentSpanContext?.spanId).toBe(source?.spanContext().spanId);
+    // collect has its own trace, linked to the source's run span.
+    expect(collect?.spanContext().traceId).not.toBe(source?.spanContext().traceId);
+    expect(collect?.parentSpanContext).toBeUndefined();
+    expect(collect?.links.map((l) => l.context.spanId)).toEqual([source?.spanContext().spanId]);
     expect(judge?.parentSpanContext?.spanId).toBe(collect?.spanContext().spanId);
     expect(judge?.attributes).toMatchObject({
       "job_scan.node": "judge",
@@ -86,11 +92,60 @@ describe("tracing", () => {
     expect(named("node mark_seen")?.parentSpanContext?.spanId).toBe(collect?.spanContext().spanId);
   });
 
-  it("names the run's trace in its evaluation report message (#128)", async () => {
+  it("names the collect run's trace in its evaluation report message (#128)", async () => {
     const sent: { traceId: string }[] = [];
     await runDay({ ...fakes(), evalQueue: { send: async (m) => void sent.push(m) } }, quiet);
-    expect(sent[0]?.traceId).toBe(named("daily run")?.spanContext().traceId);
+    expect(sent[0]?.traceId).toBe(named("collect run")?.spanContext().traceId);
     expect(sent[0]?.traceId).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  describe("the run record's traces", () => {
+    /** The mail source runs; the jobspy scanner's file, if given, is written beside it. */
+    async function collectWith(jobspyTrace: TracePoint | null | undefined) {
+      const f = fakes();
+      const written: RunRecord[][] = [];
+      f.records.write = async (records) => {
+        written.push(records);
+        return "x.jsonl";
+      };
+      await runIngest(f, quiet);
+      const message = f.handoffMessages[0] as HandoffMessage;
+      if (jobspyTrace !== undefined) {
+        const mail = await f.handoffs.read(message.blob);
+        await f.handoffs.write({ ...mail, source: "jobspy", mail: null, trace: jobspyTrace });
+      }
+      await runCollect(f, message, quiet, {
+        expected: jobspyTrace === undefined ? ["mail"] : ["mail", "jobspy"],
+      });
+      const run = written[0]?.find((r): r is RunStatsRecord => r.kind === "run");
+      return { run, mail: named("daily run"), collect: named("collect run") };
+    }
+    const JOBSPY = { trace_id: "c".repeat(32), span_id: "d".repeat(16) };
+
+    it("keeps collect's trace first, then the mail source's, on a mail-only day", async () => {
+      const { run, mail, collect } = await collectWith(undefined);
+      expect(run?.trace_id).toBe(collect?.spanContext().traceId);
+      expect(run?.trace_ids).toEqual([collect?.spanContext().traceId, mail?.spanContext().traceId]);
+    });
+
+    it("links both sources when both handed over", async () => {
+      const { run, mail, collect } = await collectWith(JOBSPY);
+      expect(collect?.links.map((l) => l.context.traceId)).toEqual([
+        mail?.spanContext().traceId,
+        JOBSPY.trace_id,
+      ]);
+      expect(run?.trace_ids).toEqual([
+        collect?.spanContext().traceId,
+        mail?.spanContext().traceId,
+        JOBSPY.trace_id,
+      ]);
+    });
+
+    it("leaves out a source that named no trace", async () => {
+      const { run, collect } = await collectWith(null);
+      expect(collect?.links).toHaveLength(1);
+      expect(run?.trace_ids).toHaveLength(2);
+    });
   });
 
   it("marks a failed node and the run as errors", async () => {

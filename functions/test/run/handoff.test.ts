@@ -156,7 +156,7 @@ describe("seedFrom and mergeMeta", () => {
       nodeMs: { fetch_mail: 100, extract_postings: 900, scrape: 4000 },
       throttledMs: 5,
       rateLimited: 1,
-      trace: a.trace,
+      traces: [a.trace],
     });
   });
 });
