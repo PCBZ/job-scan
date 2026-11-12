@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
 import pandas as pd
+from openai.types.completion_usage import CompletionUsage
 
 from scanner.extract import Extracted, Extractor
 
@@ -112,7 +113,7 @@ PYTHON_ROLE = Extracted(
 
 
 class FakeOpenAI:
-    """The one SDK call the extractor makes: client.beta.chat.completions.parse.
+    """The one SDK call the extractor makes: client.chat.completions.create.
 
     `answer` gets the request's kwargs and returns an Extracted or raises.
     """
@@ -120,15 +121,31 @@ class FakeOpenAI:
     def __init__(self, answer=lambda **_: PYTHON_ROLE) -> None:
         self.requests: list[dict] = []
         self._answer = answer
-        completions = SimpleNamespace(parse=self._parse)
-        self.beta = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+        completions = SimpleNamespace(create=self._create)
+        self.chat = SimpleNamespace(completions=completions)
 
-    def _parse(self, **kwargs):
+    def _create(self, **kwargs):
         self.requests.append(kwargs)
-        parsed = self._answer(**kwargs)
-        message = SimpleNamespace(parsed=parsed)
-        usage = SimpleNamespace(prompt_tokens=100, completion_tokens=20)
-        return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=usage)
+        answer = self._answer(**kwargs)
+        # None stands for a refusal; anything else is the answer's JSON.
+        message = SimpleNamespace(
+            content=None if answer is None else answer.model_dump_json(),
+            refusal="I can't help with that." if answer is None else None,
+        )
+        usage = CompletionUsage.model_validate(
+            {
+                "prompt_tokens": 100,
+                "completion_tokens": 20,
+                "total_tokens": 120,
+                "prompt_tokens_details": {"cached_tokens": 40, "cache_write_tokens": 8},
+                "completion_tokens_details": {"reasoning_tokens": 5},
+            }
+        )
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=message)],
+            usage=usage,
+            model="extract-deployment-2026-03-17",
+        )
 
 
 def extractor(answer=lambda **_: PYTHON_ROLE) -> Extractor:
