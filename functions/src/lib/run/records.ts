@@ -78,6 +78,11 @@ export interface RunMeta {
    * it. Absent on records from before the sources had their own traces.
    */
   trace_ids?: string[];
+  /**
+   * Each trace's nodes that used tokens (#190), so the evaluation report knows
+   * which traces to wait on for model calls. Absent on records from before.
+   */
+  trace_nodes?: Record<string, string[]>;
   /** The deployed release (APP_VERSION), "local" outside CD. */
   version: string;
   /** Milliseconds per node, summed over its runs. */

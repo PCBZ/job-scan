@@ -204,6 +204,34 @@ export function seedFrom(handoffs: SourceHandoff[]): Update {
   };
 }
 
+/**
+ * Each trace's nodes that used tokens (#190): a source's from its file,
+ * collect's from what the run used beyond the sources' sum. Collect's nodes
+ * and the sources' don't share names. The evaluation report waits for the
+ * model calls of each trace listed here.
+ */
+export function traceNodes(
+  handoffs: SourceHandoff[],
+  collectTrace: string,
+  usage: Record<string, TokenUsage>,
+): Record<string, string[]> {
+  const nodes: Record<string, Set<string>> = {};
+  const add = (trace: string, node: string) => {
+    nodes[trace] ??= new Set();
+    nodes[trace].add(node);
+  };
+  const seeded: Record<string, number> = {};
+  for (const h of handoffs) {
+    for (const [node, u] of Object.entries(h.usage)) {
+      seeded[node] = (seeded[node] ?? 0) + u.input;
+      if (h.trace && u.input > 0) add(h.trace.trace_id, node);
+    }
+  }
+  for (const [node, u] of Object.entries(usage))
+    if (u.input > (seeded[node] ?? 0)) add(collectTrace, node);
+  return Object.fromEntries(Object.entries(nodes).map(([t, n]) => [t, [...n].sort()]));
+}
+
 /** What the run's records and summary need from the sources, summed. */
 export function mergeMeta(handoffs: SourceHandoff[]) {
   const nodeMs: Record<string, number> = {};

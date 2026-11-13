@@ -9,6 +9,12 @@ import type { HandoffMessage } from "../../src/lib/run/handoff.js";
 import { runIngest } from "../../src/lib/run/ingest.js";
 import type { RunRecord, RunStatsRecord } from "../../src/lib/run/records.js";
 import { instrumentOpenAI } from "../../src/lib/telemetry/instrument.js";
+import {
+  MODEL_CALL_SPANS,
+  NODE_SPAN_PREFIX,
+  nodeSpan,
+  RUN_SPANS,
+} from "../../src/lib/telemetry/spans.js";
 import type { TracePoint } from "../../src/lib/telemetry/tracing.js";
 import { runDay } from "../run/helpers.js";
 import { fakes } from "../workflow/fakes.js";
@@ -69,9 +75,9 @@ const named = (name: string) => spans().find((s) => s.name === name);
 describe("tracing", () => {
   it("nests every node's span under its stage's, each stage in its own trace, with the node's tokens", async () => {
     await runDay(fakes(), quiet);
-    const source = named("daily run");
-    const collect = named("collect run");
-    const judge = named("node judge");
+    const source = named(RUN_SPANS.mail);
+    const collect = named(RUN_SPANS.collect);
+    const judge = named(nodeSpan("judge"));
     expect(source).toBeDefined();
     expect(collect).toBeDefined();
     // collect has its own trace, linked to the source's run span.
@@ -84,18 +90,20 @@ describe("tracing", () => {
       "gen_ai.usage.input_tokens": 10,
       "gen_ai.usage.output_tokens": 2,
     });
-    const nodes = spans().filter((s) => s.name.startsWith("node "));
-    expect(nodes.map((s) => s.name)).toContain("node mark_seen");
-    expect(named("node extract_postings")?.parentSpanContext?.spanId).toBe(
+    const nodes = spans().filter((s) => s.name.startsWith(NODE_SPAN_PREFIX));
+    expect(nodes.map((s) => s.name)).toContain(nodeSpan("mark_seen"));
+    expect(named(nodeSpan("extract_postings"))?.parentSpanContext?.spanId).toBe(
       source?.spanContext().spanId,
     );
-    expect(named("node mark_seen")?.parentSpanContext?.spanId).toBe(collect?.spanContext().spanId);
+    expect(named(nodeSpan("mark_seen"))?.parentSpanContext?.spanId).toBe(
+      collect?.spanContext().spanId,
+    );
   });
 
   it("names the collect run's trace in its evaluation report message (#128)", async () => {
     const sent: { traceId: string }[] = [];
     await runDay({ ...fakes(), evalQueue: { send: async (m) => void sent.push(m) } }, quiet);
-    expect(sent[0]?.traceId).toBe(named("collect run")?.spanContext().traceId);
+    expect(sent[0]?.traceId).toBe(named(RUN_SPANS.collect)?.spanContext().traceId);
     expect(sent[0]?.traceId).toMatch(/^[0-9a-f]{32}$/);
   });
 
@@ -118,7 +126,7 @@ describe("tracing", () => {
         expected: jobspyTrace === undefined ? ["mail"] : ["mail", "jobspy"],
       });
       const run = written[0]?.find((r): r is RunStatsRecord => r.kind === "run");
-      return { run, mail: named("daily run"), collect: named("collect run") };
+      return { run, mail: named(RUN_SPANS.mail), collect: named(RUN_SPANS.collect) };
     }
     const JOBSPY = { trace_id: "c".repeat(32), span_id: "d".repeat(16) };
 
@@ -126,6 +134,11 @@ describe("tracing", () => {
       const { run, mail, collect } = await collectWith(undefined);
       expect(run?.trace_id).toBe(collect?.spanContext().traceId);
       expect(run?.trace_ids).toEqual([collect?.spanContext().traceId, mail?.spanContext().traceId]);
+      // Each trace's nodes that used tokens, for the report to wait on (#190).
+      expect(run?.trace_nodes).toEqual({
+        [mail?.spanContext().traceId ?? ""]: ["extract_postings"],
+        [collect?.spanContext().traceId ?? ""]: ["explain", "judge", "screen"],
+      });
     });
 
     it("links both sources when both handed over", async () => {
@@ -150,12 +163,12 @@ describe("tracing", () => {
 
   it("marks a failed node and the run as errors", async () => {
     await expect(runDay(fakes({ deliverFails: true }), quiet)).rejects.toThrow("smtp down");
-    expect(named("node deliver")?.status).toMatchObject({
+    expect(named(nodeSpan("deliver"))?.status).toMatchObject({
       code: SpanStatusCode.ERROR,
       message: "smtp down",
     });
-    expect(named("collect run")?.status.code).toBe(SpanStatusCode.ERROR);
-    expect(named("daily run")?.status.code).not.toBe(SpanStatusCode.ERROR);
+    expect(named(RUN_SPANS.collect)?.status.code).toBe(SpanStatusCode.ERROR);
+    expect(named(RUN_SPANS.mail)?.status.code).not.toBe(SpanStatusCode.ERROR);
   });
 
   it("nests each model call under its node, with tokens but never the prompt or answer", async () => {
@@ -171,8 +184,8 @@ describe("tracing", () => {
       return judge(...args);
     };
     await runDay(f, quiet);
-    const call = named("OpenAI Chat Completions");
-    expect(call?.parentSpanContext?.spanId).toBe(named("node judge")?.spanContext().spanId);
+    const call = named(MODEL_CALL_SPANS.node);
+    expect(call?.parentSpanContext?.spanId).toBe(named(nodeSpan("judge"))?.spanContext().spanId);
     expect(call?.attributes).toMatchObject({
       "llm.provider": "azure",
       "llm.token_count.prompt": 50,
@@ -195,8 +208,17 @@ describe("tracing", () => {
       throw new Error("unreachable");
     };
     await expect(runDay(f, quiet)).rejects.toMatchObject({ code: "model_provider" });
-    expect(named("node judge")?.status).toMatchObject({ code: SpanStatusCode.ERROR });
-    expect(named("node judge")?.status.message).toContain("503");
-    expect(spans().filter((s) => s.name === "OpenAI Chat Completions")).toEqual([]);
+    expect(named(nodeSpan("judge"))?.status).toMatchObject({ code: SpanStatusCode.ERROR });
+    expect(named(nodeSpan("judge"))?.status.message).toContain("503");
+    expect(spans().filter((s) => s.name === MODEL_CALL_SPANS.node)).toEqual([]);
+  });
+});
+
+describe("the scanner's span names", () => {
+  it("are the ones jobspy-scanner writes", () => {
+    // Python can't import these; its test_telemetry.py pins the same values.
+    expect(RUN_SPANS.jobspy).toBe("jobspy run");
+    expect(nodeSpan("extract_postings")).toBe("node extract_postings");
+    expect(MODEL_CALL_SPANS.python).toBe("ChatCompletion");
   });
 });

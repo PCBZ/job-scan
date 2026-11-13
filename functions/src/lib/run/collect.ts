@@ -11,6 +11,7 @@
 // write is logged, not a failed run, since the report is already out.
 
 import type { Source } from "../postings/types.js";
+import { RUN_SPANS } from "../telemetry/spans.js";
 import { inSpan } from "../telemetry/tracing.js";
 import { buildCollectWorkflow, type State } from "../workflow/graph.js";
 import type { Loop } from "../workflow/state.js";
@@ -25,6 +26,7 @@ import {
   mergeMeta,
   type SourceHandoff,
   seedFrom,
+  traceNodes,
 } from "./handoff.js";
 import { RUN_TIMEOUT_MS, type RunLog } from "./ingest.js";
 import { loopRecord, runRecords } from "./records.js";
@@ -128,7 +130,7 @@ export async function runCollect(
     // collect, so none of them is its parent.
     let traceId = "";
     const state = await inSpan(
-      "collect run",
+      RUN_SPANS.collect,
       {},
       (span) => {
         traceId = span.spanContext().traceId;
@@ -157,6 +159,7 @@ export async function runCollect(
         ended_at: now().toISOString(),
         trace_id: traceId,
         trace_ids: traceIds,
+        trace_nodes: traceNodes(handoffs, traceId, state.usage),
         version: pipeline.version,
         node_ms: nodeMs,
         throttled_ms: throttledMs,
