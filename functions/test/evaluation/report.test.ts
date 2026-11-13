@@ -380,10 +380,11 @@ describe("the post-deploy smoke test (#134)", () => {
   });
 
   it("asks for every trace of a run that has several", async () => {
-    const traceIds = ["3".repeat(32), "4".repeat(32)];
+    const COLLECT = "3".repeat(32);
+    const traceIds = [COLLECT, "4".repeat(32)];
     const asked: string[][] = [];
     const h = harness(
-      { [TRACED]: toJsonl(records({ trace_id: traceIds[0], trace_ids: traceIds })) },
+      { [TRACED]: toJsonl(records({ trace_id: COLLECT, trace_ids: traceIds })) },
       CONFIG,
       async (ids) => {
         asked.push(ids);
