@@ -83,11 +83,11 @@ export async function runEvalReport(
     return;
   }
   const records = await d.records.read(m.record);
-  const expectCalls = madeModelCalls(records);
+  const traceIds = traceIdsOf(records, m.traceId);
   let latency: Latency | null = null;
   let why = "not in Application Insights yet";
   try {
-    latency = await d.latency(traceIdsOf(records, m.traceId), new Date(m.startedAt), expectCalls);
+    latency = await d.latency(traceIds, new Date(m.startedAt), callingTraces(records, m.traceId));
   } catch (err) {
     why = err instanceof Error ? err.message : String(err);
   }
@@ -183,13 +183,22 @@ async function pricesFor(
  */
 const TRACED_PROVIDERS: ReadonlySet<string> = new Set(["azure-openai", "openai-compatible"]);
 
-/** Whether a traced node used tokens: then the run's traces aren't complete without its calls. */
-function madeModelCalls(records: RunRecord[]): boolean {
+/**
+ * The traces that hold model calls, so the report waits for each one's (#190):
+ * those with a traced node that used tokens. A record from before that has no
+ * per-trace nodes had one trace, which holds the calls if any node made them.
+ */
+function callingTraces(records: RunRecord[], traceId: string): string[] {
   const run = records.find((r): r is RunStatsRecord => r.kind === "run");
-  if (!run) return false;
-  return Object.entries(run.usage).some(
-    ([node, u]) => TRACED_PROVIDERS.has(modelOf(run, node).provider) && u.input > 0,
-  );
+  if (!run) return [];
+  const traced = (node: string) => TRACED_PROVIDERS.has(modelOf(run, node).provider);
+  if (run.trace_nodes) {
+    return Object.entries(run.trace_nodes)
+      .filter(([, nodes]) => nodes.some(traced))
+      .map(([trace]) => trace);
+  }
+  const madeCalls = Object.entries(run.usage).some(([node, u]) => traced(node) && u.input > 0);
+  return madeCalls ? [traceId] : [];
 }
 
 /**
@@ -228,7 +237,7 @@ async function runSmoke(id: string, d: EvalReportDeps, log: EvalReportLog): Prom
     const latency = await d.latency(
       traceIdsOf(records, latest.run.trace_id),
       new Date(latest.run.started_at),
-      madeModelCalls(records),
+      callingTraces(records, latest.run.trace_id),
     );
     if (latency === null)
       throw new Error(`the trace of ${latest.name} isn't in Application Insights`);

@@ -134,6 +134,11 @@ describe("tracing", () => {
       const { run, mail, collect } = await collectWith(undefined);
       expect(run?.trace_id).toBe(collect?.spanContext().traceId);
       expect(run?.trace_ids).toEqual([collect?.spanContext().traceId, mail?.spanContext().traceId]);
+      // Each trace's nodes that used tokens, for the report to wait on (#190).
+      expect(run?.trace_nodes).toEqual({
+        [mail?.spanContext().traceId ?? ""]: ["extract_postings"],
+        [collect?.spanContext().traceId ?? ""]: ["explain", "judge", "screen"],
+      });
     });
 
     it("links both sources when both handed over", async () => {

@@ -20,15 +20,16 @@ export interface Latency extends CallTimes {
 }
 
 /**
- * `traceIds` are the run's traces, from its record. `expectCalls` says whether
- * the run made model calls, from its record. Then traces with no calls yet
- * aren't complete: Azure ingests spans in no set order, so the run's spans can
- * arrive before its calls'.
+ * `traceIds` are the run's traces, from its record. `callingTraces` are the
+ * ones whose nodes made model calls, from its record too. Until each of those
+ * shows a call, the run isn't complete: Azure ingests spans in no set order,
+ * so a trace's run span can arrive before its calls, and another trace's calls
+ * before this one's.
  */
 export type LatencySource = (
   traceIds: string[],
   startedAt: Date,
-  expectCalls: boolean,
+  callingTraces: string[],
 ) => Promise<Latency | null>;
 
 type Logs = Pick<LogsQueryClient, "queryWorkspace">;
@@ -62,9 +63,11 @@ function rowsOf(table: LogsTable | undefined): Record<string, unknown>[] {
 const num = (v: unknown) => Math.round(Number(v ?? 0));
 
 export function latencyFromLogs(logs: Logs, workspaceId: string): LatencySource {
-  return async (traceIds, startedAt, expectCalls) => {
+  return async (traceIds, startedAt, callingTraces) => {
     if (traceIds.length === 0) throw new Error("no trace ids");
-    for (const id of traceIds) if (!TRACE_ID.test(id)) throw new Error(`not a trace id: ${id}`);
+    for (const id of [...traceIds, ...callingTraces])
+      if (!TRACE_ID.test(id)) throw new Error(`not a trace id: ${id}`);
+    const calling = [...new Set(callingTraces)];
     // From just before the run to now: the spans are in it whenever they land.
     const timespan = { startTime: new Date(startedAt.getTime() - 5 * 60_000), endTime: new Date() };
     const query = async (kql: string) => {
@@ -75,10 +78,12 @@ export function latencyFromLogs(logs: Logs, workspaceId: string): LatencySource 
 
     const [total] = await query(`${spans(traceIds)}
 calls | summarize ${TIMES}, failed = countif(Success == false)
-| extend runs = toscalar(deps | where Name in (${list(Object.values(RUN_SPANS))}) | summarize dcount(OperationId))`);
-    // Every trace's run span, or some of the run is still on its way.
+| extend runs = toscalar(deps | where Name in (${list(Object.values(RUN_SPANS))}) | summarize dcount(OperationId))
+| extend callingIn = ${calling.length === 0 ? "0" : `toscalar(calls | where OperationId in (${list(calling)}) | summarize dcount(OperationId))`}`);
+    // Every trace's run span, and a call in each trace that made calls, or
+    // some of the run is still on its way.
     if (!total || num(total.runs) < new Set(traceIds).size) return null;
-    if (expectCalls && num(total.calls) === 0) return null;
+    if (num(total.callingIn) < calling.length) return null;
     const byNode = await query(`${spans(traceIds)}
 calls | summarize ${TIMES} by Node | order by calls desc`);
 

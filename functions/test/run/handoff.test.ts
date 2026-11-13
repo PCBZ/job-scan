@@ -6,6 +6,7 @@ import {
   mergeMeta,
   type SourceHandoff,
   seedFrom,
+  traceNodes,
 } from "../../src/lib/run/handoff.js";
 import { posting } from "../postings/helpers.js";
 import { fakePostingsContainer, fakePostingsQueue } from "./fake-postings.js";
@@ -158,5 +159,41 @@ describe("seedFrom and mergeMeta", () => {
       rateLimited: 1,
       traces: [a.trace],
     });
+  });
+});
+
+describe("traceNodes", () => {
+  const MAIL = "a".repeat(32);
+  const JOBSPY = "c".repeat(32);
+  const COLLECT = "e".repeat(32);
+
+  it("names each trace's nodes that used tokens: a source's from its file, collect's from the rest", () => {
+    const mail = handoff({ usage: { extract_postings: { input: 100, output: 10 } } });
+    const jobspy = handoff({
+      source: "jobspy",
+      trace: { trace_id: JOBSPY, span_id: "d".repeat(16) },
+      usage: { extract_postings: { input: 50, output: 5 }, scrape: { input: 0, output: 0 } },
+    });
+    // The run's usage: the sources' sum, plus collect's own nodes.
+    const usage = {
+      extract_postings: { input: 150, output: 15 },
+      judge: { input: 900, output: 90 },
+      screen: { input: 0, output: 0 },
+    };
+    expect(traceNodes([mail, jobspy], COLLECT, usage)).toEqual({
+      [MAIL]: ["extract_postings"],
+      [JOBSPY]: ["extract_postings"],
+      [COLLECT]: ["judge"],
+    });
+  });
+
+  it("leaves out a source without a trace, and a trace with no tokens", () => {
+    const untraced = handoff({
+      trace: null,
+      usage: { extract_postings: { input: 100, output: 10 } },
+    });
+    expect(
+      traceNodes([untraced], COLLECT, { extract_postings: { input: 100, output: 10 } }),
+    ).toEqual({});
   });
 });

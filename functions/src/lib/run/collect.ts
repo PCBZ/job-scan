@@ -26,6 +26,7 @@ import {
   mergeMeta,
   type SourceHandoff,
   seedFrom,
+  traceNodes,
 } from "./handoff.js";
 import { RUN_TIMEOUT_MS, type RunLog } from "./ingest.js";
 import { loopRecord, runRecords } from "./records.js";
@@ -158,6 +159,7 @@ export async function runCollect(
         ended_at: now().toISOString(),
         trace_id: traceId,
         trace_ids: traceIds,
+        trace_nodes: traceNodes(handoffs, traceId, state.usage),
         version: pipeline.version,
         node_ms: nodeMs,
         throttled_ms: throttledMs,

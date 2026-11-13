@@ -91,7 +91,7 @@ function fakeMarks(marks: Set<string>) {
 type Source = (
   traceIds: string[],
   startedAt: Date,
-  expectCalls: boolean,
+  callingTraces: string[],
 ) => Promise<typeof LATENCY | null>;
 
 function harness(
@@ -280,16 +280,27 @@ describe("one evaluation email per run (#130)", () => {
     expect(retry.sent).toHaveLength(1);
   });
 
-  it("tells the latency source whether the run made model calls", async () => {
-    const asked: boolean[] = [];
-    const spy: Source = async (_t, _s, expectCalls) => {
-      asked.push(expectCalls);
+  it("tells the latency source which traces made model calls", async () => {
+    const asked: string[][] = [];
+    const spy: Source = async (_t, _s, callingTraces) => {
+      asked.push(callingTraces);
       return LATENCY;
     };
+    const MAIL = "1".repeat(32);
+    const JOBSPY = "2".repeat(32);
+    // Per trace: collect's judge and the mail source's extract made calls; the
+    // scanner's trace used no tokens that day.
+    const perTrace = records({
+      trace_id: MESSAGE.traceId,
+      trace_ids: [MESSAGE.traceId, MAIL, JOBSPY],
+      trace_nodes: { [MESSAGE.traceId]: ["judge"], [MAIL]: ["extract_postings"] },
+    });
+    await harness({ [NAME]: toJsonl(perTrace) }, CONFIG, spy).run(MESSAGE);
+    // An older record: its one trace, if any node made calls.
     await harness({ [NAME]: toJsonl(records()) }, CONFIG, spy).run(MESSAGE);
     // No mail that day: no node used any tokens.
     await harness({ [NAME]: toJsonl(records({ usage: {} })) }, CONFIG, spy).run(MESSAGE);
-    expect(asked).toEqual([true, false]);
+    expect(asked).toEqual([[MESSAGE.traceId, MAIL], [MESSAGE.traceId], []]);
   });
 
   it("asks for all of the run's traces, or the message's one on an older record", async () => {
