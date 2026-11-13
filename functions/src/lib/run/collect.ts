@@ -11,6 +11,7 @@
 // write is logged, not a failed run, since the report is already out.
 
 import type { Source } from "../postings/types.js";
+import { RUN_SPANS } from "../telemetry/spans.js";
 import { inSpan } from "../telemetry/tracing.js";
 import { buildCollectWorkflow, type State } from "../workflow/graph.js";
 import type { Loop } from "../workflow/state.js";
@@ -128,7 +129,7 @@ export async function runCollect(
     // collect, so none of them is its parent.
     let traceId = "";
     const state = await inSpan(
-      "collect run",
+      RUN_SPANS.collect,
       {},
       (span) => {
         traceId = span.spanContext().traceId;

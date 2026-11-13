@@ -15,7 +15,7 @@ from .extract import Extractor, extract_all
 from .handoff import build_handoff, message_for, send_message, write_handoff
 from .mapping import SITES, fingerprint, posting_from, text, usable
 from .scrape import Scrape, run_searches
-from .telemetry import span, trace_of
+from .telemetry import RUN_SPAN, node_span, span, trace_of
 
 log = logging.getLogger("jobspy-scanner")
 
@@ -54,14 +54,14 @@ def scan(
     started_at: datetime,
     clock: Callable[[], float] = time.monotonic,
 ) -> dict:
-    with span("node scrape"):
+    with span(node_span("scrape")):
         scraped = run_searches(config, scrape, clock=clock)
     rows, dropped = distinct(scraped.rows)
     warnings = list(scraped.warnings)
     if len(rows) > config.max_postings:
         warnings.append(f"jobspy: {len(rows) - config.max_postings} postings left out (max_postings)")
         rows = rows[: config.max_postings]
-    with span("node extract_postings"):
+    with span(node_span("extract_postings")):
         done = extract_all(
             rows,
             extractor,
@@ -109,7 +109,7 @@ def run_scan(
     The run is one span, the root of its trace; the file names that trace so
     `collect` can link to it.
     """
-    with span("jobspy run") as run:
+    with span(RUN_SPAN) as run:
         started_at = now()
         try:
             handoff = scan(parse_config(config_text()), scrape, extractor(), started_at)

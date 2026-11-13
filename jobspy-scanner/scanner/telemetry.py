@@ -10,8 +10,9 @@ locations; the OpenAI client goes through `httpx2`, and OpenInference already
 spans those calls.
 Only this scanner's own logger is exported, never a library's: jobspy logs
 the URLs it fetched. OpenInference hides prompts and answers, which hold
-posting text. Span names follow the Node side ("node <stage>"), so the
-evaluation's latency query finds them.
+posting text. Span names follow the Node side, so the evaluation's latency
+query finds them: functions/src/lib/telemetry/spans.ts lists the same names,
+and a test on each side pins them.
 """
 
 from __future__ import annotations
@@ -23,6 +24,21 @@ from opentelemetry import trace
 
 LOGGER = "jobspy-scanner"
 TRACER = "jobspy-scanner"
+
+# The run's span, the root of its trace (RUN_SPANS.jobspy on the Node side).
+RUN_SPAN = "jobspy run"
+
+# A stage's span is "node <stage>", as a Node graph node's is.
+NODE_SPAN_PREFIX = "node "
+
+# What OpenInference names an OpenAI SDK call (MODEL_CALL_SPANS.python); the
+# library sets it, so the test through the real client pins it.
+MODEL_CALL_SPAN = "ChatCompletion"
+
+
+def node_span(stage: str) -> str:
+    return f"{NODE_SPAN_PREFIX}{stage}"
+
 
 # The distro's instrumentations that would record request URLs or duplicate spans.
 HTTP_CLIENTS = ("requests", "urllib", "urllib3", "httpx", "httpx2")

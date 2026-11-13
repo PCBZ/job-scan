@@ -4,10 +4,17 @@ import httpx2 as httpx
 from openai import AzureOpenAI
 
 from scanner.extract import Extractor, extract_all
-from scanner.telemetry import HTTP_CLIENTS, LOGGER, configure, span
+from scanner.telemetry import HTTP_CLIENTS, LOGGER, MODEL_CALL_SPAN, RUN_SPAN, configure, node_span, span
 from scanner.run import run_scan
 
 from .helpers import CONFIG, DESCRIPTION, INDEED, ROWS, STARTED_AT, FakeContainer, FakeQueue, extractor, frame
+
+
+def test_the_span_names_are_the_ones_the_latency_query_reads():
+    # functions/src/lib/telemetry/spans.ts can't be imported here; its test pins the same values.
+    assert RUN_SPAN == "jobspy run"
+    assert node_span("extract_postings") == "node extract_postings"
+    assert MODEL_CALL_SPAN == "ChatCompletion"
 
 
 def test_nothing_is_configured_without_a_connection_string():
@@ -36,9 +43,9 @@ def test_a_run_is_one_trace_its_stages_nest_under_it_and_the_file_names_it(spans
         now=lambda: STARTED_AT,
     )
     by_name = {s.name: s for s in spans.get_finished_spans()}
-    run = by_name["jobspy run"]
+    run = by_name[RUN_SPAN]
     assert run.parent is None
-    for stage in ("node scrape", "node extract_postings"):
+    for stage in (node_span("scrape"), node_span("extract_postings")):
         assert by_name[stage].parent.span_id == run.context.span_id
     handoff = json.loads(container.blobs[name])
     assert handoff["trace"] == {
@@ -59,7 +66,7 @@ def test_a_failed_run_is_a_failed_span_and_still_names_its_trace(spans):
         )
     except ValueError:
         pass
-    (run,) = [s for s in spans.get_finished_spans() if s.name == "jobspy run"]
+    (run,) = [s for s in spans.get_finished_spans() if s.name == RUN_SPAN]
     assert not run.status.is_ok
     assert json.loads(next(iter(container.blobs.values())))["trace"]["trace_id"] == f"{run.context.trace_id:032x}"
 
@@ -97,11 +104,13 @@ def _azure_openai(answer: dict) -> AzureOpenAI:
 def test_each_model_call_is_a_span_under_its_stage_with_no_posting_text(spans):
     answer = {"workplace": "remote", "salary": "", "requirements": ["Python"], "skills": ["Python"]}
     client = _azure_openai(answer)
-    with span("node extract_postings") as stage:
+    with span(node_span("extract_postings")) as stage:
         out = extract_all([INDEED, INDEED], Extractor(client, "extract"), concurrency=2, budget=5)
     assert out.failed == 0
-    calls = [s for s in spans.get_finished_spans() if s.name != "node extract_postings"]
+    calls = [s for s in spans.get_finished_spans() if s.name != node_span("extract_postings")]
     assert len(calls) == 2
+    # The evaluation's latency query matches calls by this name.
+    assert {c.name for c in calls} == {MODEL_CALL_SPAN}
     assert all(c.parent.span_id == stage.get_span_context().span_id for c in calls)
     recorded = json.dumps([dict(c.attributes or {}) for c in calls], default=str)
     assert DESCRIPTION not in recorded and "Acme Pay" not in recorded
@@ -134,7 +143,7 @@ def test_an_answer_that_does_not_fit_is_no_result_and_its_text_stays_out_of_the_
 
 def test_a_failed_stage_records_the_error_type_only(spans):
     try:
-        with span("node scrape"):
+        with span(node_span("scrape")):
             raise ValueError("Acme Pay, Software Engineer in Boston")
     except ValueError:
         pass

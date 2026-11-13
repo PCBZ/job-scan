@@ -1,6 +1,7 @@
 import type { LogsQueryClient } from "@azure/monitor-query-logs";
 import { describe, expect, it } from "vitest";
 import { latencyFromLogs } from "../../src/lib/eval/latency.js";
+import { MODEL_CALL_SPANS } from "../../src/lib/telemetry/spans.js";
 
 const TRACE = "0d3354b7b5fa70d10000805a9af26a96";
 const STARTED = new Date("2026-10-14T15:00:00Z");
@@ -59,7 +60,9 @@ describe("latencyFromLogs", () => {
     });
     expect(queries[0]?.kql).toContain(`OperationId in ("${TRACE}")`);
     // Node's model-call spans and the scanner's, named differently by their SDKs.
-    expect(queries[0]?.kql).toContain(`Name in ("OpenAI Chat Completions", "ChatCompletion")`);
+    expect(queries[0]?.kql).toContain(
+      `Name in ("${MODEL_CALL_SPANS.node}", "${MODEL_CALL_SPANS.python}")`,
+    );
     expect(queries[0]?.timespan).toMatchObject({ startTime: new Date("2026-10-14T14:55:00Z") });
   });
 

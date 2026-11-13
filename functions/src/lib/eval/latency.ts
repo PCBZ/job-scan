@@ -5,6 +5,7 @@
 
 import type { TokenCredential } from "@azure/identity";
 import { LogsQueryClient, type LogsTable } from "@azure/monitor-query-logs";
+import { MODEL_CALL_SPANS, NODE_SPAN_PREFIX, RUN_SPANS } from "../telemetry/spans.js";
 
 export interface CallTimes {
   calls: number;
@@ -35,15 +36,6 @@ type Logs = Pick<LogsQueryClient, "queryWorkspace">;
 /** Trace ids are 32 hex digits, checked before they go into a query. */
 const TRACE_ID = /^[0-9a-f]{32}$/;
 
-/** The span each trace's run is in: collect's, the mail source's and the scanner's. */
-const RUN_SPANS = ["collect run", "daily run", "jobspy run"];
-
-/**
- * Model-call spans: OpenInference names the Node SDK's calls one way and the
- * Python SDK's (the scanner, #188) another.
- */
-const CALL_SPANS = ["OpenAI Chat Completions", "ChatCompletion"];
-
 const list = (names: string[]) => names.map((n) => `"${n}"`).join(", ");
 
 /**
@@ -52,8 +44,9 @@ const list = (names: string[]) => names.map((n) => `"${n}"`).join(", ");
  */
 const spans = (traceIds: string[]) => `
 let deps = AppDependencies | where OperationId in (${list(traceIds)});
-let nodes = deps | where Name startswith "node " | project NodeId = Id, Node = substring(Name, 5);
-let calls = deps | where Name in (${list(CALL_SPANS)})
+let nodes = deps | where Name startswith "${NODE_SPAN_PREFIX}"
+  | project NodeId = Id, Node = substring(Name, ${NODE_SPAN_PREFIX.length});
+let calls = deps | where Name in (${list(Object.values(MODEL_CALL_SPANS))})
   | join kind=leftouter nodes on $left.ParentId == $right.NodeId;`;
 
 const TIMES = `calls = count(), p50Ms = percentile(DurationMs, 50),
@@ -82,7 +75,7 @@ export function latencyFromLogs(logs: Logs, workspaceId: string): LatencySource 
 
     const [total] = await query(`${spans(traceIds)}
 calls | summarize ${TIMES}, failed = countif(Success == false)
-| extend runs = toscalar(deps | where Name in (${list(RUN_SPANS)}) | summarize dcount(OperationId))`);
+| extend runs = toscalar(deps | where Name in (${list(Object.values(RUN_SPANS))}) | summarize dcount(OperationId))`);
     // Every trace's run span, or some of the run is still on its way.
     if (!total || num(total.runs) < new Set(traceIds).size) return null;
     if (expectCalls && num(total.calls) === 0) return null;

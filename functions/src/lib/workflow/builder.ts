@@ -4,6 +4,7 @@
 
 import { END, START, StateGraph } from "@langchain/langgraph";
 import type { TokenUsage } from "../model/types.js";
+import { nodeSpan } from "../telemetry/spans.js";
 import { inSpan } from "../telemetry/tracing.js";
 import { type Loop, type State, type Update, WorkflowState } from "./state.js";
 import type { NodeEvent } from "./types.js";
@@ -49,7 +50,7 @@ export class WorkflowBuilder {
   node(name: string, fn: NodeFn): this {
     const { onNode } = this.options;
     this.graph.addNode(name, (s: State, config?: { signal?: AbortSignal }) =>
-      inSpan(`node ${name}`, { "job_scan.node": name }, async (span) => {
+      inSpan(nodeSpan(name), { "job_scan.node": name }, async (span) => {
         const started = performance.now();
         try {
           const update = await fn(s, config?.signal);
