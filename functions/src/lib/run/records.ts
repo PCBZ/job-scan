@@ -68,8 +68,16 @@ export interface RunMeta {
   started_at: string;
   /** When the workflow finished, before the record was written (#129). */
   ended_at: string;
-  /** The run's trace id, to find its telemetry again (#134); absent before. */
+  /**
+   * The trace the collect run is in, which holds judge and explain (#134);
+   * absent before. Before the sources linked their traces, it was the whole run's.
+   */
   trace_id?: string;
+  /**
+   * Every trace of the run: the collect run's, then each source's, linked from
+   * it. Absent on records from before the sources had their own traces.
+   */
+  trace_ids?: string[];
   /** The deployed release (APP_VERSION), "local" outside CD. */
   version: string;
   /** Milliseconds per node, summed over its runs. */

@@ -6,8 +6,7 @@
 
 import {
   type Attributes,
-  context,
-  ROOT_CONTEXT,
+  type Link,
   type Span,
   SpanStatusCode,
   TraceFlags,
@@ -16,13 +15,32 @@ import {
 
 export const tracer = trace.getTracer("job-scan");
 
-/** Runs `fn` in a span that is current for its duration; a throw marks it failed. */
+/** Where another invocation's trace stands: its trace and the span to link to. */
+export interface TracePoint {
+  trace_id: string;
+  span_id: string;
+}
+
+/**
+ * Runs `fn` in a span that is current for its duration; a throw marks it
+ * failed. `links` point at spans in other traces that led to this one: how
+ * the collect run names the sources it merged, each in its own trace.
+ */
 export async function inSpan<T>(
   name: string,
   attributes: Attributes,
   fn: (span: Span) => Promise<T> | T,
+  links: TracePoint[] = [],
 ): Promise<T> {
-  return tracer.startActiveSpan(name, { attributes }, async (span) => {
+  const linked: Link[] = links.map((l) => ({
+    context: {
+      traceId: l.trace_id,
+      spanId: l.span_id,
+      traceFlags: TraceFlags.SAMPLED,
+      isRemote: true,
+    },
+  }));
+  return tracer.startActiveSpan(name, { attributes, links: linked }, async (span) => {
     try {
       return await fn(span);
     } catch (err) {
@@ -35,19 +53,4 @@ export async function inSpan<T>(
       span.end();
     }
   });
-}
-
-/**
- * Runs `fn` as a continuation of a trace another invocation started: spans
- * opened inside it join that trace instead of beginning their own. How the
- * collect run keeps one trace per day's run.
- */
-export function inTrace<T>(parent: { trace_id: string; span_id: string }, fn: () => T): T {
-  const parentContext = trace.setSpanContext(ROOT_CONTEXT, {
-    traceId: parent.trace_id,
-    spanId: parent.span_id,
-    traceFlags: TraceFlags.SAMPLED,
-    isRemote: true,
-  });
-  return context.with(parentContext, fn);
 }

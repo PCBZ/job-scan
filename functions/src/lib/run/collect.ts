@@ -11,7 +11,7 @@
 // write is logged, not a failed run, since the report is already out.
 
 import type { Source } from "../postings/types.js";
-import { inSpan, inTrace } from "../telemetry/tracing.js";
+import { inSpan } from "../telemetry/tracing.js";
 import { buildCollectWorkflow, type State } from "../workflow/graph.js";
 import type { Loop } from "../workflow/state.js";
 import type { NodeEvent } from "../workflow/types.js";
@@ -124,14 +124,19 @@ export async function runCollect(
     { onNode },
   );
   try {
-    // Inside the source's trace, so the evaluation report finds the whole run.
-    let traceId = meta.trace?.trace_id ?? "";
-    const run = () =>
-      inSpan("collect run", {}, (span) => {
+    // Its own trace, linked to each source's: several sources lead to one
+    // collect, so none of them is its parent.
+    let traceId = "";
+    const state = await inSpan(
+      "collect run",
+      {},
+      (span) => {
         traceId = span.spanContext().traceId;
         return workflow.invoke(seedFrom(handoffs), { signal });
-      });
-    const state = await (meta.trace ? inTrace(meta.trace, run) : run());
+      },
+      meta.traces,
+    );
+    const traceIds = [...new Set([traceId, ...meta.traces.map((t) => t.trace_id)])];
     const throttledMs = meta.throttledMs + Math.round(pipeline.throttledMs?.() ?? 0);
     const rateLimited = meta.rateLimited + (pipeline.rateLimited?.() ?? 0);
     const summary: RunSummary = {
@@ -151,6 +156,7 @@ export async function runCollect(
         started_at: meta.startedAt,
         ended_at: now().toISOString(),
         trace_id: traceId,
+        trace_ids: traceIds,
         version: pipeline.version,
         node_ms: nodeMs,
         throttled_ms: throttledMs,
