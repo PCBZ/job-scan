@@ -87,7 +87,7 @@ export async function runEvalReport(
   let latency: Latency | null = null;
   let why = "not in Application Insights yet";
   try {
-    latency = await d.latency(m.traceId, new Date(m.startedAt), expectCalls);
+    latency = await d.latency(traceIdsOf(records, m.traceId), new Date(m.startedAt), expectCalls);
   } catch (err) {
     why = err instanceof Error ? err.message : String(err);
   }
@@ -178,18 +178,27 @@ async function pricesFor(
 }
 
 /**
- * The providers whose calls the run's trace holds: OpenInference instruments
- * the OpenAI SDK (#101), which these two use.
+ * The providers whose calls the run's traces hold: OpenInference instruments
+ * the OpenAI SDK, Node's (#101) and the scanner's (#188), which these two use.
  */
 const TRACED_PROVIDERS: ReadonlySet<string> = new Set(["azure-openai", "openai-compatible"]);
 
-/** Whether a traced node used tokens: then the run's trace isn't complete without its calls. */
+/** Whether a traced node used tokens: then the run's traces aren't complete without its calls. */
 function madeModelCalls(records: RunRecord[]): boolean {
   const run = records.find((r): r is RunStatsRecord => r.kind === "run");
   if (!run) return false;
   return Object.entries(run.usage).some(
     ([node, u]) => TRACED_PROVIDERS.has(modelOf(run, node).provider) && u.input > 0,
   );
+}
+
+/**
+ * The run's traces, from its record: collect's and each source's (#189). A
+ * record from before has only the one trace, which held the whole run.
+ */
+function traceIdsOf(records: RunRecord[], traceId: string): string[] {
+  const run = records.find((r): r is RunStatsRecord => r.kind === "run");
+  return run?.trace_ids?.length ? run.trace_ids : [traceId];
 }
 
 /**
@@ -217,7 +226,7 @@ async function runSmoke(id: string, d: EvalReportDeps, log: EvalReportLog): Prom
     if (!latest) throw new Error("no run record with a trace id yet");
     const records = await d.records.read(latest.name);
     const latency = await d.latency(
-      latest.run.trace_id,
+      traceIdsOf(records, latest.run.trace_id),
       new Date(latest.run.started_at),
       madeModelCalls(records),
     );

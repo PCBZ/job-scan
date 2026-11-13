@@ -89,7 +89,7 @@ function fakeMarks(marks: Set<string>) {
 }
 
 type Source = (
-  traceId: string,
+  traceIds: string[],
   startedAt: Date,
   expectCalls: boolean,
 ) => Promise<typeof LATENCY | null>;
@@ -291,6 +291,20 @@ describe("one evaluation email per run (#130)", () => {
     await harness({ [NAME]: toJsonl(records({ usage: {} })) }, CONFIG, spy).run(MESSAGE);
     expect(asked).toEqual([true, false]);
   });
+
+  it("asks for all of the run's traces, or the message's one on an older record", async () => {
+    const asked: string[][] = [];
+    const spy: Source = async (traceIds) => {
+      asked.push(traceIds);
+      return LATENCY;
+    };
+    const MAIL = "1".repeat(32);
+    const JOBSPY = "2".repeat(32);
+    const all = records({ trace_id: MESSAGE.traceId, trace_ids: [MESSAGE.traceId, MAIL, JOBSPY] });
+    await harness({ [NAME]: toJsonl(all) }, CONFIG, spy).run(MESSAGE);
+    await harness({ [NAME]: toJsonl(records()) }, CONFIG, spy).run(MESSAGE);
+    expect(asked).toEqual([[MESSAGE.traceId, MAIL, JOBSPY], [MESSAGE.traceId]]);
+  });
 });
 
 describe("the post-deploy smoke test (#134)", () => {
@@ -302,13 +316,13 @@ describe("the post-deploy smoke test (#134)", () => {
   };
 
   it("reports on the latest run with a trace, as [SMOKE], and says it passed", async () => {
-    const asked: string[] = [];
-    const h = harness(blobs, CONFIG, async (traceId) => {
-      asked.push(traceId);
+    const asked: string[][] = [];
+    const h = harness(blobs, CONFIG, async (traceIds) => {
+      asked.push(traceIds);
       return LATENCY;
     });
     await h.run({ smoke: true, id: "run-1" });
-    expect(asked).toEqual(["0af7651916cd43dd8448eb211c80319c"]);
+    expect(asked).toEqual([["0af7651916cd43dd8448eb211c80319c"]]);
     expect(h.sent).toHaveLength(1);
     expect(h.sent[0]?.subject).toMatch(/^\[SMOKE\] Job Scan — evaluation 2026-10-15/);
     expect(h.smokes).toEqual([
@@ -363,6 +377,22 @@ describe("the post-deploy smoke test (#134)", () => {
     // Reporting a failure: logged too, never thrown.
     await expect(run(true)).resolves.toBeUndefined();
     expect(sent).toHaveLength(1);
+  });
+
+  it("asks for every trace of a run that has several", async () => {
+    const traceIds = ["3".repeat(32), "4".repeat(32)];
+    const asked: string[][] = [];
+    const h = harness(
+      { [TRACED]: toJsonl(records({ trace_id: traceIds[0], trace_ids: traceIds })) },
+      CONFIG,
+      async (ids) => {
+        asked.push(ids);
+        return LATENCY;
+      },
+    );
+    await h.run({ smoke: true, id: "run-5" });
+    expect(asked).toEqual([traceIds]);
+    expect(h.smokes[0]).toMatchObject({ id: "run-5", ok: true });
   });
 
   it("fails when no run kept its trace id yet", async () => {

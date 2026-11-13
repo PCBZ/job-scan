@@ -1,6 +1,7 @@
-// The run's model-call latency (#130), from its trace in Application
+// The run's model-call latency (#130), from its traces in Application
 // Insights: the OpenInference spans under each graph node's span (#101).
-// Null until the run's telemetry is in, so the report knows to wait.
+// A run is collect's trace plus each source's (#189), so every query takes
+// all of them. Null until the run's telemetry is in, so the report knows to wait.
 
 import type { TokenCredential } from "@azure/identity";
 import { LogsQueryClient, type LogsTable } from "@azure/monitor-query-logs";
@@ -18,12 +19,13 @@ export interface Latency extends CallTimes {
 }
 
 /**
- * `expectCalls` says whether the run made model calls, from its record. Then
- * a trace with no calls yet isn't complete: Azure ingests spans in no set
- * order, so the run's span can arrive before its calls'.
+ * `traceIds` are the run's traces, from its record. `expectCalls` says whether
+ * the run made model calls, from its record. Then traces with no calls yet
+ * aren't complete: Azure ingests spans in no set order, so the run's spans can
+ * arrive before its calls'.
  */
 export type LatencySource = (
-  traceId: string,
+  traceIds: string[],
   startedAt: Date,
   expectCalls: boolean,
 ) => Promise<Latency | null>;
@@ -33,14 +35,25 @@ type Logs = Pick<LogsQueryClient, "queryWorkspace">;
 /** Trace ids are 32 hex digits, checked before they go into a query. */
 const TRACE_ID = /^[0-9a-f]{32}$/;
 
+/** The span each trace's run is in: collect's, the mail source's and the scanner's. */
+const RUN_SPANS = ["collect run", "daily run", "jobspy run"];
+
 /**
- * The run's spans, with each model call's node. Its collect span, the last the run
- * ends, tells whether the trace is in yet.
+ * Model-call spans: OpenInference names the Node SDK's calls one way and the
+ * Python SDK's (the scanner, #188) another.
  */
-const spans = (traceId: string) => `
-let deps = AppDependencies | where OperationId == "${traceId}";
+const CALL_SPANS = ["OpenAI Chat Completions", "ChatCompletion"];
+
+const list = (names: string[]) => names.map((n) => `"${n}"`).join(", ");
+
+/**
+ * The run's spans, with each model call's node. A trace is in once its run
+ * span is, the last the trace ends.
+ */
+const spans = (traceIds: string[]) => `
+let deps = AppDependencies | where OperationId in (${list(traceIds)});
 let nodes = deps | where Name startswith "node " | project NodeId = Id, Node = substring(Name, 5);
-let calls = deps | where Name == "OpenAI Chat Completions"
+let calls = deps | where Name in (${list(CALL_SPANS)})
   | join kind=leftouter nodes on $left.ParentId == $right.NodeId;`;
 
 const TIMES = `calls = count(), p50Ms = percentile(DurationMs, 50),
@@ -56,8 +69,9 @@ function rowsOf(table: LogsTable | undefined): Record<string, unknown>[] {
 const num = (v: unknown) => Math.round(Number(v ?? 0));
 
 export function latencyFromLogs(logs: Logs, workspaceId: string): LatencySource {
-  return async (traceId, startedAt, expectCalls) => {
-    if (!TRACE_ID.test(traceId)) throw new Error(`not a trace id: ${traceId}`);
+  return async (traceIds, startedAt, expectCalls) => {
+    if (traceIds.length === 0) throw new Error("no trace ids");
+    for (const id of traceIds) if (!TRACE_ID.test(id)) throw new Error(`not a trace id: ${id}`);
     // From just before the run to now: the spans are in it whenever they land.
     const timespan = { startTime: new Date(startedAt.getTime() - 5 * 60_000), endTime: new Date() };
     const query = async (kql: string) => {
@@ -66,12 +80,13 @@ export function latencyFromLogs(logs: Logs, workspaceId: string): LatencySource 
       return rowsOf(r.tables[0]);
     };
 
-    const [total] = await query(`${spans(traceId)}
+    const [total] = await query(`${spans(traceIds)}
 calls | summarize ${TIMES}, failed = countif(Success == false)
-| extend runs = toscalar(deps | where Name == "collect run" | count)`);
-    if (!total || num(total.runs) === 0) return null;
+| extend runs = toscalar(deps | where Name in (${list(RUN_SPANS)}) | summarize dcount(OperationId))`);
+    // Every trace's run span, or some of the run is still on its way.
+    if (!total || num(total.runs) < new Set(traceIds).size) return null;
     if (expectCalls && num(total.calls) === 0) return null;
-    const byNode = await query(`${spans(traceId)}
+    const byNode = await query(`${spans(traceIds)}
 calls | summarize ${TIMES} by Node | order by calls desc`);
 
     const times = (r: Record<string, unknown>): CallTimes => ({
