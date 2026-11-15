@@ -71,10 +71,12 @@ def test_a_failed_run_is_a_failed_span_and_still_names_its_trace(spans):
     assert json.loads(next(iter(container.blobs.values())))["trace"]["trace_id"] == f"{run.context.trace_id:032x}"
 
 
-def _azure_openai(answer: dict) -> AzureOpenAI:
-    """The real client, over a transport that answers as Azure would."""
+def _azure_openai(answer: dict, sent: list[dict] | None = None) -> AzureOpenAI:
+    """The real client, over a transport that answers as Azure would; `sent` collects the request bodies."""
 
     def respond(request: httpx.Request) -> httpx.Response:
+        if sent is not None:
+            sent.append(json.loads(request.content))
         return httpx.Response(
             200,
             json={
@@ -115,6 +117,18 @@ def test_each_model_call_is_a_span_under_its_stage_with_no_posting_text(spans):
     recorded = json.dumps([dict(c.attributes or {}) for c in calls], default=str)
     assert DESCRIPTION not in recorded and "Acme Pay" not in recorded
     assert "extract-2026-03-17" in recorded  # the model is kept
+
+
+def test_the_reasoning_effort_and_prompt_cache_reach_azure_in_the_request():
+    sent: list[dict] = []
+    answer = {"workplace": "remote", "salary": "", "requirements": [], "skills": []}
+    client = _azure_openai(answer, sent)
+    Extractor(client, "extract", reasoning_effort="none", prompt_cache="explicit").extract(INDEED)
+    Extractor(client, "extract").extract(INDEED)
+    tuned, plain = sent
+    assert tuned["reasoning_effort"] == "none"
+    assert tuned["prompt_cache_options"] == {"mode": "explicit"}
+    assert "reasoning_effort" not in plain and "prompt_cache_options" not in plain
 
 
 def _everything_exported(spans) -> str:

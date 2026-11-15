@@ -32,5 +32,7 @@ module "jobspy_app" {
     module.openai.extract_deployment_name == null ? {} : {
       "MODEL_EXTRACT_NAME" = module.openai.extract_deployment_name
     },
+    # The same reasoning effort and prompt cache as the Node app's calls (#200).
+    local.model_tuning,
   )
 }
