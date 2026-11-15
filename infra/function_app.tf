@@ -24,16 +24,9 @@ module "function_app" {
     "MODEL_ENDPOINT" = module.openai.endpoint
     "MODEL_NAME"     = module.openai.deployment_name
     # Calls are paced to the deployment's TPM (functions/src/lib/model/rate-limit.ts, #93).
-    "MODEL_TPM" = tostring(module.openai.tokens_per_minute)
-    # gpt-6-luna and gpt-5.6 write the prompt cache where the last message ends
-    # unless told where the shared prefix does (#160); earlier models answer 400.
-    "MODEL_PROMPT_CACHE" = "explicit"
-    # They reason at medium by default, and gpt-5.6-luna's reasoning tokens were
-    # 82% of the judge's output on 2026-10-28 (#166). The default 2024-10-21 API
-    # version honours "none" (checked on both).
-    "MODEL_REASONING_EFFORT" = "none"
-    "CONFIG_BLOB_URL"        = module.config_blob.url
-    "RESUME_CACHE_URL"       = module.storage.container_endpoints["resume-cache"]
+    "MODEL_TPM"        = tostring(module.openai.tokens_per_minute)
+    "CONFIG_BLOB_URL"  = module.config_blob.url
+    "RESUME_CACHE_URL" = module.storage.container_endpoints["resume-cache"]
     # seenmessages and seenjobs (#9, #15).
     "TABLES_URL" = module.storage.table_endpoint
     # Private; reports are read through user delegation SAS links (#19).
@@ -77,5 +70,6 @@ module "function_app" {
       "COSMOS_DATABASE"  = var.platform.cosmos_database
       "COSMOS_CONTAINER" = var.platform.cosmos_container
     },
+    local.model_tuning,
   )
 }

@@ -39,7 +39,8 @@ def test_one_structured_call_per_posting():
     (request,) = client.requests
     assert request["model"] == "dep" and request["response_format"] == RESPONSE_FORMAT
     assert request["messages"][0] == {"role": "system", "content": SYSTEM}
-    assert "reasoning_effort" not in request  # the scanner never sets one
+    # Without the settings, nothing is sent and the model keeps its defaults.
+    assert "reasoning_effort" not in request and "extra_body" not in request
 
 
 def test_an_answer_that_cannot_be_parsed_is_no_result_but_still_costs_tokens():
@@ -120,6 +121,22 @@ def test_the_extract_slot_takes_the_main_ones_name_unless_it_has_its_own():
     assert extractor_from_env(ENV, Credential()).model == "main-deployment"  # type: ignore[arg-type]
     own = extractor_from_env({**ENV, "MODEL_EXTRACT_NAME": "nano"}, Credential())  # type: ignore[arg-type]
     assert own.model == "nano"
+
+
+def test_reasoning_and_the_prompt_cache_follow_the_node_apps_settings():
+    tuned = {**ENV, "MODEL_REASONING_EFFORT": "none", "MODEL_PROMPT_CACHE": "explicit"}
+    main = extractor_from_env(tuned, Credential())  # type: ignore[arg-type]
+    assert (main.reasoning_effort, main.prompt_cache) == ("none", "explicit")
+    # Extraction's own deployment never takes the main one's, as in the Node app.
+    own = extractor_from_env({**tuned, "MODEL_EXTRACT_NAME": "nano"}, Credential())  # type: ignore[arg-type]
+    assert (own.reasoning_effort, own.prompt_cache) == (None, None)
+    own = extractor_from_env(
+        {**tuned, "MODEL_EXTRACT_NAME": "nano", "MODEL_EXTRACT_REASONING_EFFORT": "minimal"},
+        Credential(),  # type: ignore[arg-type]
+    )
+    assert own.reasoning_effort == "minimal"
+    with pytest.raises(RuntimeError, match='MODEL_PROMPT_CACHE must be "explicit"'):
+        extractor_from_env({**ENV, "MODEL_PROMPT_CACHE": "auto"}, Credential())  # type: ignore[arg-type]
 
 
 def test_a_missing_setting_is_named():

@@ -4,7 +4,8 @@ A scraped row has the title, company, place and link as fields, but the
 requirements, skills, workplace and pay live in the description. One call per
 posting asks the model for them; the other fields are copied, never asked for.
 Settings are the Node app's own (MODEL_EXTRACT_* then MODEL_*), and the model
-is reached with the app's identity, so no key is stored.
+is reached with the app's identity, so no key is stored. The reasoning effort
+and prompt cache follow functions/src/lib/model/config.ts too (#200).
 """
 
 from __future__ import annotations
@@ -106,9 +107,21 @@ def user_message(row: dict) -> str:
 
 
 class Extractor:
-    def __init__(self, client: AzureOpenAI, model: str):
+    def __init__(
+        self,
+        client: AzureOpenAI,
+        model: str,
+        reasoning_effort: str | None = None,
+        prompt_cache: Literal["explicit"] | None = None,
+    ):
         self.client = client
         self.model = model
+        # How hard a reasoning model thinks; None sends none and leaves the model's default.
+        self.reasoning_effort = reasoning_effort
+        # "explicit": the cache is written only where a call marks it (#160). This
+        # prompt marks nothing, its shared system part being under the model's
+        # minimum, so no call writes the cache for a posting no later call repeats.
+        self.prompt_cache = prompt_cache
 
     def extract(self, row: dict) -> tuple[Extracted | None, Usage]:
         """The model's reading of one row, and what the call used; None when it
@@ -124,6 +137,9 @@ class Extractor:
                 {"role": "user", "content": user_message(row)},
             ],
             response_format=RESPONSE_FORMAT,  # type: ignore[arg-type]
+            **({"reasoning_effort": self.reasoning_effort} if self.reasoning_effort else {}),
+            # The SDK's request type doesn't list this yet.
+            **({"extra_body": {"prompt_cache_options": {"mode": self.prompt_cache}}} if self.prompt_cache else {}),
         )
         usage, message = usage_of(completion), completion.choices[0].message
         if message.refusal or not message.content:
@@ -151,10 +167,21 @@ def usage_of(completion: ChatCompletion) -> Usage:
 
 
 def extractor_from_env(env: dict[str, str], credential: TokenCredential) -> Extractor:
-    """From MODEL_EXTRACT_NAME / _ENDPOINT / _API_VERSION, else MODEL_*, as the Node app does."""
+    """From MODEL_EXTRACT_NAME / _ENDPOINT / _API_VERSION, else MODEL_*, as the Node app does.
+
+    The reasoning effort and prompt cache are the slot's own, as in the Node
+    app: MODEL_EXTRACT_* when MODEL_EXTRACT_NAME gives extraction its own
+    deployment, never the main one's; otherwise the main MODEL_* ones.
+    """
 
     def pick(key: str) -> str:
         return (env.get(f"MODEL_EXTRACT_{key}") or env.get(f"MODEL_{key}") or "").strip()
+
+    slot = "MODEL_EXTRACT" if env.get("MODEL_EXTRACT_NAME", "").strip() else "MODEL"
+    effort = env.get(f"{slot}_REASONING_EFFORT", "").strip() or None
+    cache = env.get(f"{slot}_PROMPT_CACHE", "").strip() or None
+    if cache not in (None, "explicit"):
+        raise RuntimeError(f'{slot}_PROMPT_CACHE must be "explicit", got "{cache}"')
 
     endpoint, name = pick("ENDPOINT"), pick("NAME")
     for key, value in (("MODEL_ENDPOINT", endpoint), ("MODEL_NAME", name)):
@@ -167,7 +194,7 @@ def extractor_from_env(env: dict[str, str], credential: TokenCredential) -> Extr
         max_retries=MAX_RETRIES,
         timeout=TIMEOUT_SECONDS,
     )
-    return Extractor(client, name)
+    return Extractor(client, name, reasoning_effort=effort, prompt_cache=cache)
 
 
 @dataclass
