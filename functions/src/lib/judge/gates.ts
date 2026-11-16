@@ -13,13 +13,16 @@ export const MODEL_GATES = ["sponsorship", "seniority", "keyword", "location", "
 export type ModelGate = (typeof MODEL_GATES)[number];
 
 /**
- * The gates a scraped posting can take before its description is read (#203):
- * they need only its title and place. The others read its requirements.
+ * The gates a scraped posting takes before its description is read (#203):
+ * they need only its title and place.
  */
 export const BEFORE_READING: readonly ModelGate[] = ["location", "title"];
-export const AFTER_READING: readonly ModelGate[] = MODEL_GATES.filter(
-  (g) => !BEFORE_READING.includes(g),
-);
+/**
+ * And after: the ones that read its requirements, and location again, since
+ * reading can change its workplace and so the location questions code asks.
+ * Location is asked only of a posting code left questions on.
+ */
+export const AFTER_READING: readonly ModelGate[] = MODEL_GATES.filter((g) => g !== "title");
 
 export interface AskedGate {
   gate: ModelGate;

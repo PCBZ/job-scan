@@ -38,9 +38,12 @@ function need<T>(value: T | null, what: string): T {
   return value;
 }
 
-/** The code gates for a scraped posting before its description is read, and after (#203). */
+/**
+ * The code gates for a scraped posting before its description is read, and
+ * after (#203). Location runs again after: reading can change the workplace.
+ */
 const CODE_BEFORE_READING: readonly Gate[] = ["location"];
-const CODE_AFTER_READING: readonly Gate[] = ["salary", "keyword"];
+const CODE_AFTER_READING: readonly Gate[] = ["location", "salary", "keyword"];
 
 const isUnread = (p: Posting) => p.description !== undefined;
 

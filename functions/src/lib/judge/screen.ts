@@ -53,7 +53,7 @@ const failing = (gate: AskedGate, yes: number) => (gate.failsOn === "yes" ? yes 
 export function screenStep(decision: DecisionClient | null, options: ScreenOptions = {}) {
   const concurrency = options.concurrency ?? 4;
   return async (
-    { postings, profile, gates: only }: ScreenInput,
+    { postings, profile, gates: gatesToAsk }: ScreenInput,
     signal?: AbortSignal,
   ): Promise<ScreenResult> => {
     let usage: TokenUsage = { input: 0, output: 0 };
@@ -65,7 +65,11 @@ export function screenStep(decision: DecisionClient | null, options: ScreenOptio
       postings,
       concurrency,
       async (posting): Promise<Outcome> => {
-        const gates = gatesFor(posting, profile).filter((g) => !only || only.includes(g.gate));
+        // The gates that apply to this posting, narrowed to the ones this pass
+        // asks: a scraped posting is screened before and after it is read (#203).
+        const gates = gatesFor(posting, profile).filter(
+          (g) => !gatesToAsk || gatesToAsk.includes(g.gate),
+        );
         if (gates.length === 0) return { kept: posting };
         if (!decision) {
           unscreened++;

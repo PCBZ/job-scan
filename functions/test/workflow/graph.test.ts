@@ -380,19 +380,21 @@ describe("workflow graph", () => {
       expect(f.hardGateInputs).toEqual([
         { titles: ["attempt 1"] },
         { titles: ["Developer", "Chef"], gates: ["location"] },
-        { titles: ["Developer"], gates: ["salary", "keyword"] },
+        { titles: ["Developer"], gates: ["location", "salary", "keyword"] },
       ]);
       expect(f.screenInputs).toEqual([
         { titles: ["attempt 1"] },
         { titles: ["Developer", "Chef"], gates: ["location", "title"] },
-        { titles: ["Developer"], gates: ["sponsorship", "seniority", "keyword"] },
+        { titles: ["Developer"], gates: ["sponsorship", "seniority", "keyword", "location"] },
       ]);
       const reads = f.llmInputs.filter((c) => c.node === "read_postings");
       expect(
         reads.map((c) => (c.args[0] as { postings: Posting[] }).postings.map((p) => p.title)),
       ).toEqual([["Developer"]]);
       expect(ranBefore(f.log, "screen:location,title", "read_postings")).toBe(true);
-      expect(ranBefore(f.log, "read_postings", "screen:sponsorship,seniority,keyword")).toBe(true);
+      expect(
+        ranBefore(f.log, "read_postings", "screen:sponsorship,seniority,keyword,location"),
+      ).toBe(true);
 
       const judged = f.llmInputs.find((c) => c.node === "judge")?.args[0] as {
         postings: Posting[];

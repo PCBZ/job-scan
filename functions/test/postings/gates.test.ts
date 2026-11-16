@@ -334,4 +334,28 @@ describe("only some gates (#203)", () => {
     expect(location.kept).toEqual([p]);
     expect(location.filtered).toEqual([]);
   });
+
+  it("rechecks location after reading changed the workplace, replacing stale questions", async () => {
+    const step = hardGatesStep(async () => 1.4);
+    const config = { profile: VANCOUVER } as AppConfig;
+    // The board said remote, so the place didn't matter; the description says onsite.
+    const board = posting({ location: "Toronto, ON", workplace: "remote", salary: "" });
+    expect((await step([board], config, ["location"])).kept).toHaveLength(1);
+    const read = { ...board, workplace: "onsite" as const };
+    const after = await step([read], config, ["location", "salary", "keyword"]);
+    expect(after.filtered.map((f) => [f.gate, f.reason])).toEqual([
+      ["location", "outside locations: Toronto, ON"],
+    ]);
+
+    const settled = posting({
+      location: "Vancouver, BC",
+      workplace: "onsite",
+      gate_questions: ["old"],
+    });
+    const [kept] = (await step([settled], config, ["location"])).kept;
+    expect(kept).not.toHaveProperty("gate_questions");
+    // A pass without location leaves them as they were.
+    const [untouched] = (await step([settled], config, ["keyword"])).kept;
+    expect(untouched?.gate_questions).toEqual(["old"]);
+  });
 });

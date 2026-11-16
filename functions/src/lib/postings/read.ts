@@ -50,21 +50,13 @@ function withAnswer(p: Posting, answer: ReadAnswer | null): Posting {
   return answer ? { ...rest, ...answer } : rest;
 }
 
-export interface ReadOptions {
-  /** Postings in flight at once. */
-  concurrency?: number;
-}
-
 /**
  * Reads each posting's description. A call that fails keeps the posting with
  * what the board said and no requirements, which judge treats as thin: one
- * row, or a provider outage, mustn't cost the day's report.
+ * row, or a provider outage, mustn't cost the day's report. `concurrency` is
+ * the postings in flight at once.
  */
-export function readStep(
-  client: ModelClient,
-  options: ReadOptions = {},
-): ModelSteps["readPostings"] {
-  const concurrency = options.concurrency ?? 4;
+export function readStep(client: ModelClient, concurrency = 4): ModelSteps["readPostings"] {
   return async ({ postings }, signal) => {
     let usage: TokenUsage = { input: 0, output: 0 };
     let unread = 0;
