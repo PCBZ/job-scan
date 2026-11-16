@@ -1,4 +1,4 @@
-"""OpenTelemetry for the scanner: its run and stages as spans, and each model call.
+"""OpenTelemetry for the scanner: its run and stages as spans.
 
 Exports to APPLICATIONINSIGHTS_CONNECTION_STRING, which Terraform sets, through
 the Azure Monitor distro. Without it (tests, local runs) nothing is configured
@@ -6,13 +6,11 @@ and spans go nowhere.
 
 The distro instruments HTTP clients by default. Those are off here: jobspy
 scrapes through `requests`, and every search URL carries the target titles and
-locations; the OpenAI client goes through `httpx2`, and OpenInference already
-spans those calls.
+locations.
 Only this scanner's own logger is exported, never a library's: jobspy logs
-the URLs it fetched. OpenInference hides prompts and answers, which hold
-posting text. Span names follow the Node side, so the evaluation's latency
-query finds them: functions/src/lib/telemetry/spans.ts lists the same names,
-and a test on each side pins them.
+the URLs it fetched. Span names follow the Node side, so the evaluation's
+latency query finds the run: functions/src/lib/telemetry/spans.ts lists the
+same names, and a test on each side pins them.
 """
 
 from __future__ import annotations
@@ -31,16 +29,12 @@ RUN_SPAN = "jobspy run"
 # A stage's span is "node <stage>", as a Node graph node's is.
 NODE_SPAN_PREFIX = "node "
 
-# What OpenInference names an OpenAI SDK call (MODEL_CALL_SPANS.python); the
-# library sets it, so the test through the real client pins it.
-MODEL_CALL_SPAN = "ChatCompletion"
-
 
 def node_span(stage: str) -> str:
     return f"{NODE_SPAN_PREFIX}{stage}"
 
 
-# The distro's instrumentations that would record request URLs or duplicate spans.
+# The distro's instrumentations that would record request URLs.
 HTTP_CLIENTS = ("requests", "urllib", "urllib3", "httpx", "httpx2")
 
 
@@ -57,19 +51,7 @@ def configure(
         logger_name=LOGGER,
         instrumentation_options={name: {"enabled": False} for name in HTTP_CLIENTS},
     )
-    instrument_openai()
     return True
-
-
-def instrument_openai(tracer_provider: trace.TracerProvider | None = None) -> None:
-    """A span for every OpenAI call: model, tokens and status, with no prompt or answer."""
-    from openinference.instrumentation import TraceConfig
-    from openinference.instrumentation.openai import OpenAIInstrumentor
-
-    OpenAIInstrumentor().instrument(
-        tracer_provider=tracer_provider or trace.get_tracer_provider(),
-        config=TraceConfig(hide_inputs=True, hide_outputs=True),
-    )
 
 
 @contextmanager

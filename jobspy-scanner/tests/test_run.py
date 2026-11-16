@@ -7,19 +7,18 @@ from scanner.config import parse_config
 from scanner.handoff import iso, message_for, run_day
 from scanner.run import distinct, run_scan, scan
 
-from .helpers import CONFIG, LINKEDIN, ROWS, STARTED_AT, FakeContainer, FakeQueue, extractor, frame
+from .helpers import CONFIG, LINKEDIN, ROWS, STARTED_AT, FakeContainer, FakeQueue, frame
 
 
 def scrape(**_):
     return frame(*ROWS)
 
 
-def go(config=CONFIG, scraper=scrape, model=None):
+def go(config=CONFIG, scraper=scrape):
     container, queue = FakeContainer(), FakeQueue()
     run = lambda: run_scan(  # noqa: E731
         config_text=lambda: config,
         scrape=scraper,
-        extractor=lambda: model or extractor(),
         container=container,
         queue=queue,
         now=lambda: STARTED_AT,
@@ -76,21 +75,6 @@ def test_postings_over_the_cap_are_left_out_with_a_warning():
     assert handoff["warnings"] == ["jobspy: 1 postings left out (max_postings)"]
 
 
-def test_a_failed_extraction_keeps_the_posting_without_its_requirements():
-    def answer(**_):
-        raise RuntimeError("model down")
-
-    run, container, _ = go(model=extractor(answer))
-    run()
-    handoff = json.loads(next(iter(container.blobs.values())))
-    assert len(handoff["postings"]) == 3
-    assert all(p["requirements"] == [] for p in handoff["postings"])
-    assert handoff["warnings"] == [
-        "jobspy: 3 of 3 postings kept without their requirements "
-        "(extraction failed or ran out of time)"
-    ]
-
-
 def test_a_failed_scan_still_hands_over_so_collect_does_not_wait_the_deadline():
     run, container, queue = go(config='[profile]\ntarget_titles = ["A"]')
     with pytest.raises(ValueError):
@@ -103,16 +87,11 @@ def test_a_failed_scan_still_hands_over_so_collect_does_not_wait_the_deadline():
 def test_the_file_matches_the_golden_file():
     """The shape SourceHandoff (functions/src/lib/run/handoff.ts) reads, kept as a golden file."""
     fixture = json.loads((Path(__file__).parent / "fixtures" / "handoff.json").read_text())
-    times = iter([0.0, 1.5, 1.5, 4.0])  # scrape 1.5 s, then extract 2.5 s
-    scanned = scan(parse_config(CONFIG), scrape, extractor(), STARTED_AT, clock=lambda: next(times))
+    times = iter([0.0, 1.5])  # scrape 1.5 s
+    scanned = scan(parse_config(CONFIG), scrape, STARTED_AT, clock=lambda: next(times))
     assert scanned == fixture
-    assert scanned["node_ms"] == {"scrape": 1500, "extract_postings": 2500}
-
-
-def test_a_day_with_nothing_to_read_reports_no_usage():
-    times = iter([0.0, 1.0, 1.0, 1.0])
-    scanned = scan(parse_config(CONFIG), lambda **_: frame(), extractor(), STARTED_AT, clock=lambda: next(times))
-    assert scanned["usage"] == {} and scanned["node_ms"]["scrape"] == 1000
+    # The scanner calls no model (#204): no usage, and only the scrape is timed.
+    assert scanned["usage"] == {} and scanned["node_ms"] == {"scrape": 1500}
 
 
 def test_the_message_matches_the_golden_file():

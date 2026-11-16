@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { readUser } from "../../src/lib/postings/read.js";
+import type { Posting } from "../../src/lib/postings/types.js";
 import {
   type HandoffMessage,
   handoffQueue,
@@ -212,5 +215,29 @@ describe("traceNodes", () => {
     expect(
       traceNodes([untraced], COLLECT, { extract_postings: { input: 100, output: 10 } }),
     ).toEqual({});
+  });
+});
+
+describe("the scanner's file (#204)", () => {
+  // The golden file jobspy-scanner/tests/test_run.py checks its own output against.
+  const golden = readFileSync(
+    new URL("../../../jobspy-scanner/tests/fixtures/handoff.json", import.meta.url),
+  );
+
+  it("reads as a handoff whose postings collect reads itself", async () => {
+    const { container, blobs } = fakePostingsContainer();
+    blobs.set("2026-11-10/jobspy/golden.json", golden);
+    const h = await handoffStore(container).read("2026-11-10/jobspy/golden.json");
+
+    // Only a posting's own fields, so nothing the pipeline doesn't know rides along.
+    const known = new Set(Object.keys(posting({ description: "" })));
+    for (const p of h.postings) expect(Object.keys(p).filter((k) => !known.has(k))).toEqual([]);
+    // Unread: the board's fields, no requirements, and a description for the reader.
+    const unread = h.postings.filter((p) => p.description !== undefined);
+    expect(unread.map((p) => p.source)).toEqual(["indeed", "zip_recruiter"]);
+    expect(unread.every((p) => p.requirements.length === 0)).toBe(true);
+    expect(JSON.parse(readUser(unread[0] as Posting)).description).toContain("Requirements:");
+    // The scanner calls no model, so it reports no usage.
+    expect(h.usage).toEqual({});
   });
 });

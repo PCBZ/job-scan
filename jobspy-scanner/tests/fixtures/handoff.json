@@ -5,8 +5,7 @@
   "started_at": "2026-11-10T15:00:01.113Z",
   "trace": null,
   "node_ms": {
-    "scrape": 1500,
-    "extract_postings": 2500
+    "scrape": 1500
   },
   "throttled_ms": 0,
   "rate_limited": 0,
@@ -19,25 +18,26 @@
       "workplace": "unknown",
       "salary": "USD 120,000 - 150,000 a year",
       "posted": "2026-11-09",
-      "requirements": ["3+ years of Python", "Kubernetes and SQL"],
-      "skills": ["Python", "Kubernetes", "SQL"],
+      "requirements": [],
+      "skills": [],
       "link": null,
       "url": "https://www.indeed.com/viewjob?jk=aaa111",
       "source": "indeed",
       "account": "jobspy",
       "message_id": "2b0fc10e0d888b5d",
       "message_subject": "jobspy indeed",
-      "row": 0
+      "row": 0,
+      "description": "About the role. We build payment systems. Requirements: 3+ years of Python, Kubernetes and SQL."
     },
     {
       "title": "Backend Engineer",
       "company": "Globex",
       "location": "Remote",
-      "workplace": "unknown",
-      "salary": "USD 120,000 - 150,000 a year",
+      "workplace": "remote",
+      "salary": "",
       "posted": "2026-11-10",
-      "requirements": ["3+ years of Python", "Kubernetes and SQL"],
-      "skills": ["Python", "Kubernetes", "SQL"],
+      "requirements": [],
+      "skills": [],
       "link": null,
       "url": "https://www.linkedin.com/jobs/view/222",
       "source": "linkedin",
@@ -51,17 +51,18 @@
       "company": "Initech",
       "location": "Cambridge, MA, US",
       "workplace": "unknown",
-      "salary": "USD 120,000 - 150,000 a year",
+      "salary": "CAD 55 an hour",
       "posted": "",
-      "requirements": ["3+ years of Python", "Kubernetes and SQL"],
-      "skills": ["Python", "Kubernetes", "SQL"],
+      "requirements": [],
+      "skills": [],
       "link": null,
       "url": "https://www.ziprecruiter.com/c/initech/job/333",
       "source": "zip_recruiter",
       "account": "jobspy",
       "message_id": "ddb1e25e450d9e1a",
       "message_subject": "jobspy zip_recruiter",
-      "row": 2
+      "row": 2,
+      "description": "Own the pipelines."
     }
   ],
   "postings": [
@@ -72,25 +73,26 @@
       "workplace": "unknown",
       "salary": "USD 120,000 - 150,000 a year",
       "posted": "2026-11-09",
-      "requirements": ["3+ years of Python", "Kubernetes and SQL"],
-      "skills": ["Python", "Kubernetes", "SQL"],
+      "requirements": [],
+      "skills": [],
       "link": null,
       "url": "https://www.indeed.com/viewjob?jk=aaa111",
       "source": "indeed",
       "account": "jobspy",
       "message_id": "2b0fc10e0d888b5d",
       "message_subject": "jobspy indeed",
-      "row": 0
+      "row": 0,
+      "description": "About the role. We build payment systems. Requirements: 3+ years of Python, Kubernetes and SQL."
     },
     {
       "title": "Backend Engineer",
       "company": "Globex",
       "location": "Remote",
-      "workplace": "unknown",
-      "salary": "USD 120,000 - 150,000 a year",
+      "workplace": "remote",
+      "salary": "",
       "posted": "2026-11-10",
-      "requirements": ["3+ years of Python", "Kubernetes and SQL"],
-      "skills": ["Python", "Kubernetes", "SQL"],
+      "requirements": [],
+      "skills": [],
       "link": null,
       "url": "https://www.linkedin.com/jobs/view/222",
       "source": "linkedin",
@@ -104,17 +106,18 @@
       "company": "Initech",
       "location": "Cambridge, MA, US",
       "workplace": "unknown",
-      "salary": "USD 120,000 - 150,000 a year",
+      "salary": "CAD 55 an hour",
       "posted": "",
-      "requirements": ["3+ years of Python", "Kubernetes and SQL"],
-      "skills": ["Python", "Kubernetes", "SQL"],
+      "requirements": [],
+      "skills": [],
       "link": null,
       "url": "https://www.ziprecruiter.com/c/initech/job/333",
       "source": "zip_recruiter",
       "account": "jobspy",
       "message_id": "ddb1e25e450d9e1a",
       "message_subject": "jobspy zip_recruiter",
-      "row": 2
+      "row": 2,
+      "description": "Own the pipelines."
     }
   ],
   "dropped": {
@@ -143,16 +146,7 @@
     }
   },
   "suspicious": {},
-  "usage": {
-    "extract_postings": {
-      "input": 300,
-      "output": 60,
-      "cached": 120,
-      "cacheWrite": 24,
-      "reasoning": 15,
-      "models": ["extract-deployment-2026-03-17"]
-    }
-  },
+  "usage": {},
   "extract_loop": {
     "turns": [],
     "problems": [],

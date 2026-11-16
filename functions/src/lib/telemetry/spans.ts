@@ -18,9 +18,10 @@ export const nodeSpan = (name: string) => `${NODE_SPAN_PREFIX}${name}`;
 
 /**
  * Model-call spans. The OpenInference instrumentations name them, not us: the
- * Node SDK's calls one way, the Python SDK's (the scanner, #188) another. The
- * telemetry tests go through the real instrumentations, so an upgrade that
- * renames them fails there.
+ * Node SDK's calls one way, the Python SDK's another. The scanner made the
+ * Python ones until #204; the name stays so a run traced before it, the one CD's
+ * smoke test may read, still counts its calls. The Node telemetry tests go
+ * through the real instrumentation, so an upgrade that renames it fails there.
  */
 export const MODEL_CALL_SPANS = {
   node: "OpenAI Chat Completions",

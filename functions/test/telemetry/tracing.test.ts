@@ -218,7 +218,8 @@ describe("the scanner's span names", () => {
   it("are the ones jobspy-scanner writes", () => {
     // Python can't import these; its test_telemetry.py pins the same values.
     expect(RUN_SPANS.jobspy).toBe("jobspy run");
-    expect(nodeSpan("extract_postings")).toBe("node extract_postings");
+    expect(nodeSpan("scrape")).toBe("node scrape");
+    // What OpenInference named the scanner's model calls, before #204.
     expect(MODEL_CALL_SPANS.python).toBe("ChatCompletion");
   });
 });

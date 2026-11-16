@@ -10,7 +10,7 @@ def test_defaults_come_from_the_mail_configs_lists():
     assert (c.titles, c.locations) == (["A", "B"], ["Boston, MA"])
     assert c.sites == DEFAULT_SITES == [Site.INDEED, Site.LINKEDIN, Site.GLASSDOOR, Site.ZIP_RECRUITER]
     assert (c.results_wanted, c.hours_old, c.concurrency) == (15, 48, 2)
-    assert (c.max_postings, c.extract_concurrency) == (200, 8)
+    assert c.max_postings == 200
     assert c.fetch_descriptions is True
 
 
@@ -46,6 +46,8 @@ def test_the_jobspy_table_overrides():
         ('[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nconcurrency = 0', "concurrency"),
         ('[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nenabled = false', "enabled"),
         ('[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nresult_wanted = 5', "result_wanted"),
+        # The scanner reads no postings any more (#204); collect does.
+        ('[profile]\ntarget_titles = ["A"]\nlocations = ["X"]\n[jobspy]\nextract_concurrency = 8', "extract_concurrency"),
         ('[profile]\ntarget_titles = "A"\nlocations = ["X"]', "target_titles|titles"),
     ],
 )
