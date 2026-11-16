@@ -40,7 +40,7 @@ export interface Filtered {
 export function hardGatesStep(
   rate: () => Promise<number | null> = usdCad,
 ): DeterministicSteps["hardGates"] {
-  return async (postings, config: AppConfig) => {
+  return async (postings, config: AppConfig, gatesToRun) => {
     const profile = config.profile;
     const floor = floorOf(profile);
     // Fetch the rate only when some stated salary is in the other currency.
@@ -51,9 +51,9 @@ export function hardGatesStep(
     const filtered: Filtered[] = [];
     const unsettled = new Map<string, number>();
     for (const p of postings) {
-      const outcomes = Object.entries(GATES).map(
-        ([gate, check]) => [gate as Gate, check(p, context)] as const,
-      );
+      const outcomes = Object.entries(GATES)
+        .filter(([gate]) => !gatesToRun || gatesToRun.includes(gate as Gate))
+        .map(([gate, check]) => [gate as Gate, check(p, context)] as const);
       const failed = outcomes.find(([, o]) => "fail" in o);
       if (failed && "fail" in failed[1]) {
         filtered.push({ posting: p, gate: failed[0], reason: failed[1].fail });
@@ -63,7 +63,12 @@ export function hardGatesStep(
       for (const [, o] of outcomes) {
         if ("note" in o) unsettled.set(o.note, (unsettled.get(o.note) ?? 0) + 1);
       }
-      kept.push(questions.length ? { ...p, gate_questions: questions } : p);
+      // Only the location gate asks. When it runs again on a posting just read
+      // (#203), its questions replace the earlier pass's, which may be stale.
+      const { gate_questions: _, ...rest } = p;
+      const reasked = outcomes.some(([gate]) => gate === "location");
+      const base = reasked ? rest : p;
+      kept.push(questions.length ? { ...base, gate_questions: questions } : base);
     }
     const notes = [...unsettled].map(
       ([why, n]) => `salary not compared for ${n} posting(s): ${why}`,

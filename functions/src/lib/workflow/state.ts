@@ -47,6 +47,8 @@ export const WorkflowState = Annotation.Root({
 
   extracted: last<Posting[]>([]),
   postings: last<Posting[]>([]),
+  /** Scraped postings past the title and location gates, waiting to be read (#203). */
+  unread: last<Posting[]>([]),
   repeats: last<number>(0),
   duplicates: last<number>(0),
   // Code gates (#16), then model gates (#17).

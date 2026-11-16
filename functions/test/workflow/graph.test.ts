@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { handoffFrom, seedFrom } from "../../src/lib/run/handoff.js";
+import { handoffFrom, type SourceHandoff, seedFrom } from "../../src/lib/run/handoff.js";
 import { buildCollectWorkflow, buildMailWorkflow } from "../../src/lib/workflow/graph.js";
-import type { NodeEvent } from "../../src/lib/workflow/types.js";
+import type { NodeEvent, Posting } from "../../src/lib/workflow/types.js";
 import { judgement } from "../judge/helpers.js";
 import { posting } from "../postings/helpers.js";
 import { fakes } from "./fakes.js";
@@ -29,6 +29,49 @@ async function run(f: ReturnType<typeof fakes>, options = {}, signal?: AbortSign
 }
 
 const ranBefore = (log: string[], a: string, b: string) => log.indexOf(a) < log.indexOf(b);
+
+/** A scraped row, handed over unread (#203). */
+const scraped = (title: string) =>
+  posting({ title, source: "linkedin", account: "jobspy", description: `About ${title}` });
+
+/** A scraping source's file, holding `rows` as it handed them over. */
+function scrapeHandoff(rows: Posting[]): SourceHandoff {
+  return {
+    version: 1,
+    source: "jobspy",
+    day: "2026-10-13",
+    started_at: "2026-10-13T15:00:00.000Z",
+    trace: null,
+    node_ms: {},
+    throttled_ms: 0,
+    rate_limited: 0,
+    mail: null,
+    extracted: rows,
+    postings: rows,
+    dropped: {},
+    suspicious: {},
+    usage: {},
+    extract_loop: { turns: [], problems: [], retry: false },
+    warnings: [],
+  };
+}
+
+/** One day's run with the mail source and a scraping source. */
+async function runWithScraped(f: ReturnType<typeof fakes>, rows: Posting[]) {
+  const mail = await buildMailWorkflow(f.deterministicSteps, f.modelSteps).invoke({});
+  const handoff = handoffFrom(mail, {
+    source: "mail",
+    day: "2026-10-13",
+    started_at: "2026-10-13T15:00:00.000Z",
+    trace: null,
+    node_ms: {},
+    throttled_ms: 0,
+    rate_limited: 0,
+  });
+  return buildCollectWorkflow(f.deterministicSteps, f.modelSteps, f.effects).invoke(
+    seedFrom([handoff, scrapeHandoff(rows)]),
+  );
+}
 
 describe("workflow graph", () => {
   it("runs the full path in order, delivering before marking mail seen", async () => {
@@ -328,11 +371,67 @@ describe("workflow graph", () => {
     expect(callables).toEqual([]);
   });
 
+  describe("scraped postings handed over unread (#203)", () => {
+    it("reads only those past the title and location gates, then gives them the other gates", async () => {
+      const f = fakes({ screenTitles: ["Chef"] });
+      const out = await runWithScraped(f, [scraped("Developer"), scraped("Chef")]);
+
+      // Mail's postings take every gate at once; the scraped ones, two passes around reading.
+      expect(f.hardGateInputs).toEqual([
+        { titles: ["attempt 1"] },
+        { titles: ["Developer", "Chef"], gates: ["location"] },
+        { titles: ["Developer"], gates: ["location", "salary", "keyword"] },
+      ]);
+      expect(f.screenInputs).toEqual([
+        { titles: ["attempt 1"] },
+        { titles: ["Developer", "Chef"], gates: ["location", "title"] },
+        { titles: ["Developer"], gates: ["sponsorship", "seniority", "keyword", "location"] },
+      ]);
+      const reads = f.llmInputs.filter((c) => c.node === "read_postings");
+      expect(
+        reads.map((c) => (c.args[0] as { postings: Posting[] }).postings.map((p) => p.title)),
+      ).toEqual([["Developer"]]);
+      expect(ranBefore(f.log, "screen:location,title", "read_postings")).toBe(true);
+      expect(
+        ranBefore(f.log, "read_postings", "screen:sponsorship,seniority,keyword,location"),
+      ).toBe(true);
+
+      const judged = f.llmInputs.find((c) => c.node === "judge")?.args[0] as {
+        postings: Posting[];
+      };
+      expect(judged.postings.map((p) => p.title)).toEqual(["attempt 1", "Developer"]);
+      expect(judged.postings[1]?.requirements).toEqual(["read Developer"]);
+      expect(judged.postings[1]).not.toHaveProperty("description");
+      expect(out.filtered.map((x) => x.posting.title)).toContain("Chef");
+
+      // Reading counts as extraction, beside the mail source's; screen sums its three calls.
+      expect(out.usage.extract_postings).toEqual({ input: 17, output: 5 });
+      expect(out.usage.screen).toEqual({ input: 9, output: 3 });
+    });
+
+    it("reads nothing when the gates leave no scraped posting", async () => {
+      const f = fakes({ messages: 0, screenTitles: ["Developer", "Chef"] });
+      const out = await runWithScraped(f, [scraped("Developer"), scraped("Chef")]);
+      expect(f.llmInputs.filter((c) => c.node === "read_postings")).toEqual([]);
+      expect(out.outcome).toBe("nothing_left");
+      expect(out.usage.extract_postings).toBeUndefined();
+    });
+
+    it("leaves a run with nothing scraped as it was", async () => {
+      const f = fakes();
+      await run(f);
+      expect(f.llmInputs.filter((c) => c.node === "read_postings")).toEqual([]);
+      expect(f.screenInputs).toEqual([{ titles: ["attempt 1"] }]);
+      expect(f.hardGateInputs).toEqual([{ titles: ["attempt 1"] }]);
+    });
+  });
+
   it("reports every node's duration and sums token use across retries", async () => {
     const events: NodeEvent[] = [];
     const f = fakes({ extractProblems: [["x"]] });
     const out = await run(f, { onNode: (e: NodeEvent) => events.push(e) });
-    expect(events.filter((e) => e.node === "extract_postings")).toHaveLength(2);
+    // Two in the mail source's loop, and collect's, with nothing scraped to read.
+    expect(events.filter((e) => e.node === "extract_postings")).toHaveLength(3);
     expect(events.every((e) => e.ok && e.ms >= 0)).toBe(true);
     expect(events.find((e) => e.node === "judge")?.usage).toEqual({ input: 10, output: 2 });
     expect(out.usage.extract_postings).toEqual({ input: 20, output: 4 });

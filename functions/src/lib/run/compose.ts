@@ -40,6 +40,7 @@ import {
 import { dedupeStep } from "../postings/dedupe.js";
 import { extractStep } from "../postings/extract.js";
 import { hardGatesStep } from "../postings/gates.js";
+import { readStep } from "../postings/read.js";
 import { TableSeenJobsStore } from "../postings/seen-jobs.js";
 import { validatePostings } from "../postings/validate.js";
 import { reportPublisherFromUrl } from "../report/publish.js";
@@ -165,6 +166,7 @@ export function composePipeline(
 
   const modelSteps: ModelSteps = {
     extractPostings: extractStep(extractClient),
+    readPostings: readStep(extractClient),
     // Without a TypeSafe key the gates go unscreened, and the report says so.
     screen: screenStep(env.TYPESAFE_API_KEY?.trim() ? decisionClientFromEnv(env) : null),
     judge: judgeStep(client),
