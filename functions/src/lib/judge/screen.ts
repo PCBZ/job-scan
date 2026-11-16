@@ -12,7 +12,7 @@ import type { Filtered } from "../postings/gates.js";
 import type { Posting } from "../postings/types.js";
 import { mapWithLimit } from "../workflow/limit.js";
 import { postingFields } from "./fields.js";
-import { type AskedGate, gatesFor } from "./gates.js";
+import { type AskedGate, gatesFor, type ModelGate } from "./gates.js";
 
 /** A gate fails at this probability or above. */
 export const FAILS_AT = 0.8;
@@ -22,6 +22,8 @@ export const UNSURE_AT = 0.5;
 export interface ScreenInput {
   postings: Posting[];
   profile: ProfileConfig;
+  /** Ask only these gates; all of them when absent (#203). */
+  gates?: readonly ModelGate[];
 }
 
 export interface ScreenResult {
@@ -51,7 +53,7 @@ const failing = (gate: AskedGate, yes: number) => (gate.failsOn === "yes" ? yes 
 export function screenStep(decision: DecisionClient | null, options: ScreenOptions = {}) {
   const concurrency = options.concurrency ?? 4;
   return async (
-    { postings, profile }: ScreenInput,
+    { postings, profile, gates: only }: ScreenInput,
     signal?: AbortSignal,
   ): Promise<ScreenResult> => {
     let usage: TokenUsage = { input: 0, output: 0 };
@@ -63,7 +65,7 @@ export function screenStep(decision: DecisionClient | null, options: ScreenOptio
       postings,
       concurrency,
       async (posting): Promise<Outcome> => {
-        const gates = gatesFor(posting, profile);
+        const gates = gatesFor(posting, profile).filter((g) => !only || only.includes(g.gate));
         if (gates.length === 0) return { kept: posting };
         if (!decision) {
           unscreened++;
@@ -98,7 +100,9 @@ export function screenStep(decision: DecisionClient | null, options: ScreenOptio
             notes.push(`Would have been filtered: ${gate.failure} (${percent(p)})`);
           else if (p >= UNSURE_AT) notes.push(`Possibly ${gate.failure} (${percent(p)})`);
         }
-        return { kept: notes.length ? { ...posting, gate_notes: notes } : posting };
+        // A posting screened twice (#203) keeps the first pass's notes.
+        const all = [...(posting.gate_notes ?? []), ...notes];
+        return { kept: notes.length ? { ...posting, gate_notes: all } : posting };
       },
     );
 

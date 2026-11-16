@@ -44,6 +44,13 @@ export interface Provenance {
   gate_questions?: string[];
   /** What screen noted but didn't filter on: a sentinel gate, or Jev unsure (#121). */
   gate_notes?: string[];
+  /**
+   * A scraped row's description, as plain text, when the source hands it over
+   * unread (#203): its requirements and skills are empty, its workplace and
+   * salary are what the board's fields say. collect reads it after the title
+   * and location gates, then drops it.
+   */
+  description?: string;
 }
 
 export type Posting = ExtractedPosting & Provenance;

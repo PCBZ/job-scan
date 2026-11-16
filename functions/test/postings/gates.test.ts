@@ -322,3 +322,16 @@ describe("usdCad", () => {
     expect(await usdCad(down)).toBeNull();
   });
 });
+
+describe("only some gates (#203)", () => {
+  it("runs only the gates it is given", async () => {
+    const profile = { ...VANCOUVER, exclude_keywords: ["clearance"] };
+    const p = posting({ title: "Backend Engineer, clearance required" });
+    const step = hardGatesStep(async () => 1.4);
+    const all = await step([p], { profile } as AppConfig);
+    expect(all.filtered.map((f) => f.gate)).toEqual(["keyword"]);
+    const location = await step([p], { profile } as AppConfig, ["location"]);
+    expect(location.kept).toEqual([p]);
+    expect(location.filtered).toEqual([]);
+  });
+});

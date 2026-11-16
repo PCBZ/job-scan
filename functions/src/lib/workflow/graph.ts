@@ -4,20 +4,27 @@
 //
 //   mail:    load_config ─ fetch_mail ─ extract_postings ⇄ validate
 //
-//   collect: load_config ─┬─ intake ─ dedupe ─ hard_gates ─ screen ─ await_resumes ─┐
-//                         └─ load_resumes ──────────────────────────────────────────┴─ check_resumes ─ recall_judgements ─ judge ⇄ verify_judgements
-//   ─ remember_judgements ─ rank ─ explain ⇄ verify_explanations ─ render_report ─ deliver ─ mark_seen
+//   collect: load_config ─┬─ intake ─ dedupe ─ hard_gates ─ screen ─ extract_postings ─ screen_read ─ await_resumes ─┐
+//                         └─ load_resumes ───────────────────────────────────────────────────────────────────────────┴─ check_resumes
+//   ─ recall_judgements ─ judge ⇄ verify_judgements ─ remember_judgements ─ rank ─ explain ⇄ verify_explanations
+//   ─ render_report ─ deliver ─ mark_seen
 //
-// collect starts from the sources' postings (run/handoff.ts seedFrom). No new
+// collect starts from the sources' postings (run/handoff.ts seedFrom). A
+// scraped posting handed over unread (#203) takes only the gates that need no
+// description first; extract_postings then reads the ones left, and screen_read
+// gives them the other gates. Postings already read pass both untouched. No new
 // mail, nothing past the gates, or no resumes to judge against skips straight to
 // render_report. Without resumes, nothing is marked seen, so the next run judges
 // the same mail.
 // Keyword insights (#28) add their nodes when they land.
 
+import { AFTER_READING, BEFORE_READING } from "../judge/gates.js";
 import type { FetchPayload } from "../mail/types.js";
+import { addUsage } from "../model/types.js";
+import type { Gate } from "../postings/gates.js";
 import { type BuilderOptions, END, START, WorkflowBuilder } from "./builder.js";
 import type { State } from "./state.js";
-import type { DeterministicSteps, Effects, ModelSteps } from "./types.js";
+import type { DeterministicSteps, Effects, ModelSteps, Posting } from "./types.js";
 
 export { type State, WorkflowState } from "./state.js";
 export type WorkflowOptions = BuilderOptions;
@@ -29,6 +36,17 @@ function isPayload(mail: State["mail"]): mail is FetchPayload {
 function need<T>(value: T | null, what: string): T {
   if (value === null) throw new Error(`workflow: ${what} is missing`);
   return value;
+}
+
+/** The code gates for a scraped posting before its description is read, and after (#203). */
+const CODE_BEFORE_READING: readonly Gate[] = ["location"];
+const CODE_AFTER_READING: readonly Gate[] = ["salary", "keyword"];
+
+const isUnread = (p: Posting) => p.description !== undefined;
+
+/** Postings read already, and scraped ones still unread, in their own order. */
+function split(postings: Posting[]): [Posting[], Posting[]] {
+  return [postings.filter((p) => !isUnread(p)), postings.filter(isUnread)];
 }
 
 /** True when a source gave anything to work on: mail to read, or postings. */
@@ -116,8 +134,16 @@ export function buildCollectWorkflow(
       })
       .edge("dedupe", "hard_gates")
       .node("hard_gates", async (s) => {
-        const { kept, filtered, notes } = await steps.hardGates(s.postings, config(s));
-        return { postings: kept, filtered, notes };
+        const [read, unread] = split(s.postings);
+        const all = await steps.hardGates(read, config(s));
+        if (unread.length === 0)
+          return { postings: all.kept, filtered: all.filtered, notes: all.notes };
+        const before = await steps.hardGates(unread, config(s), CODE_BEFORE_READING);
+        return {
+          postings: [...all.kept, ...before.kept],
+          filtered: [...all.filtered, ...before.filtered],
+          notes: [...all.notes, ...before.notes],
+        };
       })
       .branch("hard_gates", (s) => (s.postings.length > 0 ? "continue" : "nothing_left"), {
         continue: "screen",
@@ -125,15 +151,60 @@ export function buildCollectWorkflow(
       })
       // The model gates, by Jev (#121): what fails never costs a judge call.
       .node("screen", async (s, signal) => {
-        const r = await model.screen({ postings: s.postings, profile: config(s).profile }, signal);
+        const profile = config(s).profile;
+        const [read, unread] = split(s.postings);
+        const r = await model.screen({ postings: read, profile }, signal);
+        if (unread.length === 0)
+          return {
+            postings: r.kept,
+            filtered: r.filtered,
+            usage: { screen: r.usage },
+            ...(r.warnings.length ? { warnings: r.warnings } : {}),
+          };
+        const b = await model.screen({ postings: unread, profile, gates: BEFORE_READING }, signal);
+        const warnings = [...r.warnings, ...b.warnings];
         return {
           postings: r.kept,
-          filtered: r.filtered,
+          unread: b.kept,
+          filtered: [...r.filtered, ...b.filtered],
+          usage: { screen: addUsage(r.usage, b.usage) },
+          ...(warnings.length ? { warnings } : {}),
+        };
+      })
+      .branch(
+        "screen",
+        (s) => (s.postings.length + s.unread.length > 0 ? "continue" : "nothing_left"),
+        { continue: "extract_postings", nothing_left: "short_nothing_left" },
+      )
+      // Only the scraped postings left are read, so a screened-out one costs no call.
+      .node("extract_postings", async (s, signal) => {
+        if (s.unread.length === 0) return {};
+        const r = await model.readPostings({ postings: s.unread }, signal);
+        return {
+          unread: r.value,
+          usage: { extract_postings: r.usage },
+          ...(r.warnings?.length ? { warnings: r.warnings } : {}),
+        };
+      })
+      .edge("extract_postings", "screen_read")
+      // The gates that read requirements, for the postings just read.
+      .node("screen_read", async (s, signal) => {
+        if (s.unread.length === 0) return {};
+        const code = await steps.hardGates(s.unread, config(s), CODE_AFTER_READING);
+        const r = await model.screen(
+          { postings: code.kept, profile: config(s).profile, gates: AFTER_READING },
+          signal,
+        );
+        return {
+          postings: [...s.postings, ...r.kept],
+          unread: [],
+          filtered: [...code.filtered, ...r.filtered],
+          notes: code.notes,
           usage: { screen: r.usage },
           ...(r.warnings.length ? { warnings: r.warnings } : {}),
         };
       })
-      .branch("screen", (s) => (s.postings.length > 0 ? "continue" : "nothing_left"), {
+      .branch("screen_read", (s) => (s.postings.length > 0 ? "continue" : "nothing_left"), {
         continue: "await_resumes",
         nothing_left: "short_nothing_left",
       })

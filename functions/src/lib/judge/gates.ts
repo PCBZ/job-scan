@@ -12,6 +12,15 @@ import { question } from "./questions.js";
 export const MODEL_GATES = ["sponsorship", "seniority", "keyword", "location", "title"] as const;
 export type ModelGate = (typeof MODEL_GATES)[number];
 
+/**
+ * The gates a scraped posting can take before its description is read (#203):
+ * they need only its title and place. The others read its requirements.
+ */
+export const BEFORE_READING: readonly ModelGate[] = ["location", "title"];
+export const AFTER_READING: readonly ModelGate[] = MODEL_GATES.filter(
+  (g) => !BEFORE_READING.includes(g),
+);
+
 export interface AskedGate {
   gate: ModelGate;
   /** "filter" removes a failing posting; "note" keeps it and says so. */

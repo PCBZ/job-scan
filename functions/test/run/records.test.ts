@@ -47,6 +47,7 @@ function state(over: Partial<State> = {}): State {
     recalled: [],
     extracted: [],
     postings: [],
+    unread: [],
     repeats: 0,
     duplicates: 0,
     filtered: [],

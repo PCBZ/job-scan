@@ -52,6 +52,8 @@ export interface FakeOptions {
   screenWarnings?: string[];
   /** Jev screens every posting out (#121). */
   screenAll?: boolean;
+  /** Postings whose titles Jev screens out, whatever gates are asked (#203). */
+  screenTitles?: string[];
   /** Answers kept from earlier runs, and what finding them warned about (#150). */
   recalled?: Judgement[];
   recallWarnings?: string[];
@@ -68,6 +70,10 @@ export function fakes(o: FakeOptions = {}) {
   const reported: ReportInput[] = [];
   const recallInputs: Parameters<DeterministicSteps["recallJudgements"]>[0][] = [];
   const remembered: Parameters<Effects["rememberJudgements"]>[0][] = [];
+  /** What each screen call was given: the postings' titles and the gates asked. */
+  const screenInputs: { titles: string[]; gates?: readonly string[] }[] = [];
+  /** What each hard_gates call was given. */
+  const hardGateInputs: { titles: string[]; gates?: readonly string[] }[] = [];
   const take = (lists: string[][] | undefined, n: number) => lists?.[n] ?? [];
   const llmCall = (node: string, args: unknown[]) => {
     log.push(node);
@@ -99,8 +105,9 @@ export function fakes(o: FakeOptions = {}) {
       log.push("dedupe");
       return { fresh: postings, repeats: 1, duplicates: 2 };
     },
-    async hardGates(postings) {
+    async hardGates(postings, _config, gates) {
       log.push("hard_gates");
+      hardGateInputs.push({ titles: postings.map((p) => p.title), ...(gates ? { gates } : {}) });
       return o.keepNone
         ? {
             kept: [],
@@ -155,8 +162,18 @@ export function fakes(o: FakeOptions = {}) {
   };
 
   const modelSteps: ModelSteps = {
-    async screen({ postings }) {
-      log.push("screen");
+    async screen({ postings, gates }) {
+      log.push(gates ? `screen:${gates.join(",")}` : "screen");
+      screenInputs.push({ titles: postings.map((p) => p.title), ...(gates ? { gates } : {}) });
+      if (o.screenTitles) {
+        const out = postings.filter((p) => o.screenTitles?.includes(p.title));
+        return {
+          kept: postings.filter((p) => !o.screenTitles?.includes(p.title)),
+          filtered: out.map((p) => ({ posting: p, gate: "title" as const, reason: "t" })),
+          usage: { input: 3, output: 1 },
+          warnings: [],
+        };
+      }
       return {
         kept: o.screenAll ? [] : postings,
         filtered: o.screenAll
@@ -174,6 +191,17 @@ export function fakes(o: FakeOptions = {}) {
             ],
         usage: { input: 3, output: 1 },
         warnings: o.screenWarnings ?? [],
+      };
+    },
+    async readPostings(...args) {
+      llmCall("read_postings", args);
+      const [{ postings }] = args;
+      return {
+        value: postings.map(({ description: _, ...p }) => ({
+          ...p,
+          requirements: [`read ${p.title}`],
+        })),
+        usage: { input: 7, output: 3 },
       };
     },
     async extractPostings(...args) {
@@ -261,5 +289,7 @@ export function fakes(o: FakeOptions = {}) {
     reported,
     recallInputs,
     remembered,
+    screenInputs,
+    hardGateInputs,
   };
 }

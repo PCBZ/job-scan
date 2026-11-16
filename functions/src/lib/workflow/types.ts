@@ -9,12 +9,13 @@ import type { AppConfig } from "../config/load.js";
 import type { ProfileConfig } from "../config/schema.js";
 import type { ExplainInput } from "../explain/explain.js";
 import type { Explanation } from "../explain/schema.js";
+import type { ModelGate } from "../judge/gates.js";
 import type { JudgeInput } from "../judge/judge.js";
 import type { Ranked, RankResult } from "../judge/rank.js";
 import type { Judgement } from "../judge/verify.js";
 import type { AllAccountsFailed, FetchedMessage, FetchPayload } from "../mail/types.js";
 import type { RepairTurn, TokenUsage } from "../model/types.js";
-import type { Filtered } from "../postings/gates.js";
+import type { Filtered, Gate } from "../postings/gates.js";
 import type { SuspiciousFlag } from "../postings/schema.js";
 import type { Posting, Source } from "../postings/types.js";
 import type { Report } from "../report/types.js";
@@ -38,9 +39,16 @@ export interface LlmResult<T> {
 export interface ModelSteps {
   /** The model gates, decided by Jev before judge (#121). */
   screen(
-    input: { postings: Posting[]; profile: AppConfig["profile"] },
+    input: {
+      postings: Posting[];
+      profile: AppConfig["profile"];
+      /** Ask only these gates; all of them when absent (#203). */
+      gates?: readonly ModelGate[];
+    },
     signal?: AbortSignal,
   ): Promise<{ kept: Posting[]; filtered: Filtered[]; usage: TokenUsage; warnings: string[] }>;
+  /** Reads scraped postings' descriptions (#203); a posting it can't read keeps the board's fields. */
+  readPostings(input: { postings: Posting[] }, signal?: AbortSignal): Promise<LlmResult<Posting[]>>;
   /** Also flags suspicious content, per message asked this time (#66). */
   extractPostings(
     input: { messages: FetchedMessage[] },
@@ -79,6 +87,8 @@ export interface DeterministicSteps {
   hardGates(
     postings: Posting[],
     config: AppConfig,
+    /** Only these gates; all of them when absent (#203). */
+    gates?: readonly Gate[],
   ): Promise<{ kept: Posting[]; filtered: Filtered[]; notes: string[] }>;
   /** The answers kept from earlier runs for these postings (#150); never throws. */
   recallJudgements(

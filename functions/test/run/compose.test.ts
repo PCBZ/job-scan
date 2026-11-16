@@ -50,6 +50,7 @@ describe("composePipeline", () => {
       "explain",
       "extractPostings",
       "judge",
+      "readPostings",
       "screen",
     ]);
     expect(Object.keys(pipeline.effects).sort()).toEqual([

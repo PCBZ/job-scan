@@ -187,6 +187,23 @@ describe("traceNodes", () => {
     });
   });
 
+  it("lists extract_postings under collect when it read scraped postings itself (#203)", () => {
+    const mail = handoff({ usage: { extract_postings: { input: 100, output: 10 } } });
+    // The scanner handed its rows over unread, so it used no tokens.
+    const jobspy = handoff({
+      source: "jobspy",
+      trace: { trace_id: JOBSPY, span_id: "d".repeat(16) },
+    });
+    const usage = {
+      extract_postings: { input: 160, output: 16 },
+      judge: { input: 900, output: 90 },
+    };
+    expect(traceNodes([mail, jobspy], COLLECT, usage)).toEqual({
+      [MAIL]: ["extract_postings"],
+      [COLLECT]: ["extract_postings", "judge"],
+    });
+  });
+
   it("leaves out a source without a trace, and a trace with no tokens", () => {
     const untraced = handoff({
       trace: null,

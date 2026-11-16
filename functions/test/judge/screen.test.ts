@@ -133,6 +133,32 @@ describe("screenStep", () => {
     ]);
   });
 
+  it("asks only the gates it is given, keeping an earlier pass's notes (#203)", async () => {
+    const profile = { ...VANCOUVER, target_titles: ["Backend Engineer"] };
+    const before = jev(() => 0.35);
+    const first = await screenStep(before.client)({
+      postings: [posting()],
+      profile,
+      gates: ["location", "title"],
+    });
+    // Only the title gate applies to this posting: code settled its place.
+    expect(before.sent.map((s) => Object.keys(s.questions).length)).toEqual([1]);
+    const unsure = "Possibly title far from your target roles (Jev 0.65)";
+    expect(first.kept[0]?.gate_notes).toEqual([unsure]);
+
+    const after = jev(() => 0.65);
+    const second = await screenStep(after.client)({
+      postings: first.kept,
+      profile,
+      gates: ["sponsorship", "seniority", "keyword"],
+    });
+    expect(after.sent.map((s) => Object.keys(s.questions).length)).toEqual([1]);
+    expect(second.kept[0]?.gate_notes).toEqual([
+      unsure,
+      'Possibly seniority far from "mid" (Jev 0.65)',
+    ]);
+  });
+
   it("passes a gate below the unsure line, and asks nothing of a posting with no gates", async () => {
     const { client, sent } = jev(() => 0.2);
     const out = await screenStep(client)({ postings: [posting()], profile: VANCOUVER });

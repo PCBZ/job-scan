@@ -40,7 +40,7 @@ export interface Filtered {
 export function hardGatesStep(
   rate: () => Promise<number | null> = usdCad,
 ): DeterministicSteps["hardGates"] {
-  return async (postings, config: AppConfig) => {
+  return async (postings, config: AppConfig, only) => {
     const profile = config.profile;
     const floor = floorOf(profile);
     // Fetch the rate only when some stated salary is in the other currency.
@@ -51,9 +51,9 @@ export function hardGatesStep(
     const filtered: Filtered[] = [];
     const unsettled = new Map<string, number>();
     for (const p of postings) {
-      const outcomes = Object.entries(GATES).map(
-        ([gate, check]) => [gate as Gate, check(p, context)] as const,
-      );
+      const outcomes = Object.entries(GATES)
+        .filter(([gate]) => !only || only.includes(gate as Gate))
+        .map(([gate, check]) => [gate as Gate, check(p, context)] as const);
       const failed = outcomes.find(([, o]) => "fail" in o);
       if (failed && "fail" in failed[1]) {
         filtered.push({ posting: p, gate: failed[0], reason: failed[1].fail });
