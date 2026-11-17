@@ -64,7 +64,6 @@ const jobspy = z.strictObject({
   hours_old: positiveInt.optional(),
   concurrency: positiveInt.optional(),
   max_postings: positiveInt.optional(),
-  extract_concurrency: positiveInt.optional(),
   country_indeed: z.string().trim().min(1).optional(),
   fetch_descriptions: z.boolean().optional(),
 });

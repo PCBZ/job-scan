@@ -12,8 +12,7 @@ resource "random_string" "suffix" {
 locals {
   suffix = random_string.suffix.result
 
-  # How both apps call the model: the Node app (functions/src/lib/model/config.ts)
-  # and the scanner (jobspy-scanner/scanner/extract.py) read the same keys (#200).
+  # How the Node app calls the model (functions/src/lib/model/config.ts, #200).
   model_tuning = {
     # gpt-6-luna and gpt-5.6 write the prompt cache where the last message ends
     # unless told where the shared prefix does (#160); earlier models answer 400.

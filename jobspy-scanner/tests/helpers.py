@@ -3,12 +3,8 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from types import SimpleNamespace
 
 import pandas as pd
-from openai.types.completion_usage import CompletionUsage
-
-from scanner.extract import Extracted, Extractor
 
 STARTED_AT = datetime(2026, 11, 10, 15, 0, 1, 113000, tzinfo=timezone.utc)
 
@@ -102,52 +98,3 @@ class FakeQueue:
 
     def send_message(self, content, *, visibility_timeout):
         self.sent.append((content, visibility_timeout))
-
-
-PYTHON_ROLE = Extracted(
-    workplace="unknown",
-    salary="USD 120,000 - 150,000 a year",
-    requirements=["3+ years of Python", "Kubernetes and SQL"],
-    skills=["Python", "Kubernetes", "SQL"],
-)
-
-
-class FakeOpenAI:
-    """The one SDK call the extractor makes: client.chat.completions.create.
-
-    `answer` gets the request's kwargs and returns an Extracted or raises.
-    """
-
-    def __init__(self, answer=lambda **_: PYTHON_ROLE) -> None:
-        self.requests: list[dict] = []
-        self._answer = answer
-        completions = SimpleNamespace(create=self._create)
-        self.chat = SimpleNamespace(completions=completions)
-
-    def _create(self, **kwargs):
-        self.requests.append(kwargs)
-        answer = self._answer(**kwargs)
-        # None stands for a refusal; anything else is the answer's JSON.
-        message = SimpleNamespace(
-            content=None if answer is None else answer.model_dump_json(),
-            refusal="I can't help with that." if answer is None else None,
-        )
-        usage = CompletionUsage.model_validate(
-            {
-                "prompt_tokens": 100,
-                "completion_tokens": 20,
-                "total_tokens": 120,
-                "prompt_tokens_details": {"cached_tokens": 40, "cache_write_tokens": 8},
-                "completion_tokens_details": {"reasoning_tokens": 5},
-            }
-        )
-        return SimpleNamespace(
-            choices=[SimpleNamespace(message=message)],
-            usage=usage,
-            model="extract-deployment-2026-03-17",
-        )
-
-
-def extractor(answer=lambda **_: PYTHON_ROLE) -> Extractor:
-    client = FakeOpenAI(answer)
-    return Extractor(client, "extract-deployment")  # type: ignore[arg-type]
