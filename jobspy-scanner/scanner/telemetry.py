@@ -28,10 +28,11 @@ RUN_SPAN = "jobspy run"
 
 # What the run span says it is, in OTel's GenAI agent terms, so Foundry's Traces
 # view lists the run (#207): the same agent as the Node app's runs
-# (AGENT_ATTRIBUTES in functions/src/lib/telemetry/spans.ts).
+# (AGENT_ATTRIBUTES in functions/src/lib/telemetry/spans.ts). The id is a UUID
+# made once and fixed: a new one per run would make every run its own agent.
 AGENT_ATTRIBUTES = {
     "gen_ai.operation.name": "invoke_agent",
-    "gen_ai.agent.id": "job-scan",
+    "gen_ai.agent.id": "a6eb43be-bad6-4bf7-95ab-fdec6368760b",
     "gen_ai.agent.name": "job-scan",
 }
 

@@ -12,7 +12,7 @@ def test_the_span_names_are_the_ones_the_latency_query_reads():
     assert node_span("scrape") == "node scrape"
     assert AGENT_ATTRIBUTES == {
         "gen_ai.operation.name": "invoke_agent",
-        "gen_ai.agent.id": "job-scan",
+        "gen_ai.agent.id": "a6eb43be-bad6-4bf7-95ab-fdec6368760b",
         "gen_ai.agent.name": "job-scan",
     }
 

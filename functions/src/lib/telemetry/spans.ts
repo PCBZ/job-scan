@@ -16,11 +16,12 @@ export const RUN_SPANS = {
  * view lists traces by agent (#207), and an app outside Foundry has to name
  * itself. One agent for the whole day, across both apps; the scanner sets the
  * same (jobspy-scanner/scanner/telemetry.py, AGENT_ATTRIBUTES), and a test on
- * each side pins them.
+ * each side pins them. The id is a UUID made once and fixed, so it can't clash
+ * with another agent's; a new one per run would make every run its own agent.
  */
 export const AGENT_ATTRIBUTES = {
   "gen_ai.operation.name": "invoke_agent",
-  "gen_ai.agent.id": "job-scan",
+  "gen_ai.agent.id": "a6eb43be-bad6-4bf7-95ab-fdec6368760b",
   "gen_ai.agent.name": "job-scan",
 } as const;
 

@@ -232,7 +232,7 @@ describe("the scanner's span names", () => {
     expect(nodeSpan("scrape")).toBe("node scrape");
     expect(AGENT_ATTRIBUTES).toEqual({
       "gen_ai.operation.name": "invoke_agent",
-      "gen_ai.agent.id": "job-scan",
+      "gen_ai.agent.id": "a6eb43be-bad6-4bf7-95ab-fdec6368760b",
       "gen_ai.agent.name": "job-scan",
     });
     // What OpenInference named the scanner's model calls, before #204.
