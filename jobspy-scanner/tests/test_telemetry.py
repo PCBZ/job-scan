@@ -1,6 +1,6 @@
 import json
 
-from scanner.telemetry import HTTP_CLIENTS, LOGGER, RUN_SPAN, configure, node_span, span
+from scanner.telemetry import AGENT_ATTRIBUTES, HTTP_CLIENTS, LOGGER, RUN_SPAN, configure, node_span, span
 from scanner.run import run_scan
 
 from .helpers import CONFIG, ROWS, STARTED_AT, FakeContainer, FakeQueue, frame
@@ -10,6 +10,11 @@ def test_the_span_names_are_the_ones_the_latency_query_reads():
     # functions/src/lib/telemetry/spans.ts can't be imported here; its test pins the same values.
     assert RUN_SPAN == "jobspy run"
     assert node_span("scrape") == "node scrape"
+    assert AGENT_ATTRIBUTES == {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.id": "job-scan",
+        "gen_ai.agent.name": "job-scan",
+    }
 
 
 def test_nothing_is_configured_without_a_connection_string():
@@ -40,6 +45,9 @@ def test_a_run_is_one_trace_its_stages_nest_under_it_and_the_file_names_it(spans
     run = by_name[RUN_SPAN]
     assert run.parent is None
     assert by_name[node_span("scrape")].parent.span_id == run.context.span_id
+    # The run, and only the run, names the agent Foundry's Traces view lists (#207).
+    assert dict(run.attributes) == AGENT_ATTRIBUTES
+    assert "gen_ai.agent.id" not in by_name[node_span("scrape")].attributes
     # No model is called here any more (#204): collect reads the postings.
     assert set(by_name) == {RUN_SPAN, node_span("scrape")}
     handoff = json.loads(container.blobs[name])
