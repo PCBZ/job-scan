@@ -27,4 +27,9 @@ resource "azurerm_cognitive_account_connection_api_key" "app_insights" {
   category             = "AppInsights"
   target               = module.monitoring.app_insights_id
   api_key              = module.monitoring.connection_string
+  # Required for this category: without it the service answers 400,
+  # "Required metadata property ResourceId is missing" (v0.2.5's apply).
+  metadata = {
+    ResourceId = module.monitoring.app_insights_id
+  }
 }
