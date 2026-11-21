@@ -17,3 +17,14 @@ module "openai" {
   # extraction.
   capacity_k_tpm = 400
 }
+
+# Foundry's Traces view reads the traces both apps already send to Application
+# Insights; it stores none of its own (#207). On the account, as azurerm has no
+# project-level connection; account connections are shared with its projects.
+resource "azurerm_cognitive_account_connection_api_key" "app_insights" {
+  name                 = "${var.name}-insights"
+  cognitive_account_id = module.openai.account_id
+  category             = "AppInsights"
+  target               = module.monitoring.app_insights_id
+  api_key              = module.monitoring.connection_string
+}

@@ -162,7 +162,8 @@ All granted in `bootstrap/identities.tf`:
   container: Storage Blob Data Contributor.
 - **You**, the operator who applies bootstrap: Key Vault Secrets Officer, and
   on the main resource group Storage Blob Data Contributor and Cognitive
-  Services OpenAI User, for a local apply and the live evals.
+  Services OpenAI User, for a local apply and the live evals, and Log
+  Analytics Reader, for Foundry's Traces view.
 
 CD can't grant rights. A change to any of these is a bootstrap apply, by you.
 Resource provider registration needs subscription rights too, so bootstrap

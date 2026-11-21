@@ -10,6 +10,7 @@ import { runIngest } from "../../src/lib/run/ingest.js";
 import type { RunRecord, RunStatsRecord } from "../../src/lib/run/records.js";
 import { instrumentOpenAI } from "../../src/lib/telemetry/instrument.js";
 import {
+  AGENT_ATTRIBUTES,
   MODEL_CALL_SPANS,
   NODE_SPAN_PREFIX,
   nodeSpan,
@@ -98,6 +99,16 @@ describe("tracing", () => {
     expect(named(nodeSpan("mark_seen"))?.parentSpanContext?.spanId).toBe(
       collect?.spanContext().spanId,
     );
+  });
+
+  it("marks both run spans, and only them, as the job-scan agent for Foundry's Traces view (#207)", async () => {
+    await runDay(fakes(), quiet);
+    for (const run of [RUN_SPANS.mail, RUN_SPANS.collect]) {
+      expect(named(run)?.attributes).toMatchObject(AGENT_ATTRIBUTES);
+    }
+    const others = spans().filter((s) => s.name !== RUN_SPANS.mail && s.name !== RUN_SPANS.collect);
+    expect(others.length).toBeGreaterThan(0);
+    for (const s of others) expect(s.attributes).not.toHaveProperty("gen_ai.agent.id");
   });
 
   it("names the collect run's trace in its evaluation report message (#128)", async () => {
@@ -215,10 +226,15 @@ describe("tracing", () => {
 });
 
 describe("the scanner's span names", () => {
-  it("are the ones jobspy-scanner writes", () => {
+  it("are the ones jobspy-scanner writes, with the same agent attributes", () => {
     // Python can't import these; its test_telemetry.py pins the same values.
     expect(RUN_SPANS.jobspy).toBe("jobspy run");
     expect(nodeSpan("scrape")).toBe("node scrape");
+    expect(AGENT_ATTRIBUTES).toEqual({
+      "gen_ai.operation.name": "invoke_agent",
+      "gen_ai.agent.id": "a6eb43be-bad6-4bf7-95ab-fdec6368760b",
+      "gen_ai.agent.name": "job-scan",
+    });
     // What OpenInference named the scanner's model calls, before #204.
     expect(MODEL_CALL_SPANS.python).toBe("ChatCompletion");
   });

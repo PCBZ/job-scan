@@ -18,7 +18,7 @@ from .config import ScanConfig, parse_config
 from .handoff import build_handoff, message_for, send_message, write_handoff
 from .mapping import SITES, fingerprint, posting_from, text, usable
 from .scrape import Scrape, run_searches
-from .telemetry import RUN_SPAN, node_span, span, trace_of
+from .telemetry import AGENT_ATTRIBUTES, RUN_SPAN, node_span, span, trace_of
 
 log = logging.getLogger("jobspy-scanner")
 
@@ -89,7 +89,7 @@ def run_scan(
     The run is one span, the root of its trace; the file names that trace so
     `collect` can link to it.
     """
-    with span(RUN_SPAN) as run:
+    with span(RUN_SPAN, AGENT_ATTRIBUTES) as run:
         started_at = now()
         try:
             handoff = scan(parse_config(config_text()), scrape, started_at)

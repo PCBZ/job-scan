@@ -5,7 +5,7 @@
 // it again.
 
 import { runDay } from "../day.js";
-import { RUN_SPANS } from "../telemetry/spans.js";
+import { AGENT_ATTRIBUTES, RUN_SPANS } from "../telemetry/spans.js";
 import { inSpan } from "../telemetry/tracing.js";
 import { buildMailWorkflow } from "../workflow/graph.js";
 import type { NodeEvent } from "../workflow/types.js";
@@ -39,7 +39,7 @@ export async function runIngest(
     // One span over the source's graph; the nodes' spans nest under it,
     // and collect's join its trace, so the evaluation report finds the whole run.
     let trace: SourceHandoff["trace"] = null;
-    const state = await inSpan(RUN_SPANS.mail, {}, (span) => {
+    const state = await inSpan(RUN_SPANS.mail, AGENT_ATTRIBUTES, (span) => {
       const { traceId, spanId } = span.spanContext();
       trace = { trace_id: traceId, span_id: spanId };
       return workflow.invoke({}, { signal });
