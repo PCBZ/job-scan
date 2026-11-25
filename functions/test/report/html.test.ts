@@ -116,6 +116,7 @@ describe("renderWebHtml, the browser copy", () => {
     expect(html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1">');
     expect(html).toContain('<div class="picks">');
     expect(html).toContain("flex-wrap: wrap");
+    expect(html).toContain("overflow-wrap: break-word");
     expect(html).toContain("@media (prefers-color-scheme: dark)");
     expect(html).not.toContain("<!--[if mso");
     expect(html).not.toContain("View in a browser");

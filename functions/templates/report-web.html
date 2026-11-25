@@ -78,6 +78,10 @@
     border-radius: 8px;
     padding: var(--pad);
     min-width: 0;
+    /* A long unbroken string from the mail, a URL say, wraps rather than
+       widening the page. Not "anywhere": that shrinks a table cell's minimum
+       width too, splitting words where the table should scroll instead. */
+    overflow-wrap: break-word;
   }
   .muted { color: var(--muted); }
   .alert { color: var(--danger); font-weight: bold; }
