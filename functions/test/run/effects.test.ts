@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../../src/lib/config/load.js";
 import type { FetchPayload } from "../../src/lib/mail/types.js";
+import { renderWebHtml } from "../../src/lib/report/html.js";
 import { productionEffects } from "../../src/lib/run/effects.js";
 import { judgement, rankedOf } from "../judge/helpers.js";
 import { SAMPLE } from "../report/sample.js";
@@ -45,7 +46,7 @@ function harness(
     judgements: over.judgements ?? null,
     publisher: {
       async publish(html, day) {
-        calls.push(`publish ${day} ${html.length > 0}`);
+        calls.push(`publish ${day} ${html === renderWebHtml(SAMPLE) ? "web" : "other"}`);
         return SAS;
       },
     },
@@ -84,11 +85,11 @@ function harness(
 }
 
 describe("productionEffects.deliver", () => {
-  it("publishes first, then emails and sends to Telegram, both linking the browser copy", async () => {
+  it("publishes the browser copy first, then emails and sends to Telegram, both linking the browser copy", async () => {
     const { effects, calls } = harness();
     await effects.deliver(SAMPLE, config({ email_account: "gmail-main", telegram_chat_id: 42 }));
     expect(calls).toEqual([
-      "publish 2026-10-08 true",
+      "publish 2026-10-08 web",
       "email me@example.test true",
       `telegram 42 [{"text":"📄 Full report","url":"${SAS}"}]`,
     ]);
@@ -97,7 +98,7 @@ describe("productionEffects.deliver", () => {
   it("only publishes when no channel is configured", async () => {
     const { effects, calls } = harness();
     await effects.deliver(SAMPLE, config({}));
-    expect(calls).toEqual(["publish 2026-10-08 true"]);
+    expect(calls).toEqual(["publish 2026-10-08 web"]);
   });
 
   it("still sends to Telegram when email fails, then fails the delivery", async () => {
@@ -114,7 +115,7 @@ describe("productionEffects.deliver", () => {
     await expect(
       effects.deliver(SAMPLE, config({ email_account: "gmail-main", telegram_chat_id: 42 })),
     ).rejects.toMatchObject({ code: "config" });
-    expect(calls).toEqual(["publish 2026-10-08 true", "email me@example.test true"]);
+    expect(calls).toEqual(["publish 2026-10-08 web", "email me@example.test true"]);
   });
 
   it("names every channel when all of them fail", async () => {
