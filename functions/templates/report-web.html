@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<!--
+  The job-scan daily report's browser copy, a Mustache template (#210). It
+  renders the same view() as the email (report.html) but is a plain web page:
+  flexbox and media queries, which mail clients can't be trusted with. Mustache
+  escapes every {{value}}, so text from the mail can't add markup; the template
+  never uses unescaped {{{triple}}} tags.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex">
+<title>Job Scan — {{day}}</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f2f4f7;
+    --card: #ffffff;
+    --ink: #101828;
+    --text: #344054;
+    --muted: #667085;
+    --quote: #475467;
+    --rule: #e4e7ec;
+    --rule-strong: #d0d5dd;
+    --link: #1d4ed8;
+    --button: #1d4ed8;
+    --button-hover: #1e40af;
+    --danger: #b42318;
+    --gap: 16px;
+    --pad: clamp(16px, 2vw, 24px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111111;
+      --card: #1f1f1f;
+      --ink: #f7f7f9;
+      --text: #d0d5dd;
+      --muted: #a3a8b1;
+      --quote: #c2c7cf;
+      --rule: #383838;
+      --rule-strong: #4a4a4a;
+      --link: #8ab4ff;
+      --button: #2563eb;
+      --button-hover: #3b82f6;
+      --danger: #ff8a80;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    max-width: 1480px;
+    margin: 0 auto;
+    padding: var(--gap) var(--gap) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+  }
+  h1, h2, h3 { color: var(--ink); margin: 0; }
+  h1 { font-size: clamp(22px, 2.4vw, 28px); line-height: 1.25; margin-bottom: 12px; }
+  h2 { font-size: 20px; line-height: 1.3; margin-bottom: 12px; }
+  h3 { font-size: 17px; line-height: 1.35; margin-bottom: 4px; }
+  p { margin: 0 0 8px; }
+  ul { margin: 8px 0 0; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  a { color: var(--link); }
+
+  .card {
+    background: var(--card);
+    border-radius: 8px;
+    padding: var(--pad);
+    min-width: 0;
+    /* A long unbroken string from the mail, a URL say, wraps rather than
+       widening the page. Not "anywhere": that shrinks a table cell's minimum
+       width too, splitting words where the table should scroll instead. */
+    overflow-wrap: break-word;
+  }
+  .muted { color: var(--muted); }
+  .alert { color: var(--danger); font-weight: bold; }
+  .noted { color: var(--danger); }
+  .quote {
+    padding-left: 10px;
+    border-left: 3px solid var(--rule-strong);
+    color: var(--quote);
+  }
+  .quote-danger { border-left-color: var(--danger); margin-bottom: 12px; }
+
+  /* Top picks: one column on a phone, two from a tablet, three on a desktop.
+     Fixed widths per breakpoint, so a short last row doesn't stretch. */
+  .picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap);
+  }
+  .pick {
+    flex: 1 1 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  @media (min-width: 720px) {
+    .pick { flex: 0 0 calc((100% - var(--gap)) / 2); }
+  }
+  @media (min-width: 1240px) {
+    .pick { flex: 0 0 calc((100% - 2 * var(--gap)) / 3); }
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: bold;
+  }
+  .pick .actions { margin-top: auto; padding-top: 12px; }
+  .button {
+    display: inline-block;
+    padding: 10px 16px;
+    border-radius: 4px;
+    background: var(--button);
+    color: #ffffff;
+    text-decoration: none;
+  }
+  .button:hover { background: var(--button-hover); }
+
+  /* Tables scroll inside their card on a narrow screen, rather than the page. */
+  .table-wrap { overflow-x: auto; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 20px; }
+  th, td { padding: 6px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--rule); }
+  th { border-bottom-width: 2px; white-space: nowrap; }
+  @media (max-width: 600px) {
+    th, td { padding: 5px 4px; font-size: 13px; }
+    td { min-width: 96px; }
+  }
+
+  /* Suspicious and Housekeeping, short lists, side by side when there's room. */
+  .pair { display: flex; flex-wrap: wrap; gap: var(--gap); }
+  .pair > .card { flex: 1 1 420px; }
+
+  footer {
+    padding: 20px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="card">
+    <h1>Job Scan — {{day}}</h1>
+    {{#alerts}}<p class="alert">⚠️ {{.}}</p>{{/alerts}}
+    <p>{{funnel}}</p>
+    {{#counts}}<p class="muted"><i>{{counts}}</i></p>{{/counts}}
+    {{#hasNotes}}<ul>{{#notes}}<li>{{.}}</li>{{/notes}}</ul>{{/hasNotes}}
+  </header>
+
+  <section aria-labelledby="top-picks">
+    <h2 id="top-picks">Top picks</h2>
+    {{#hasTop}}<div class="picks">
+      {{#top}}
+      <article class="card pick">
+        <p><span class="badge" style="background: {{badge}};">{{score}}/100</span> <span class="muted">confidence: {{confidence}}{{#capped}} · capped: {{capped}}{{/capped}}</span></p>
+        <h3>{{n}}. {{title}} — {{company}}</h3>
+        <p class="muted">{{facts}} · via {{account}}</p>
+        <p>Send <b>{{send}}</b></p>
+        {{#fit}}<p><b>Fit:</b> {{sentence}}</p><p class="quote">{{quote}}</p>{{/fit}}
+        {{#gap}}<p><b>Gap:</b> {{#requirement}}{{requirement}}. {{/requirement}}{{advice}}</p>{{/gap}}
+        {{#unknown}}<p><b>Unknown from the email:</b> {{unknown}}</p>{{/unknown}}
+        {{#noted}}<p class="noted">{{.}}</p>{{/noted}}
+        {{#url}}<div class="actions"><a class="button" href="{{url}}">Open the posting</a></div>{{/url}}
+      </article>
+      {{/top}}
+    </div>{{/hasTop}}
+    {{^top}}<div class="card"><p>Nothing cleared the floor today.{{#hasOthers}} The near misses are below.{{/hasOthers}}</p></div>{{/top}}
+  </section>
+
+  {{#hasOthers}}
+  <section class="card" aria-labelledby="others">
+    <h2 id="others">Also worth a look</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Role</th><th>Company</th><th>Location</th><th>Score</th><th>The one thing to check</th></tr></thead>
+        <tbody>
+          {{#others}}<tr><td>{{#url}}<a href="{{url}}">{{title}}</a>{{/url}}{{^url}}{{title}}{{/url}}</td><td>{{company}}</td><td>{{location}}</td><td>{{score}}</td><td>{{check}}</td></tr>{{/others}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {{/hasOthers}}
+
+  <section class="card" aria-labelledby="filtered">
+    <h2 id="filtered">Filtered out</h2>
+    {{#filtered}}<h3>{{gate}} ({{count}})</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Role</th><th>Company</th><th>Location</th><th>Reason</th></tr></thead>
+        <tbody>
+          {{#items}}<tr><td>{{title}}</td><td>{{company}}</td><td>{{location}}</td><td>{{reason}}</td></tr>{{/items}}
+        </tbody>
+      </table>
+    </div>{{/filtered}}
+    {{^filtered}}<p>Nothing.</p>{{/filtered}}
+  </section>
+
+  <div class="pair">
+    <section class="card" aria-labelledby="suspicious">
+      <h2 id="suspicious">Suspicious</h2>
+      {{#suspicious}}{{#lead}}<p>{{.}}</p>{{/lead}}
+      {{#items}}<p><b>{{kind}}</b>: {{from}} — “{{subject}}”</p><p>{{reason}}</p><p class="quote quote-danger">{{quote}}</p>{{/items}}
+      {{#unchecked}}<p class="muted">{{unchecked}}</p>{{/unchecked}}{{/suspicious}}
+    </section>
+
+    <section class="card" aria-labelledby="housekeeping">
+      <h2 id="housekeeping">Housekeeping</h2>
+      {{#hasHousekeeping}}<ul>{{#housekeeping}}<li>{{.}}</li>{{/housekeeping}}</ul>{{/hasHousekeeping}}
+      {{^hasHousekeeping}}<p>Nothing.</p>{{/hasHousekeeping}}
+    </section>
+  </div>
+</main>
+<footer>job-scan · {{day}}</footer>
+</body>
+</html>

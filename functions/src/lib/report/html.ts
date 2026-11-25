@@ -1,14 +1,19 @@
-// The report as HTML: templates/report.html, a Mustache template built on
-// Cerberus Responsive, which renders in browsers, Gmail and Outlook alike.
-// Mustache escapes every {{value}}, so text from the mail can't add markup;
-// the template never uses unescaped {{{triple}}} tags.
+// The report as HTML, from two Mustache templates over one view: the email's,
+// templates/report.html, built on Cerberus Responsive, which renders in Gmail
+// and Outlook alike; and the browser copy's, templates/report-web.html, a plain
+// web page laid out with flexbox, which mail clients can't be trusted with
+// (#210). Mustache escapes every {{value}}, so text from the mail can't add
+// markup; neither template uses unescaped {{{triple}}} tags.
 
 import { readFileSync } from "node:fs";
 import Mustache from "mustache";
 import type { Report } from "./types.js";
 
 /** Three levels up from both src/lib/report and dist/lib/report. */
-const TEMPLATE = readFileSync(new URL("../../../templates/report.html", import.meta.url), "utf8");
+const template = (name: string) =>
+  readFileSync(new URL(`../../../templates/${name}`, import.meta.url), "utf8");
+const TEMPLATE = template("report.html");
+const WEB_TEMPLATE = template("report-web.html");
 
 const BADGE = { high: "#067647", medium: "#b54708", low: "#667085" } as const;
 
@@ -37,6 +42,7 @@ export function view(r: Report, webUrl?: string) {
     counts: r.counts,
     notes: r.notes,
     hasNotes: r.notes.length > 0,
+    hasTop: r.top.length > 0,
     top: r.top.map((p, i) => ({
       ...p,
       n: i + 1,
@@ -57,7 +63,12 @@ export function view(r: Report, webUrl?: string) {
   };
 }
 
-/** `webUrl`, the report's SAS link, adds "View in a browser" for the email. */
+/** The email's HTML. `webUrl`, the browser copy's SAS link, adds "View in a browser". */
 export function renderHtml(r: Report, webUrl?: string): string {
   return Mustache.render(TEMPLATE, view(r, webUrl));
+}
+
+/** The browser copy, the page published to the reports container. */
+export function renderWebHtml(r: Report): string {
+  return Mustache.render(WEB_TEMPLATE, view(r));
 }

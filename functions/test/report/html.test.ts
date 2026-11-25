@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderHtml, view } from "../../src/lib/report/html.js";
+import { renderHtml, renderWebHtml, view } from "../../src/lib/report/html.js";
 import type { OtherPick, Report, TopPick } from "../../src/lib/report/types.js";
 import { SAMPLE } from "./sample.js";
 
@@ -7,9 +7,14 @@ const top = SAMPLE.top[0] as TopPick;
 const other = SAMPLE.others[0] as OtherPick;
 const report = (over: Partial<Report> = {}): Report => ({ ...SAMPLE, ...over });
 
-describe("renderHtml", () => {
+// The email and the browser copy render one view through two templates (#210),
+// so both must say the same things the same safe way.
+describe.each([
+  ["the email", renderHtml],
+  ["the browser copy", renderWebHtml],
+] as const)("%s", (_, render) => {
   it("fills every section of the template", () => {
-    const html = renderHtml(SAMPLE);
+    const html = render(SAMPLE);
     for (const text of [
       "<title>Job Scan — 2026-10-08</title>",
       "⚠️ school mailbox failed to sync",
@@ -38,14 +43,6 @@ describe("renderHtml", () => {
     }
   });
 
-  it("keeps Cerberus's mail-client fixes and its license notice", () => {
-    const html = renderHtml(SAMPLE);
-    expect(html).toContain("<!--[if mso]>");
-    expect(html).toContain("@media (prefers-color-scheme: dark)");
-    expect(html).toContain("Copyright (c) 2017 Ted Goas");
-    expect(html).not.toMatch(/\{\{|\}\}/);
-  });
-
   it("escapes every string from the mail, in text and in links", () => {
     const hostile = report({
       top: [
@@ -65,7 +62,7 @@ describe("renderHtml", () => {
         },
       ],
     });
-    const html = renderHtml(hostile);
+    const html = render(hostile);
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("<img src=x");
     expect(html).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;&#x2F;script&gt;");
@@ -74,7 +71,7 @@ describe("renderHtml", () => {
   });
 
   it("states an empty day honestly, and leaves out empty tables", () => {
-    const html = renderHtml(report({ top: [], others: [], filtered: [], housekeeping: [] }));
+    const html = render(report({ top: [], others: [], filtered: [], housekeeping: [] }));
     expect(html).toContain("Nothing cleared the floor today.");
     expect(html).not.toContain("Also worth a look");
     expect(html).toContain("<h2");
@@ -82,11 +79,27 @@ describe("renderHtml", () => {
   });
 
   it("points to the near misses only when there are some", () => {
-    const withOthers = renderHtml(report({ top: [] }));
+    const withOthers = render(report({ top: [] }));
     expect(withOthers).toContain("Nothing cleared the floor today. The near misses are below.");
-    const bare = renderHtml(report({ top: [], others: [] }));
+    const bare = render(report({ top: [], others: [] }));
     expect(bare).toContain("Nothing cleared the floor today.</p>");
     expect(bare).not.toContain("near misses");
+  });
+
+  it("drops the button and the link when a posting has no URL", () => {
+    const html = render(report({ top: [{ ...top, url: "" }], others: [{ ...other, url: "" }] }));
+    expect(html).not.toContain("Open the posting");
+    expect(html).not.toContain('href=""');
+  });
+});
+
+describe("renderHtml, the email", () => {
+  it("keeps Cerberus's mail-client fixes and its license notice", () => {
+    const html = renderHtml(SAMPLE);
+    expect(html).toContain("<!--[if mso]>");
+    expect(html).toContain("@media (prefers-color-scheme: dark)");
+    expect(html).toContain("Copyright (c) 2017 Ted Goas");
+    expect(html).not.toMatch(/\{\{|\}\}/);
   });
 
   it("links to the browser copy only when given one", () => {
@@ -95,13 +108,25 @@ describe("renderHtml", () => {
     );
     expect(renderHtml(SAMPLE)).not.toContain("View in a browser");
   });
+});
 
-  it("drops the button and the link when a posting has no URL", () => {
-    const html = renderHtml(
-      report({ top: [{ ...top, url: "" }], others: [{ ...other, url: "" }] }),
-    );
-    expect(html).not.toContain("Open the posting");
-    expect(html).not.toContain('href=""');
+describe("renderWebHtml, the browser copy", () => {
+  it("is a responsive web page, without the email's mail-client workarounds", () => {
+    const html = renderWebHtml(SAMPLE);
+    expect(html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1">');
+    expect(html).toContain('<div class="picks">');
+    expect(html).toContain("flex-wrap: wrap");
+    expect(html).toContain("overflow-wrap: break-word");
+    expect(html).toContain("@media (prefers-color-scheme: dark)");
+    expect(html).not.toContain("<!--[if mso");
+    expect(html).not.toContain("View in a browser");
+    expect(html).not.toMatch(/\{\{|\}\}/);
+  });
+
+  it("gives each top pick its own card", () => {
+    const html = renderWebHtml(SAMPLE);
+    expect(html.match(/<article class="card pick">/g)).toHaveLength(SAMPLE.top.length);
+    expect(renderWebHtml(report({ top: [] }))).not.toContain('class="picks"');
   });
 });
 

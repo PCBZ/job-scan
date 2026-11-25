@@ -10,7 +10,7 @@ import { telegramReport, telegramSettings } from "../delivery/telegram.js";
 import type { JudgementCache } from "../judge/cache.js";
 import { isPruneDay, SEEN_MESSAGE_DAYS, type SeenStore } from "../mail/seen-store.js";
 import type { TableSeenJobsStore } from "../postings/seen-jobs.js";
-import { renderHtml } from "../report/html.js";
+import { renderWebHtml } from "../report/html.js";
 import type { ReportPublisher } from "../report/publish.js";
 import type { Effects } from "../workflow/types.js";
 
@@ -36,7 +36,7 @@ export function productionEffects(d: EffectsServices): Effects {
   return {
     async deliver(report, config: AppConfig, signal) {
       // The browser copy first: both channels link to it.
-      const url = await d.publisher.publish(renderHtml(report), report.day);
+      const url = await d.publisher.publish(renderWebHtml(report), report.day);
       // Try every channel, its settings included; a failure in one doesn't keep
       // the other from sending. Any failure fails the delivery, so mark_seen
       // won't run and tomorrow's run reports the same mail again.
