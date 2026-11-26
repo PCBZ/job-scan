@@ -3,6 +3,7 @@
 // whole-run budget keeps the newest messages.
 
 import { addDays, runDay } from "../day.js";
+import { tradingGap } from "../market-days.js";
 import { codePointLength } from "../unicode.js";
 import { fetchAccount } from "./fetch.js";
 import type { ConnectMailbox } from "./mailbox.js";
@@ -49,7 +50,11 @@ export async function runFetch(
   const perAccount: AccountStats[] = [];
   const failures: AccountFailure[] = [];
 
-  const since = addDays(runDay(deps.now), -SEEN_MESSAGE_DAYS);
+  const day = runDay(deps.now);
+  const since = addDays(day, -SEEN_MESSAGE_DAYS);
+  // The run skips days the market is closed (#212), so the one after reads
+  // back over them too: [mail] days on most days, two more on a Monday.
+  const days = config.days + tradingGap(day) - 1;
   for (const account of config.accounts) {
     const user = deps.env[account.userEnv];
     const password = deps.env[account.passwordEnv];
@@ -61,7 +66,7 @@ export async function runFetch(
       const mailbox = await deps.connect(account, user as string, password as string);
       try {
         const seenIds = await deps.seen.seenIds(account.name, since);
-        const got = await fetchAccount(mailbox, account, config.days, seenIds, deps.now);
+        const got = await fetchAccount(mailbox, account, days, seenIds, deps.now);
         messages.push(...got.messages);
         perAccount.push(got.stats);
       } finally {
@@ -96,7 +101,7 @@ export async function runFetch(
   const sum = (pick: (s: AccountStats) => number) => perAccount.reduce((n, s) => n + pick(s), 0);
   return {
     fetched_at: deps.now.toISOString(),
-    window_days: config.days,
+    window_days: days,
     stats: {
       accounts_scanned: perAccount.length,
       accounts_failed: failures.length,

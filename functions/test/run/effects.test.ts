@@ -184,9 +184,9 @@ describe("productionEffects.markSeen", () => {
     expect(calls).toEqual(["seen 0 2026-10-09", "jobs 1 2026-10-09"]);
   });
 
-  it("on Sundays, prunes last, 90 days back", async () => {
-    const { effects, calls } = harness({ now: new Date("2026-10-11T15:00:00Z") });
+  it("on the week's first trading day, prunes last, 90 days back", async () => {
+    const { effects, calls } = harness({ now: new Date("2026-10-12T15:00:00Z") });
     await effects.markSeen({ mail, top: [rankedOf(judgement())] });
-    expect(calls).toEqual(["seen 2 2026-10-11", "jobs 1 2026-10-11", "prune before 2026-07-13"]);
+    expect(calls).toEqual(["seen 2 2026-10-12", "jobs 1 2026-10-12", "prune before 2026-07-14"]);
   });
 });

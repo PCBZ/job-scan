@@ -10,8 +10,9 @@ the gap to address for each pick.
 It runs two ways:
 - **Locally**, as a [Claude Code](https://claude.com/claude-code) skill:
   `/job-scan` writes `reports/<date>.md`.
-- **In the cloud**, as an Azure Functions app (`functions/`) that runs every day
-  at 15:00 UTC and sends you the report by email, with a Telegram summary.
+- **In the cloud**, as an Azure Functions app (`functions/`) that runs at
+  15:00 UTC on each US stock market trading day (weekends and NYSE holidays are
+  skipped) and sends you the report by email, with a Telegram summary.
 
 ## How it works
 

@@ -44,6 +44,21 @@ describe("runFetch", () => {
     expect(asked).toEqual([["a", "2026-07-05"]]);
   });
 
+  it("reads back over the days the run skipped, as the market was closed (#212)", async () => {
+    const windowOn = async (at: string) => {
+      const box = inbox([], "a");
+      const out = (await runFetch(
+        { accounts: [A], maxTotalMessages: 150, days: 2 },
+        { connect: async () => box, seen: noneSeen, env: ENV, now: new Date(at) },
+      )) as FetchPayload;
+      return [out.window_days, box.searches[0]?.since.toISOString()];
+    };
+    // A Wednesday; a Monday; the Friday after Thanksgiving.
+    expect(await windowOn("2026-11-25T15:00:00Z")).toEqual([2, "2026-11-23T15:00:00.000Z"]);
+    expect(await windowOn("2026-11-30T15:00:00Z")).toEqual([4, "2026-11-26T15:00:00.000Z"]);
+    expect(await windowOn("2026-11-27T15:00:00Z")).toEqual([3, "2026-11-24T15:00:00.000Z"]);
+  });
+
   it("records a failing account and keeps going", async () => {
     const boxB = inbox(["Sat, 03 Oct 2026 08:00:00 -0700"], "b");
     const connect: ConnectMailbox = async (acct) => {

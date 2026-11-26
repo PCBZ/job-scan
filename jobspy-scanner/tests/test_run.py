@@ -59,6 +59,28 @@ def test_a_scan_writes_the_file_then_queues_a_message_naming_it():
     }
 
 
+def test_the_scan_after_a_closed_market_searches_back_over_the_days_skipped():
+    # The market closes on weekends and holidays, and so does the scan (#212).
+    def hours_old_on(day: int) -> set[int]:
+        asked = set()
+
+        def scraper(**kwargs):
+            asked.add(kwargs["hours_old"])
+            return frame(*ROWS)
+
+        run_scan(
+            config_text=lambda: CONFIG,
+            scrape=scraper,
+            container=FakeContainer(),
+            queue=FakeQueue(),
+            now=lambda: STARTED_AT.replace(day=day),
+        )
+        return asked
+
+    # CONFIG has the default 48: a Tuesday, a Monday, the Friday after Thanksgiving.
+    assert [hours_old_on(d) for d in (10, 16, 27)] == [{48}, {96}, {72}]
+
+
 def test_a_day_that_finds_nothing_still_hands_over_an_empty_file():
     run, container, queue = go(scraper=lambda **_: frame())
     run()

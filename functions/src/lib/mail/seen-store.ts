@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { odata, TableClient, type TableTransaction } from "@azure/data-tables";
 import type { TokenCredential } from "@azure/identity";
+import { isFirstTradingDayOfWeek } from "../market-days.js";
 
 /**
  * How long a Message-ID stays seen, as in the local skill
@@ -14,15 +15,13 @@ import type { TokenCredential } from "@azure/identity";
 export const SEEN_MESSAGE_DAYS = 90;
 
 /**
- * Pruning runs on Sundays only: a day's worth of rows is too few to be worth a
- * daily table scan. A missed Sunday leaves rows a week longer, which seenIds'
- * cutoff never reads.
+ * Whether `day` (YYYY-MM-DD) is the prune day: once a week, on its first
+ * trading day, since the run skips the days the market is closed (#212). A
+ * day's worth of rows is too few to be worth a daily table scan, and a missed
+ * prune leaves rows a week longer, which seenIds' cutoff never reads.
  */
-export const PRUNE_WEEKDAY = 0;
-
-/** Whether `day` (YYYY-MM-DD) is the prune day. */
 export function isPruneDay(day: string): boolean {
-  return new Date(`${day}T00:00:00Z`).getUTCDay() === PRUNE_WEEKDAY;
+  return isFirstTradingDayOfWeek(day);
 }
 
 export interface SeenStore {

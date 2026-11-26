@@ -103,7 +103,8 @@ subject_keywords = [
 exclude_senders = ["noreply@github.com", "notifications@slack.com"]
 
 # How far back each run looks. Overlap is harmless — Message-ID dedupe drops
-# anything already seen.
+# anything already seen. The deployed run, which skips weekends and US market
+# holidays, adds the days it skipped.
 days = 7
 
 max_messages = 60           # PER ACCOUNT, newest first
