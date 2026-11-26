@@ -9,10 +9,11 @@ from scanner.market_days import (
     previous_trading_day,
     trading_gap,
 )
+from scripts.export_closures import LAST_YEAR, NODE_MODULE, render
 
-# NYSE's published closures; the Node app's tests read the same file.
+# NYSE's published closures, read off its site; the Node app's tests read the same file.
 NYSE = json.loads((Path(__file__).parent / "fixtures" / "nyse-closures.json").read_text())
-CLOSURES = {date.fromisoformat(d): name for d, name in NYSE["closures"].items()}
+CLOSURES = {date.fromisoformat(d) for d in NYSE["closures"]}
 
 
 def days(start: date, end: date):
@@ -22,33 +23,32 @@ def days(start: date, end: date):
         d += timedelta(days=1)
 
 
-def test_the_holidays_match_nyses_published_closures_name_for_name():
+def test_the_holidays_are_nyses_published_closures():
     for year in NYSE["years"]:
-        assert market_holidays(year) == {d: n for d, n in CLOSURES.items() if d.year == year}
+        assert set(market_holidays(year)) == {d for d in CLOSURES if d.year == year}
 
 
-def test_good_friday_comes_from_easter():
-    # Easter fell on 2019-04-21, 2024-03-31, 2025-04-20 and 2038-04-25.
-    good_friday = lambda y: next(d for d, n in market_holidays(y).items() if n == "Good Friday")  # noqa: E731
-    assert [good_friday(y) for y in (2019, 2024, 2025, 2038)] == [
-        date(2019, 4, 19),
-        date(2024, 3, 29),
-        date(2025, 4, 18),
-        date(2038, 4, 23),
-    ]
+def test_the_node_apps_copy_is_what_the_pinned_library_gives():
+    # If this fails after bumping holidays: python -m scripts.export_closures
+    assert NODE_MODULE.read_text() == render()
+
+
+def test_the_special_closures_nyse_announced_are_closed():
+    assert market_closed(date(2025, 1, 9)) == "National Day of Mourning for former President Jimmy Carter"
 
 
 def test_a_saturday_new_years_day_is_not_observed_unlike_the_other_holidays():
     # 2022-01-01 was a Saturday: NYSE opened on 2021-12-31.
     assert market_closed(date(2021, 12, 31)) is None
     # A Sunday one moves to Monday: 2023-01-02.
-    assert market_closed(date(2023, 1, 2)) == "New Year's Day"
+    assert market_closed(date(2023, 1, 2)) == "New Year's Day (observed)"
 
 
 def test_every_other_weekday_of_the_published_years_is_open():
     for d in days(date(2026, 1, 1), date(2028, 12, 31)):
-        want = "weekend" if d.weekday() >= 5 else CLOSURES.get(d)
-        assert market_closed(d) == want, d
+        want = "weekend" if d.weekday() >= 5 else "holiday" if d in CLOSURES else None
+        got = market_closed(d)
+        assert (got if got in (None, "weekend") else "holiday") == want, d
 
 
 def test_federal_holidays_nyse_trades_through_and_its_early_closes_are_open():
@@ -73,5 +73,5 @@ def test_previous_trading_day_steps_back_over_weekends_and_holidays():
 
 
 def test_the_gap_between_trading_days_never_exceeds_the_maximum():
-    gaps = [trading_gap(d) for d in days(date(2026, 1, 1), date(2060, 12, 31)) if not market_closed(d)]
+    gaps = [trading_gap(d) for d in days(date(2026, 1, 1), date(LAST_YEAR, 12, 31)) if not market_closed(d)]
     assert max(gaps) == MAX_TRADING_GAP

@@ -9,8 +9,9 @@ import {
   previousTradingDay,
   tradingGap,
 } from "../src/lib/market-days.js";
+import { FIRST_YEAR, LAST_YEAR } from "../src/lib/nyse-closures.js";
 
-// NYSE's published closures; the scanner's tests read the same file.
+// NYSE's published closures, read off its site; the scanner's tests read the same file.
 const NYSE: { years: number[]; closures: Record<string, string> } = JSON.parse(
   readFileSync(
     new URL("../../jobspy-scanner/tests/fixtures/nyse-closures.json", import.meta.url),
@@ -23,31 +24,29 @@ function* days(from: string, to: string) {
 }
 
 describe("marketHolidays", () => {
-  it("matches NYSE's published closures, name for name", () => {
+  it("has NYSE's published closures", () => {
     for (const year of NYSE.years) {
-      const published = Object.entries(NYSE.closures).filter(([d]) => d.startsWith(`${year}-`));
-      expect([...marketHolidays(year)].sort(), String(year)).toEqual(published.sort());
+      const published = Object.keys(NYSE.closures).filter((d) => d.startsWith(`${year}-`));
+      expect([...marketHolidays(year).keys()].sort(), String(year)).toEqual(published.sort());
     }
   });
 
-  it("finds Good Friday from Easter", () => {
-    // Easter fell on 2019-04-21, 2024-03-31, 2025-04-20 and 2038-04-25.
-    const goodFriday = (y: number) =>
-      [...marketHolidays(y)].find(([, name]) => name === "Good Friday")?.[0];
-    expect([2019, 2024, 2025, 2038].map(goodFriday)).toEqual([
-      "2019-04-19",
-      "2024-03-29",
-      "2025-04-18",
-      "2038-04-23",
-    ]);
+  it("has the special closures NYSE announced", () => {
+    expect(marketClosed("2025-01-09")).toBe(
+      "National Day of Mourning for former President Jimmy Carter",
+    );
   });
 
   it("observes a Saturday New Year's Day not at all, unlike the other holidays", () => {
     // 2022-01-01 was a Saturday: NYSE opened on 2021-12-31.
     expect(marketClosed("2021-12-31")).toBeNull();
-    expect([...marketHolidays(2022).keys()]).not.toContain("2021-12-31");
     // A Sunday one moves to Monday: 2023-01-02.
-    expect(marketClosed("2023-01-02")).toBe("New Year's Day");
+    expect(marketClosed("2023-01-02")).toBe("New Year's Day (observed)");
+  });
+
+  it("refuses a year the exported closures don't cover", () => {
+    expect(() => marketClosed(`${FIRST_YEAR - 1}-12-31`)).toThrow(/export_closures/);
+    expect(() => marketHolidays(LAST_YEAR + 1)).toThrow(/export_closures/);
   });
 });
 
@@ -55,8 +54,9 @@ describe("marketClosed", () => {
   it("is open on every other weekday of the published years", () => {
     for (const d of days("2026-01-01", "2028-12-31")) {
       const dow = new Date(`${d}T00:00:00Z`).getUTCDay();
-      const want = dow === 0 || dow === 6 ? "weekend" : (NYSE.closures[d] ?? null);
-      expect(marketClosed(d), d).toBe(want);
+      const want = dow === 0 || dow === 6 ? "weekend" : d in NYSE.closures ? "holiday" : null;
+      const got = marketClosed(d);
+      expect(got === null || got === "weekend" ? got : "holiday", d).toBe(want);
     }
   });
 
@@ -86,7 +86,7 @@ describe("previousTradingDay and tradingGap", () => {
 
   it("never exceeds MAX_TRADING_GAP from one trading day to the next", () => {
     let most = 0;
-    for (const d of days("2026-01-01", "2060-12-31")) {
+    for (const d of days("2026-01-01", `${LAST_YEAR}-12-31`)) {
       if (!marketClosed(d)) most = Math.max(most, tradingGap(d));
     }
     expect(most).toBe(MAX_TRADING_GAP);

@@ -4,3 +4,4 @@ __pycache__/
 tests/
 requirements-dev.txt
 .python_packages/
+scripts/

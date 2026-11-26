@@ -32,7 +32,7 @@ def no_clients(monkeypatch):
 @pytest.mark.parametrize(
     ("moment", "why"),
     [
-        (datetime(2026, 11, 26, 15, tzinfo=timezone.utc), "Thanksgiving"),
+        (datetime(2026, 11, 26, 15, tzinfo=timezone.utc), "Thanksgiving Day"),
         (datetime(2026, 11, 28, 15, tzinfo=timezone.utc), "weekend"),
     ],
 )

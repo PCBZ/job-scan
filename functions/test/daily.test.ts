@@ -20,7 +20,7 @@ describe("daily", () => {
   it("stops before reading anything on a day the market is closed (#212)", async () => {
     // The same unconfigured app: reading any setting would throw, as above.
     for (const [at, why] of [
-      ["2026-11-26T15:00:00Z", "Thanksgiving"],
+      ["2026-11-26T15:00:00Z", "Thanksgiving Day"],
       ["2026-11-28T15:00:00Z", "weekend"],
     ] as const) {
       const logged: unknown[] = [];
