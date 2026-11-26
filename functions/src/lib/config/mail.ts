@@ -6,6 +6,7 @@
 import { appError } from "../errors.js";
 import { SEEN_MESSAGE_DAYS } from "../mail/seen-store.js";
 import type { MailAccount, MailRunConfig } from "../mail/types.js";
+import { MAX_TRADING_GAP } from "../market-days.js";
 import type { RawConfig } from "./schema.js";
 
 /** Saves repeating host strings. */
@@ -28,8 +29,9 @@ const SHARED_DEFAULTS = {
 
 /**
  * [mail] days when unset, as in the local skill (workspace.mail_config). The
- * run is daily, so two days overlap by one: a late or failed run misses
- * nothing, and Message-ID dedupe drops the repeats.
+ * run is on each trading day, so two days overlap by one: a late or failed run
+ * misses nothing, and Message-ID dedupe drops the repeats. After a weekend or a
+ * market holiday, runFetch adds the days skipped (#212).
  */
 export const DEFAULT_LOOKBACK_DAYS = 2;
 
@@ -128,13 +130,15 @@ export function mailConfig(raw: RawConfig, origin: string): MailRunConfig {
   });
 
   // Seen Message-IDs are kept SEEN_MESSAGE_DAYS; a window reaching past that
-  // would bring forgotten mail back as new.
+  // would bring forgotten mail back as new. The run after a market holiday
+  // reads up to MAX_TRADING_GAP - 1 days more (#212), so that counts too.
   const days = mail.days ?? DEFAULT_LOOKBACK_DAYS;
-  if (days >= SEEN_MESSAGE_DAYS) {
+  const most = SEEN_MESSAGE_DAYS - MAX_TRADING_GAP + 1;
+  if (days >= most) {
     throw appError(
       "config",
-      `[mail] days = ${days} in ${origin} reaches past the ${SEEN_MESSAGE_DAYS}-day seen-message retention. ` +
-        `Use fewer than ${SEEN_MESSAGE_DAYS}.`,
+      `[mail] days = ${days} in ${origin} reaches past the ${SEEN_MESSAGE_DAYS}-day seen-message retention ` +
+        `after a long weekend, which adds ${MAX_TRADING_GAP - 1} days. Use fewer than ${most}.`,
     );
   }
 

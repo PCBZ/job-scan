@@ -9,14 +9,15 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from azure.storage.blob import ContainerClient
 from azure.storage.queue import QueueClient
 
 from .config import ScanConfig, parse_config
-from .handoff import build_handoff, message_for, send_message, write_handoff
+from .handoff import build_handoff, message_for, run_day, send_message, write_handoff
 from .mapping import SITES, fingerprint, posting_from, text, usable
+from .market_days import trading_gap
 from .scrape import Scrape, run_searches
 from .telemetry import AGENT_ATTRIBUTES, RUN_SPAN, node_span, span, trace_of
 
@@ -45,6 +46,12 @@ def distinct(rows: list[dict]) -> tuple[list[dict], dict[str, int]]:
         jobs.add(fingerprint(row))
         kept.append(row)
     return kept, dropped
+
+
+def widened(config: ScanConfig, day: date) -> ScanConfig:
+    """The scan skips days the market is closed (#212), so the one after searches
+    back over them too: `hours_old` on most days, two days more on a Monday."""
+    return config.model_copy(update={"hours_old": config.hours_old + 24 * (trading_gap(day) - 1)})
 
 
 def scan(
@@ -92,7 +99,8 @@ def run_scan(
     with span(RUN_SPAN, AGENT_ATTRIBUTES) as run:
         started_at = now()
         try:
-            handoff = scan(parse_config(config_text()), scrape, started_at)
+            config = widened(parse_config(config_text()), date.fromisoformat(run_day(started_at)))
+            handoff = scan(config, scrape, started_at)
             error = None
         except Exception as err:
             error = err

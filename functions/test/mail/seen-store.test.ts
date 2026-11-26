@@ -97,12 +97,13 @@ describe("TableSeenStore.pruneOlderThan", () => {
 });
 
 describe("isPruneDay", () => {
-  it("is Sunday only", () => {
-    // 2026-10-11 is a Sunday.
-    expect(["2026-10-10", "2026-10-11", "2026-10-12"].map(isPruneDay)).toEqual([
+  it("is the week's first trading day, as the run skips weekends and holidays (#212)", () => {
+    // 2026-10-12 is a Monday; 2026-09-07 is Labor Day, so that week's is Tuesday.
+    expect(["2026-10-11", "2026-10-12", "2026-10-13"].map(isPruneDay)).toEqual([
       false,
       true,
       false,
     ]);
+    expect(["2026-09-07", "2026-09-08"].map(isPruneDay)).toEqual([false, true]);
   });
 });
